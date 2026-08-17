@@ -5,3 +5,4 @@ vercel-blob
 playwright
 openpyxl
 pandas
+flask
