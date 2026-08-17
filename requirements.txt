@@ -3,3 +3,4 @@ requests
 google-genai
 vercel-blob
 playwright
+openpyxl
