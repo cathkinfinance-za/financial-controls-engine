@@ -1,8 +1,6 @@
 name: Sync WeconnectU Budget
 
 on:
-  schedule:
-    - cron: '0 6 * * *' # Runs everyday at 6:00 AM UTC
   workflow_dispatch: # Allows manual run from the GitHub Actions tab
 
 jobs:
