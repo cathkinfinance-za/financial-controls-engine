@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Details</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <div class="header-bar">
+        <h1>Purchase Order</h1>
+        <a href="#" class="back-btn">Back to Dashboard &gt;</a>
+    </div>
+
+    <form action="#" method="POST">
+        
+        <fieldset>
+            <legend>Purchase Order Details</legend>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>PO Number</label>
+                <input type="text" name="po_number" value="">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Description</label>
+                <textarea name="description"></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="po_date">
+                </div>
+                <div class="form-group">
+                    <label>Has this been budgeted for?</label>
+                    <select name="is_budgeted">
+                        <option value="" disabled selected>Select option</option>
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Select GL Code</label>
+                    <select name="gl_code">
+                        <option value="" disabled selected>Select GL Code</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Expense Type</label>
+                    <select name="expense_type">
+                        <option value="" disabled selected>Select expense type</option>
+                        <option value="Operational">Operational</option>
+                        <option value="Capital">Capital</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Emergency">Emergency</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>GL Description (from Select GL Code)</label>
+                <input type="text" value="" disabled>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Estimated Cost</label>
+                <input type="number" step="0.01" name="estimated_cost" value="">
+            </div>
+
+            <div class="form-group">
+                <label>Attach Quotes</label>
+                <div class="file-box">
+                    <input type="file" name="quotes" multiple>
+                </div>
+                <div class="file-preview"></div>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Vendor Selection & Rationale</legend>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Recommended Vendor</label>
+                <input type="text" name="recommended_vendor" value="">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Justification Notes</label>
+                <textarea name="justification_notes"></textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>Submission Status</label>
+                <select name="submission_status">
+                    <option value="" disabled selected>Select status</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Submit for Approval">Submit for Approval</option>
+                    <option value="Sent">Sent</option>
+                    <option value="Approved">Approved</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Latest AI Status</label>
+                <input type="text" value="" disabled>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Financial Summary</legend>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>YTD Actual (from Select GL Code)</label>
+                    <input type="text" value="" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Total Annual Budget (from Select GL Code)</label>
+                    <input type="text" value="" disabled>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Budget YTD (from Select GL Code)</label>
+                    <input type="text" value="" disabled>
+                </div>
+                <div class="form-group">
+                    <label>2M Buffer Pool</label>
+                    <input type="text" value="" disabled>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Variance (from Select GL Code)</label>
+                <input type="text" value="" disabled>
+            </div>
+        </fieldset>
+
+        <fieldset>
+            <legend>Approvals</legend>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Quotes Provided</label>
+                    <input type="text" value="" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Actioned Date</label>
+                    <input type="text" value="" disabled>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label>SYSTEM STATUS</label>
+                <input type="text" value="" disabled>
+            </div>
+            <div class="form-row" style="margin-bottom: 15px;">
+                <div class="form-group">
+                    <label>Actioned By</label>
+                    <input type="text" value="" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Approval Notes</label>
+                    <input type="text" value="" disabled>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>AI Recommendation Summary</label>
+                <textarea disabled></textarea>
+            </div>
+        </fieldset>
+
+        <button type="submit" class="submit-btn">Save</button>
+    </form>
+</div>
+
+</body>
+</html>
