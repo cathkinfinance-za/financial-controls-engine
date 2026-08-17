@@ -48,6 +48,9 @@
                     <label>Select GL Code</label>
                     <select name="gl_code">
                         <option value="" disabled selected>Select GL Code</option>
+                        {% for gl in gl_records %}
+                            <option value="{{ gl.gl_code }}">{{ gl.gl_code }} - {{ gl.description }}</option>
+                        {% endfor %}
                     </select>
                 </div>
                 <div class="form-group">
