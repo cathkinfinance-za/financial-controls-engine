@@ -1,35 +1,30 @@
-name: Sync WeconnectU Budget
+name: Sync WeconnectU Budget[cite: 11]
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Runs everyday at 6:00 AM UTC
-  workflow_dispatch: # Allows manual run from the GitHub Actions tab
+    - cron: '0 6 * * *' # Runs everyday at 6:00 AM UTC[cite: 11]
+  workflow_dispatch: # Allows manual run from the GitHub Actions tab[cite: 11]
 
 jobs:
   run-sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4[cite: 11]
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.10'[cite: 11]
 
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
           pip install pandas beautifulsoup4 playwright psycopg2-binary
-          playwright install chromium
-
-      - name: Create email_config.json from Secrets
-        env:
-          WECONNECTU_URL: ${{ secrets.WECONNECTU_URL }}
-        run: |
-          echo "{\"weconnectu_url\": \"$WECONNECTU_URL\"}" > email_config.json
+          playwright install chromium[cite: 11]
 
       - name: Run Budget Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          WECONNECTU_URL: ${{ secrets.WECONNECTU_URL }}
         run: python refresh_budget_db.py
