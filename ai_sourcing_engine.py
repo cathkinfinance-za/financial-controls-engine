@@ -29,7 +29,7 @@ def get_project_evaluation_data(project_ref: str) -> dict:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             # Fetch project master metadata
             cur.execute(
-                "SELECT project_reference, project_name, price_weighting, lowest_project_bid_floor "
+                "SELECT project_reference, name AS project_name, price_weighting, lowest_project_bid_floor "
                 "FROM projects WHERE project_reference = %s;", 
                 (project_ref,)
             )
