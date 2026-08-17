@@ -1,27 +1,27 @@
-name: Sync WeconnectU Budget[cite: 11]
+name: Sync WeconnectU Budget
 
 on:
   schedule:
-    - cron: '0 6 * * *' # Runs everyday at 6:00 AM UTC[cite: 11]
-  workflow_dispatch: # Allows manual run from the GitHub Actions tab[cite: 11]
+    - cron: '0 6 * * *' # Runs everyday at 6:00 AM UTC
+  workflow_dispatch: # Allows manual run from the GitHub Actions tab
 
 jobs:
   run-sync:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4[cite: 11]
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'[cite: 11]
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
           pip install --upgrade pip
           pip install pandas beautifulsoup4 playwright psycopg2-binary
-          playwright install chromium[cite: 11]
+          playwright install chromium
 
       - name: Run Budget Script
         env:
