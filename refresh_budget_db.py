@@ -66,8 +66,9 @@ def fetch_and_sync_weconnectu_budget():
             if not description:
                 description = "Operational Portfolio Allocation"
 
-            # Expecting: Mar, Apr, May, Jun, Jul, YTD, Budget YTD, Variance, Total Budget (at least 8-9 metrics)
+            # Safely parse metrics based on available length
             if len(clean_metrics) >= 8:
+                # If July is present (e.g. Mar, Apr, May, Jun, Jul + YTD, Budget YTD, Variance, Total Budget)
                 financial_data.append({
                     "gl_code": gl_code,
                     "description": description,
@@ -79,31 +80,29 @@ def fetch_and_sync_weconnectu_budget():
                     "ytd": clean_and_convert_number(clean_metrics[5]),
                     "budget_ytd": clean_and_convert_number(clean_metrics[6]),
                     "variance": clean_and_convert_number(clean_metrics[7]),
-                    "total_budget": clean_and_convert_number(clean_metrics[8])
+                    "total_budget": clean_and_convert_number(clean_metrics[8]) if len(clean_metrics) > 8 else 0.0
+                })
+            elif len(clean_metrics) == 7:
+                # Fallback if July isn't in the grid yet
+                financial_data.append({
+                    "gl_code": gl_code,
+                    "description": description,
+                    "mar_2026": clean_and_convert_number(clean_metrics[0]),
+                    "apr_2026": clean_and_convert_number(clean_metrics[1]),
+                    "may_2026": clean_and_convert_number(clean_metrics[2]),
+                    "jun_2026": clean_and_convert_number(clean_metrics[3]),
+                    "jul_2026": 0.0,
+                    "ytd": clean_and_convert_number(clean_metrics[4]),
+                    "budget_ytd": clean_and_convert_number(clean_metrics[5]),
+                    "variance": clean_and_convert_number(clean_metrics[6]),
+                    "total_budget": clean_and_convert_number(clean_metrics[7])
                 })
 
     df = pd.DataFrame(financial_data)
     if not df.empty:
         df = df.drop_duplicates(subset=["gl_code"], keep="first")
     else:
-        print("⚠️ Warning: Standard parsing found 0 rows. Running deep lookahead fallback...")
-        all_cells = [el.text.strip() for el in soup.find_all(text=True) if el.text.strip()]
-        for i, token in enumerate(all_cells):
-            if re.match(r'^\d{3,4}/\d{3}$', token) and i + 9 < len(all_cells):
-                financial_data.append({
-                    "gl_code": token,
-                    "description": all_cells[i+1],
-                    "mar_2026": clean_and_convert_number(all_cells[i+2]),
-                    "apr_2026": clean_and_convert_number(all_cells[i+3]),
-                    "may_2026": clean_and_convert_number(all_cells[i+4]),
-                    "jun_2026": clean_and_convert_number(all_cells[i+5]),
-                    "jul_2026": clean_and_convert_number(all_cells[i+6]),
-                    "ytd": clean_and_convert_number(all_cells[i+7]),
-                    "budget_ytd": clean_and_convert_number(all_cells[i+8]),
-                    "variance": clean_and_convert_number(all_cells[i+9]),
-                    "total_budget": clean_and_convert_number(all_cells[i+10])
-                })
-        df = pd.DataFrame(financial_data).drop_duplicates(subset=["gl_code"], keep="first")
+        print("⚠️ Warning: Standard parsing found 0 rows.")
 
     print("Connecting to Neon PostgreSQL for Budget Synchronization...")
     upsert_query = """
@@ -136,7 +135,7 @@ def fetch_and_sync_weconnectu_budget():
                 cur.execute(upsert_query, row.to_dict())
             conn.commit()
         conn.close()
-        print("🟢 Success! July included, all columns parsed, and pushed to Neon PostgreSQL master_budget.")
+        print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget.")
         
     except Exception as e:
         print(f"🔴 Database sync failed. Technical Error: {e}")
