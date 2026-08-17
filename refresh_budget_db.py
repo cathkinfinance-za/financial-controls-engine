@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import pandas as pd
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
@@ -19,25 +18,13 @@ def clean_and_convert_number(text_value):
         return 0.0
 
 def fetch_and_sync_weconnectu_budget():
-    # === 1. LOAD CONFIGURATION ===
-    try:
-        with open("email_config.json", "r") as config_file:
-            email_config = json.load(config_file)
-        URL = email_config.get("weconnectu_url", "")
-    except Exception as e:
-        print(f"❌ Configuration File Error: {e}")
-        return
-
-    if not URL or URL == "YOUR_WECONNECTU_URL_HERE":
-        print("❌ ERROR: URL missing from email_config.json. Please add your 'weconnectu_url' key.")
-        return
-
+    URL = os.getenv("WECONNECTU_URL")
     DATABASE_URL = os.getenv("DATABASE_URL")
-    if not DATABASE_URL:
-        print("❌ ERROR: DATABASE_URL environment variable is missing.")
+
+    if not URL or not DATABASE_URL:
+        print("❌ ERROR: WECONNECTU_URL or DATABASE_URL environment variable is missing.")
         return
 
-    # === 2. START BROWSER AUTOMATION (Scraping WeconnectU) ===
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
@@ -79,7 +66,8 @@ def fetch_and_sync_weconnectu_budget():
             if not description:
                 description = "Operational Portfolio Allocation"
 
-            if len(clean_metrics) >= 7:
+            # Expecting: Mar, Apr, May, Jun, Jul, YTD, Budget YTD, Variance, Total Budget (at least 8-9 metrics)
+            if len(clean_metrics) >= 8:
                 financial_data.append({
                     "gl_code": gl_code,
                     "description": description,
@@ -87,10 +75,11 @@ def fetch_and_sync_weconnectu_budget():
                     "apr_2026": clean_and_convert_number(clean_metrics[1]),
                     "may_2026": clean_and_convert_number(clean_metrics[2]),
                     "jun_2026": clean_and_convert_number(clean_metrics[3]),
-                    "ytd": clean_and_convert_number(clean_metrics[4]),
-                    "budget_ytd": clean_and_convert_number(clean_metrics[5]),
-                    "variance": clean_and_convert_number(clean_metrics[6]),
-                    "total_budget": clean_and_convert_number(clean_metrics[7])
+                    "jul_2026": clean_and_convert_number(clean_metrics[4]),
+                    "ytd": clean_and_convert_number(clean_metrics[5]),
+                    "budget_ytd": clean_and_convert_number(clean_metrics[6]),
+                    "variance": clean_and_convert_number(clean_metrics[7]),
+                    "total_budget": clean_and_convert_number(clean_metrics[8])
                 })
 
     df = pd.DataFrame(financial_data)
@@ -100,7 +89,7 @@ def fetch_and_sync_weconnectu_budget():
         print("⚠️ Warning: Standard parsing found 0 rows. Running deep lookahead fallback...")
         all_cells = [el.text.strip() for el in soup.find_all(text=True) if el.text.strip()]
         for i, token in enumerate(all_cells):
-            if re.match(r'^\d{3,4}/\d{3}$', token) and i + 8 < len(all_cells):
+            if re.match(r'^\d{3,4}/\d{3}$', token) and i + 9 < len(all_cells):
                 financial_data.append({
                     "gl_code": token,
                     "description": all_cells[i+1],
@@ -108,25 +97,23 @@ def fetch_and_sync_weconnectu_budget():
                     "apr_2026": clean_and_convert_number(all_cells[i+3]),
                     "may_2026": clean_and_convert_number(all_cells[i+4]),
                     "jun_2026": clean_and_convert_number(all_cells[i+5]),
-                    "ytd": clean_and_convert_number(all_cells[i+6]),
-                    "budget_ytd": clean_and_convert_number(all_cells[i+7]),
-                    "variance": clean_and_convert_number(all_cells[i+8]),
-                    "total_budget": clean_and_convert_number(all_cells[i+9])
+                    "jul_2026": clean_and_convert_number(all_cells[i+6]),
+                    "ytd": clean_and_convert_number(all_cells[i+7]),
+                    "budget_ytd": clean_and_convert_number(all_cells[i+8]),
+                    "variance": clean_and_convert_number(all_cells[i+9]),
+                    "total_budget": clean_and_convert_number(all_cells[i+10])
                 })
         df = pd.DataFrame(financial_data).drop_duplicates(subset=["gl_code"], keep="first")
 
-    # ==========================================
-    # 3. NEON POSTGRESQL SYNCHRONIZATION LAYER
-    # ==========================================
     print("Connecting to Neon PostgreSQL for Budget Synchronization...")
     upsert_query = """
         INSERT INTO master_budget (
             gl_code, description, mar_2026, apr_2026, may_2026, 
-            jun_2026, ytd, budget_ytd, variance, total_budget
+            jun_2026, jul_2026, ytd, budget_ytd, variance, total_budget
         )
         VALUES (
             %(gl_code)s, %(description)s, %(mar_2026)s, %(apr_2026)s, %(may_2026)s, 
-            %(jun_2026)s, %(ytd)s, %(budget_ytd)s, %(variance)s, %(total_budget)s
+            %(jun_2026)s, %(jul_2026)s, %(ytd)s, %(budget_ytd)s, %(variance)s, %(total_budget)s
         )
         ON CONFLICT (gl_code) DO UPDATE SET
             description = EXCLUDED.description,
@@ -134,6 +121,7 @@ def fetch_and_sync_weconnectu_budget():
             apr_2026 = EXCLUDED.apr_2026,
             may_2026 = EXCLUDED.may_2026,
             jun_2026 = EXCLUDED.jun_2026,
+            jul_2026 = EXCLUDED.jul_2026,
             ytd = EXCLUDED.ytd,
             budget_ytd = EXCLUDED.budget_ytd,
             variance = EXCLUDED.variance,
@@ -148,7 +136,7 @@ def fetch_and_sync_weconnectu_budget():
                 cur.execute(upsert_query, row.to_dict())
             conn.commit()
         conn.close()
-        print("🟢 Success! All columns isolated, parsed, and pushed to Neon PostgreSQL master_budget.")
+        print("🟢 Success! July included, all columns parsed, and pushed to Neon PostgreSQL master_budget.")
         
     except Exception as e:
         print(f"🔴 Database sync failed. Technical Error: {e}")
