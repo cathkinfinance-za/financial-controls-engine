@@ -6,3 +6,5 @@ playwright
 openpyxl
 pandas
 flask
+google-generativeai
+werkzeug

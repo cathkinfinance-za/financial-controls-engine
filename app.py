@@ -5,7 +5,14 @@ import vercel_blob
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
-import google.generativeai as genai
+
+try:
+    import google.generativeai as genai
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    GEMINI_AVAILABLE = True
+except ModuleNotFoundError:
+    genai = None
+    GEMINI_AVAILABLE = False
 
 app = Flask(__name__)
 
@@ -218,8 +225,10 @@ def po_form():
     )
 
 def analyze_po_with_gemini(gemini_files, form_data):
-    model = genai.GenerativeModel('gemini-1.5-pro')
-    
+    if not GEMINI_AVAILABLE:
+        return "Gemini AI SDK is not installed or configured."
+        
+    model = genai.GenerativeModel('gemini-3.5-flash')
     prompt = f"""
     Please review the attached purchase order documents and extract vendor details, 
     line items, and total pricing. Verify if the figures match across all attached documents.
