@@ -3,6 +3,7 @@ import psycopg2
 import vercel_blob
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+import google.generativeai as genai
 
 app = Flask(__name__)
 
@@ -37,6 +38,8 @@ def budget_details():
             return jsonify(row if row else {})
     finally:
         conn.close()
+
+
 
 @app.route("/", methods=["GET", "POST"])
 @app.route("/po_form", methods=["GET", "POST"])
@@ -198,6 +201,56 @@ def po_form():
         financial_summary=financial_summary,
         message=message
     )
+
+def analyze_po_with_gemini(gemini_files, form_data):
+    model = genai.GenerativeModel('gemini-1.5-pro')
+    
+    prompt = f"""
+    Please review the attached purchase order documents and extract vendor details, 
+    line items, and total pricing. Verify if the figures match across all attached documents.
+    
+    Form Context:
+    - Vendor Name: {form_data.get('vendor_name')}
+    - Department: {form_data.get('department')}
+    """
+
+    # Unpack file objects and prompt into a single contents list
+    contents = [*gemini_files, prompt]
+
+    response = model.generate_content(contents)
+    
+    # Optional cleanup of remote Gemini files after processing
+    for file_obj in gemini_files:
+        genai.delete_file(file_obj.name)
+
+    return response.text
+
+@app.route('/submit-po', methods=['POST'])
+def submit_po():
+    uploaded_files = request.files.getlist('attachments')
+    saved_file_paths = []
+    gemini_file_objects = []
+
+    for file in uploaded_files:
+        if file and file.filename != '':
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            saved_file_paths.append(filename)
+
+            # Upload to Gemini File API if using large/PDF files, 
+            # or pass file bytes directly depending on SDK setup
+            uploaded_gemini_file = genai.upload_file(filepath)
+            gemini_file_objects.append(uploaded_gemini_file)
+
+    # Call Gemini with all attached files
+    if gemini_file_objects:
+        analysis_result = analyze_po_with_gemini(gemini_file_objects, request.form)
+
+    # Save saved_file_paths (e.g. as JSON array) in your database
+    # ... database save logic ...
+
+    return render_template('po_detail.html', attachments=saved_file_paths, result=analysis_result)
 
 @app.route("/simple")
 def simple_redirect():

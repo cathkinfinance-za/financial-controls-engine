@@ -175,9 +175,30 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Attach Quotes (PDF / Images)</label>
-            <input type="file" id="attach_quotes" name="attach_quotes" multiple onchange="updateQuotesCount()">
-        </div>
+    <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
+    
+    <input 
+        type="file" 
+        id="attach_quotes" 
+        name="attach_quotes" 
+        accept=".pdf, image/*" 
+        multiple 
+        onchange="updateQuotesCount(this)"
+    >
+
+    <!-- UI FEEDBACK FOR NEWLY SELECTED FILES -->
+    <div id="quotes_count_display" style="margin-top: 6px; font-size: 0.9em; color: #6c757d; display: none;"></div>
+
+        <!-- DISPLAY EXISTING QUOTE LINK(S) -->
+        {% if selected_po and selected_po.quote_filepath %}
+            <div style="margin-top: 10px; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;">
+                <span style="font-size: 0.85em; color: #6c757d; display: block; margin-bottom: 4px;">Existing Attachment:</span>
+                <a href="{{ selected_po.quote_filepath }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
+                    📄 View / Download Uploaded Quote Document
+                </a>
+            </div>
+        {% endif %}
+    </div>
         <div class="form-group">
             <label>Quotes Provided</label>
             <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
@@ -269,6 +290,22 @@
             quotesField.value = fileInput.files.length;
         }
         calculateSystemStatus();
+    }
+
+
+    function updateQuotesCount(input) {
+    const display = document.getElementById('quotes_count_display');
+    if (!display) return;
+
+    const count = input.files ? input.files.length : 0;
+    
+    if (count > 0) {
+        display.style.display = 'block';
+        display.textContent = `${count} file${count > 1 ? 's' : ''} selected for upload.`;
+    } else {
+        display.style.display = 'none';
+        display.textContent = '';
+        }
     }
 
     function calculateSystemStatus() {
