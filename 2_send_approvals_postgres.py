@@ -74,7 +74,7 @@ def fetch_file_bytes_and_mime(location):
         )))
 
         if not mime_type:
-            mime_type = "application/pdf" # Default fallback for quote attachments
+            mime_type = "application/pdf"
 
         if location.startswith("http://") or location.startswith("https://"):
             req = urllib.request.Request(location, headers={'User-Agent': 'Mozilla/5.0'})
@@ -101,7 +101,6 @@ def get_gemini_analysis(record):
     try:
         client = genai.Client(api_key=api_key)
         
-        # Mapped directly from po_log & master_budget schemas
         desc_val = str(record.get('description') or 'Operational Procurement').strip()
         cost = float(record.get('estimated_cost') or 0.0)
         gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
@@ -110,20 +109,24 @@ def get_gemini_analysis(record):
         coi_status = str(record.get('conflict_of_interest') or 'No').strip()
         coi_details = str(record.get('conflict_details') or 'None').strip()
 
-        # Parse comma-separated quote URLs stored in 'quote_filepath'
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
         # ----------------------------------------------------
-        # PHASE 1: DOCUMENT PARSING & METADATA EXTRACTION
+        # PHASE 1: ENRICHED DOCUMENT PARSING & METADATA EXTRACTION
         # ----------------------------------------------------
         parse_contents = [
             f"""Examine the attached quote documentation for Purchase Order {po_num}.
-Extract and return ONLY a valid JSON object:
+Extract key vendor and financial details into a valid JSON object without markdown formatting.
+
+Required Fields:
 {{
     "legal_name": "Full Legal / Vendor Name",
     "cipc_number": "Company Registration Number if found else N/A",
-    "vat_number": "VAT Number if found else N/A"
+    "vat_number": "VAT Number if found else N/A",
+    "quoted_amount": "Total numerical amount stated in quote or N/A",
+    "currency": "ZAR/USD/etc or ZAR",
+    "includes_vat": "Yes/No/Unspecified"
 }}"""
         ]
 
@@ -132,7 +135,7 @@ Extract and return ONLY a valid JSON object:
             if file_data and mime_type:
                 parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
 
-        log(f"PO {po_num}: 📑 Parsing vendor metadata from quote documents...")
+        log(f"PO {po_num}: 📑 Parsing vendor metadata and financial details from quote documents...")
         parse_response = client.models.generate_content(
             model='gemini-3.5-flash-lite',
             contents=parse_contents,
@@ -147,6 +150,8 @@ Extract and return ONLY a valid JSON object:
         extracted_vendor_name = vendor_meta.get("legal_name") or user_recommended_vendor
         cipc_num = vendor_meta.get("cipc_number") or "N/A"
         vat_num = vendor_meta.get("vat_number") or "N/A"
+        quoted_amount = vendor_meta.get("quoted_amount") or "N/A"
+        includes_vat = vendor_meta.get("includes_vat") or "Unspecified"
 
         # ----------------------------------------------------
         # PHASE 2: DUCKDUCKGO WEB SEARCH (OSINT)
@@ -167,37 +172,39 @@ Extract and return ONLY a valid JSON object:
             search_context = "No direct public OSINT web results returned."
 
         # ----------------------------------------------------
-        # PHASE 3: AUDIT SYNTHESIS
+        # PHASE 3: ENRICHED AUDIT SYNTHESIS
         # ----------------------------------------------------
         synthesis_prompt = f"""You are a corporate procurement officer conducting an automated intelligence audit for Purchase Order {po_num}.
 
 Context:
 - Item Description: {desc_val}
-- Estimated Cost: R{cost:,.2f}
+- Estimated Cost (System): R{cost:,.2f}
 - General Ledger Code: {gl_code_val}
 - Recommended Vendor: {user_recommended_vendor}
 - User Justification: "{user_justification}"
 - Conflict of Interest Declared: {coi_status}
 - Conflict Details: "{coi_details}"
 
-Extracted Vendor Metadata:
+Extracted Document Metadata:
 - Legal Name: {extracted_vendor_name}
 - CIPC Reg: {cipc_num}
 - VAT Reg: {vat_num}
+- Document Quoted Amount: R{quoted_amount} (VAT Included: {includes_vat})
 
 Public OSINT Web Findings (DuckDuckGo):
 {search_context}
 
 TASKS:
 1. FINANCIAL AUDIT & CROSS-VERIFICATION
-   - Cross-verify pricing across attached quote files against R{cost:,.2f}.
-   - Evaluate vendor choice and budget health impact.
+   - Compare the document quoted amount (R{quoted_amount}) against the system estimated cost (R{cost:,.2f}) and report any variance.
+   - Evaluate whether the user justification adequately supports the vendor selection.
+   - Flag any governance or financial risk regarding GL code alignment or conflicts of interest.
 
 2. PUBLIC VENDOR DUE DILIGENCE (PUBLIC OSINT):
-   - Assess the public operational footprint and legitimacy of '{extracted_vendor_name}' in South Africa.
-   - Highlight required statutory / industry accreditations (e.g., PSIRA for security, ECA/ECB for electrical, CIDB/NHBRC for construction) relevant to '{desc_val}'.
-   - Note any public risk indicators (adverse litigation, insolvency notices, CIPC compliance status, or severe consumer complaint trends).
-   - Assign a Due Diligence status: Passed, Caution, or High Risk.
+   - Assess the operational footprint and legitimacy of '{extracted_vendor_name}' within the South African market.
+   - Identify mandatory statutory / industry accreditations required for this category (e.g., PSIRA for security, ECA/ECB/Wireman's for electrical, CIDB/NHBRC for construction, COIDA compliance).
+   - Flag public risk indicators (adverse litigation, regulatory notices, CIPC status, or red-flag search results).
+   - Determine overall Due Diligence Status: Passed, Caution, or High Risk.
 
 CRITICAL STRUCTURAL REQUIREMENTS:
 Include a dedicated markdown section labeled '### PUBLIC VENDOR DUE DILIGENCE REPORT' in your main text.
@@ -342,7 +349,6 @@ Item Details:
 {ai_analysis_text}
 ====================================================
 
-Instruction:
 Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".
 
 Regards,
