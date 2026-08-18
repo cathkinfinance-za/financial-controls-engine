@@ -71,7 +71,7 @@
             <div class="form-group">
                 <label>Attach Quotes</label>
                 <div class="file-box">
-                    <input type="file" name="quotes" multiple>
+                    <input type="file" name="quotes" id="quote-files" multiple>
                 </div>
                 <div class="file-preview"></div>
             </div>
@@ -138,9 +138,9 @@
             <legend>Approvals</legend>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Quotes Provided</label>
-                    <input type="text" value="" disabled>
-                </div>
+                <label>Quotes Provided</label>
+                <input type="text" name="quotes_provided" value="0" disabled>
+            </div>
                 <div class="form-group">
                     <label>Actioned Date</label>
                     <input type="text" value="" disabled>
@@ -210,6 +210,19 @@
             calculateBufferPool(totalBudget);
         });
     });
+
+
+    const fileInput = document.getElementById('quote-files');
+    const quotesProvidedInput = document.querySelector('input[name="quotes_provided"]');
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const count = fileInput.files.length;
+            if (quotesProvidedInput) quotesProvidedInput.value = count;
+            // Trigger system status recalculation if needed
+        });
+    }
+
 </script>
 
 </body>

@@ -28,6 +28,72 @@ def budget_details():
         conn.close()
     return jsonify({})
 
+def evaluate_system_status(form_data, files_count=0):
+    sub_status = form_data.get("submission_status", "Draft")
+    is_budgeted = form_data.get("is_budgeted", "")
+    gl_code = form_data.get("gl_code", "")
+    expense_type = form_data.get("expense_type", "")
+    est_cost = float(form_data.get("estimated_cost", 0) or 0)
+    
+    total_budget = float(form_data.get("total_annual_budget", 0) or 0)
+    ytd_actual = float(form_data.get("ytd_actual", 0) or 0)
+    
+    if sub_status == "Approved":
+        return "✅ APPROVED: Compliance Process Complete"
+    if sub_status == "Rejected":
+        return "🛑 REJECTED: Final Authorisation Declined"
+    if is_budgeted == "Yes" and not gl_code:
+        return "⚠️ ACTION REQUIRED: Select a valid GL description"
+    if not expense_type:
+        return "⚠️ ACTION REQUIRED: Select Expense Type If Not Approved"
+    if files_count == 0 and est_cost > 0:
+        return "⚠️ ACTION REQUIRED: Enter number of quotes provided"
+        
+    # Quote threshold checks
+    if est_cost <= 10000 and files_count < 1:
+        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+    if 10001 <= est_cost <= 50000 and files_count < 2:
+        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+    if est_cost > 50000 and files_count < 3:
+        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+    if expense_type == "Capital" and files_count < 3:
+        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+
+    remaining_budget = total_budget - ytd_actual
+    buffer_pool = total_budget / 6
+
+    if is_budgeted == "Yes" and total_budget > 0 and est_cost > remaining_budget:
+        return "❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget"
+    if is_budgeted == "Yes" and total_budget > 0 and (remaining_budget - est_cost) < buffer_pool:
+        return "⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool"
+        
+    if expense_type == "Capital":
+        return "🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)"
+    if expense_type == "Maintenance": # Service provider equivalent
+        return "📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)"
+        
+    if is_budgeted == "Yes":
+        if est_cost <= 10000:
+            return "🟢 Routine Operational: Within Budget (No Approval Required)"
+        elif est_cost <= 50000:
+            return "🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)"
+        else:
+            return "🟠 High-Value Operational: Within Budget (Requires 2 Board Members)"
+            
+    if is_budgeted == "No" and expense_type == "Emergency":
+        if est_cost <= 30000:
+            return "⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)"
+        else:
+            return "❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)"
+            
+    if is_budgeted == "No" and expense_type == "Operational": # Extraordinary mapping
+        if est_cost <= 30000:
+            return "🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)"
+        else:
+            return "❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)"
+
+    return "Draft - In Progress"
+
 @app.route("/", methods=["GET", "POST"])
 def purchase_order_form():
     conn = get_connection()
