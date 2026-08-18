@@ -98,6 +98,7 @@ def evaluate_status():
 def purchase_order_form():
     conn = get_connection()
     message = None
+    selected_po = None
     
     if request.method == "POST":
         po_number = request.form.get("po_number")
@@ -158,6 +159,22 @@ def purchase_order_form():
                 ORDER BY calculated_final_score DESC;
             """, (target_ref,))
             evaluated_rows = cur.fetchall()
+
+            # Fetch all saved POs for the sidebar list
+            cur.execute("""
+                SELECT po_number, description, po_date, estimated_cost, 
+                       recommended_vendor, system_status, submission_status, created_at
+                FROM po_log
+                ORDER BY created_at DESC;
+            """)
+            saved_pos = cur.fetchall()
+
+            # If a sidebar item was clicked, fetch that specific PO's full details
+            selected_po_num = request.args.get("po_number")
+            if selected_po_num:
+                cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
+                selected_po = cur.fetchone()
+                
     finally:
         conn.close()
 
@@ -165,6 +182,8 @@ def purchase_order_form():
         "po_form.html", 
         gl_records=gl_records, 
         evaluated_rows=evaluated_rows, 
+        saved_pos=saved_pos,
+        selected_po=selected_po,
         message=message
     )
 

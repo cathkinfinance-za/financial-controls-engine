@@ -111,3 +111,87 @@ textarea {
 .submit-btn:hover {
     background-color: #0052a3;
 }
+
+/* App Layout Structure */
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f9;
+    color: #333;
+}
+
+.app-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Left Sidebar Navigation */
+.sidebar {
+    width: 280px;
+    background: #2c3e50;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid #1a252f;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 20px;
+    font-size: 1.1em;
+    font-weight: bold;
+    background: #1a252f;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.new-po-btn {
+    background: #27ae60;
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 0.85em;
+    font-weight: normal;
+}
+
+.new-po-btn:hover {
+    background: #219653;
+}
+
+.sidebar-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    overflow-y: auto;
+    flex-grow: 1;
+}
+
+.sidebar-list li {
+    border-bottom: 1px solid #34495e;
+}
+
+.sidebar-list a {
+    display: block;
+    padding: 12px 20px;
+    color: #ecf0f1;
+    text-decoration: none;
+    transition: background 0.2s;
+}
+
+.sidebar-list a:hover {
+    background: #34495e;
+}
+
+.sidebar-list a.active {
+    background: #2980b9;
+}
+
+/* Main Content Area */
+.main-content {
+    flex-grow: 1;
+    padding: 30px;
+    overflow-y: auto;
+}

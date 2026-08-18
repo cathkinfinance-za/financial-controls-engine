@@ -8,6 +8,28 @@
 </head>
 <body>
 
+<div class="app-layout">
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>Saved POs</span>
+            <a href="/" class="new-po-btn">+ New PO</a>
+        </div>
+        <ul class="sidebar-list">
+            {% if saved_pos %}
+                {% for po in saved_pos %}
+                <li>
+                    <a href="/?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
+                        <strong>{{ po.po_number }}</strong><br>
+                        <span style="font-size: 0.8em; color: #bdc3c7;">{{ po.recommended_vendor or 'No Vendor' }}</span>
+                    </a>
+                </li>
+                {% endfor %}
+            {% else %}
+                <li style="padding: 20px; color: #95a5a6; text-align: center; font-size: 0.9em;">No saved purchase orders</li>
+            {% endif %}
+        </ul>
+    </div>
+
 <div class="container">
     <div class="header-bar">
         <h1>Purchase Order</h1>
@@ -20,25 +42,25 @@
             <legend>Purchase Order Details</legend>
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>PO Number</label>
-                <input type="text" name="po_number" value="">
+                <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}">
             </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Description</label>
-                <textarea name="description"></textarea>
+                <textarea name="description">{{ selected_po.description if selected_po else '' }}</textarea>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
                     <label>Date</label>
-                    <input type="date" name="po_date">
+                    <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
                 </div>
                 <div class="form-group">
                     <label>Has this been budgeted for?</label>
                     <select name="is_budgeted">
                         <option value="" disabled selected>Select option</option>
-                        <option value="Yes">Yes</option>
-                        <option value="No">No</option>
+                        <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
+                        <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
                     </select>
                 </div>
             </div>
@@ -48,7 +70,7 @@
                     <select name="gl_code">
                         <option value="" disabled selected>Select GL Code</option>
                         {% for gl in gl_records %}
-                            <option value="{{ gl.gl_code }}">{{ gl.gl_code }} - {{ gl.description }}</option>
+                            <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>{{ gl.gl_code }} - {{ gl.description }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -56,16 +78,16 @@
                     <label>Expense Type</label>
                     <select name="expense_type">
                         <option value="" disabled selected>Select expense type</option>
-                        <option value="Operational">Operational</option>
-                        <option value="Capital">Capital</option>
-                        <option value="Maintenance">Maintenance</option>
-                        <option value="Emergency">Emergency</option>
+                        <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
+                        <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
+                        <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
+                        <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
                     </select>
                 </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Estimated Cost</label>
-                <input type="number" step="0.01" name="estimated_cost" value="">
+                <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
             </div>
 
             <div class="form-group">
@@ -80,23 +102,23 @@
         <fieldset>
             <legend>Vendor Selection & Rationale</legend>
             <div class="form-group" style="margin-bottom: 15px;">
-                <label>Recommended Vendor</label>
-                <input type="text" name="recommended_vendor" value="">
+                <label>Suggested Vendor</label>
+                <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po else '' }}">
             </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Justification Notes</label>
-                <textarea name="justification_notes"></textarea>
+                <textarea name="justification_notes">{{ selected_po.justification_notes if selected_po else '' }}</textarea>
             </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Submission Status</label>
                 <select name="submission_status">
                     <option value="" disabled selected>Select status</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Submit for Approval">Submit for Approval</option>
-                    <option value="Sent">Sent</option>
-                    <option value="Approved">Approved</option>
+                    <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                    <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                    <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent</option>
+                    <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
                 </select>
             </div>
 
