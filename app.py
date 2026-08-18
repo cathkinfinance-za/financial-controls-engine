@@ -229,7 +229,7 @@ def simple_po_form():
 
         if new_po:
             try:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Look up primary key for the selected GL account
                     gl_code_id = None
                     if gl_code:
