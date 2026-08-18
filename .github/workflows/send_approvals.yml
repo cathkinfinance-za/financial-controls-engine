@@ -1,13 +1,13 @@
-name: Cathkin Finance Automation Workflow
+name: Cathkin PO Approval Notifications
 
 on:
   schedule:
-    # Runs every 30 minutes to check inbox triggers & update state
-    - cron: '*/30 * * * *'
+    # Runs every 15 minutes during South African business hours (06:00 to 18:00 SAST / 04:00 to 16:00 UTC)
+    - cron: '*/15 4-16 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI
 
 jobs:
-  run-automation:
+  send-approvals:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -22,10 +22,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          playwright install --with-deps
 
-      - name: Run Financial Control Engine
+      - name: Run Approval Notifications
         env:
+          DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           NEON_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
           BLOB_READ_WRITE_TOKEN: ${{ secrets.BLOB_READ_WRITE_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -33,6 +33,5 @@ jobs:
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
           SMTP_SERVER: ${{ secrets.SMTP_SERVER }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
         run: |
-          python main.py
+          python 2_send_approvals_postgres.py
