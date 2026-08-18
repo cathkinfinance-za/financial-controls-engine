@@ -67,12 +67,18 @@
 
                 <div class="form-group">
                     <label>Select GL Code</label>
-                    <input type="text" list="gl_options" name="gl_code" placeholder="Type to search GL code or description..." value="{{ selected_po.gl_code if selected_po else '' }}">
-                    <datalist id="gl_options">
+                    <!-- Quick filter input -->
+                    <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
+                    
+                    <!-- Original select dropdown -->
+                    <select name="gl_code" id="gl-code-select">
+                        <option value="" disabled {% if not selected_po %}selected{% endif %}>Select GL Code</option>
                         {% for gl in gl_records %}
-                            <option value="{{ gl.gl_code }}">{{ gl.gl_code }} - {{ gl.description }}</option>
+                            <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
+                                {{ gl.gl_code }} - {{ gl.description }}
+                            </option>
                         {% endfor %}
-                    </datalist>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Expense Type</label>
@@ -194,8 +200,9 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const glSelect = document.querySelector('input[name="gl_code"]');
+        const glSelect = document.querySelector('select[name="gl_code"]');
         const budgetedSelect = document.querySelector('select[name="is_budgeted"]');
+        
 
         async function updateFinancials() {
             const glCode = glSelect.value;
@@ -287,6 +294,30 @@
         element.addEventListener('change', evaluateSystemStatusLive);
         element.addEventListener('input', evaluateSystemStatusLive);
     });
+
+
+    const searchInput = document.getElementById('gl-search-input');
+    const selectElement = document.getElementById('gl-code-select');
+
+    if (searchInput && selectElement) {
+        searchInput.addEventListener('input', function() {
+            const filter = searchInput.value.toLowerCase();
+            const options = selectElement.options;
+
+            for (let i = 0; i < options.length; i++) {
+                const text = options[i].text.toLowerCase();
+                if (i === 0) {
+                    options[i].style.display = ""; // Keep placeholder visible
+                    continue;
+                }
+                if (text.includes(filter)) {
+                    options[i].style.display = "";
+                } else {
+                    options[i].style.display = "none";
+                }
+            }
+        });
+    }
 </script>
 
 </body>
