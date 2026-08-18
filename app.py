@@ -28,71 +28,71 @@ def budget_details():
         conn.close()
     return jsonify({})
 
-def evaluate_system_status(form_data, files_count=0):
-    sub_status = form_data.get("submission_status", "Draft")
-    is_budgeted = form_data.get("is_budgeted", "")
-    gl_code = form_data.get("gl_code", "")
-    expense_type = form_data.get("expense_type", "")
-    est_cost = float(form_data.get("estimated_cost", 0) or 0)
+@app.route('/api/evaluate-status', methods=['POST'])
+def evaluate_status():
+    data = request.json or {}
     
-    total_budget = float(form_data.get("total_annual_budget", 0) or 0)
-    ytd_actual = float(form_data.get("ytd_actual", 0) or 0)
+    sub_status = data.get("submission_status", "")
+    is_budgeted = data.get("is_budgeted", "")
+    gl_code = data.get("gl_code", "")
+    expense_type = data.get("expense_type", "")
+    quotes_provided = int(data.get("quotes_provided", 0) or 0)
+    est_cost = float(data.get("estimated_cost", 0) or 0)
     
+    total_budget = float(data.get("total_annual_budget", 0) or 0)
+    ytd_actual = float(data.get("ytd_actual", 0) or 0)
+    
+    # Exact rules translated from your formula text file
     if sub_status == "Approved":
-        return "✅ APPROVED: Compliance Process Complete"
-    if sub_status == "Rejected":
-        return "🛑 REJECTED: Final Authorisation Declined"
-    if is_budgeted == "Yes" and not gl_code:
-        return "⚠️ ACTION REQUIRED: Select a valid GL description"
-    if not expense_type:
-        return "⚠️ ACTION REQUIRED: Select Expense Type If Not Approved"
-    if files_count == 0 and est_cost > 0:
-        return "⚠️ ACTION REQUIRED: Enter number of quotes provided"
+        status = "✅ APPROVED: Compliance Process Complete"
+    elif sub_status == "Rejected":
+        status = "🛑 REJECTED: Final Authorisation Declined"
+    elif is_budgeted == "Yes" and not gl_code:
+        status = "⚠️ ACTION REQUIRED: Select a valid GL description"
+    elif not expense_type:
+        status = "⚠️ ACTION REQUIRED: Select Expense Type If Not Approved"
+    elif quotes_provided == 0 and est_cost > 0:
+        status = "⚠️ ACTION REQUIRED: Enter number of quotes provided"
+    elif (
+        (est_cost <= 10000 and quotes_provided < 1) or
+        (10001 <= est_cost <= 50000 and quotes_provided < 2) or
+        (est_cost > 50000 and quotes_provided < 3) or
+        (expense_type == "Capital" and quotes_provided < 3)
+    ):
+        status = "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+    else:
+        remaining_budget = total_budget - ytd_actual
+        buffer_pool = total_budget / 6
         
-    # Quote threshold checks
-    if est_cost <= 10000 and files_count < 1:
-        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
-    if 10001 <= est_cost <= 50000 and files_count < 2:
-        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
-    if est_cost > 50000 and files_count < 3:
-        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
-    if expense_type == "Capital" and files_count < 3:
-        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
-
-    remaining_budget = total_budget - ytd_actual
-    buffer_pool = total_budget / 6
-
-    if is_budgeted == "Yes" and total_budget > 0 and est_cost > remaining_budget:
-        return "❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget"
-    if is_budgeted == "Yes" and total_budget > 0 and (remaining_budget - est_cost) < buffer_pool:
-        return "⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool"
-        
-    if expense_type == "Capital":
-        return "🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)"
-    if expense_type == "Maintenance": # Service provider equivalent
-        return "📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)"
-        
-    if is_budgeted == "Yes":
-        if est_cost <= 10000:
-            return "🟢 Routine Operational: Within Budget (No Approval Required)"
-        elif est_cost <= 50000:
-            return "🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)"
+        if is_budgeted == "Yes" and total_budget > 0 and est_cost > remaining_budget:
+            status = "❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget"
+        elif is_budgeted == "Yes" and total_budget > 0 and (remaining_budget - est_cost) < buffer_pool:
+            status = "⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool"
+        elif expense_type == "Capital":
+            status = "🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)"
+        elif expense_type == "Maintenance":
+            status = "📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)"
+        elif is_budgeted == "Yes":
+            if est_cost <= 10000:
+                status = "🟢 Routine Operational: Within Budget (No Approval Required)"
+            elif est_cost <= 50000:
+                status = "🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)"
+            else:
+                status = "🟠 High-Value Operational: Within Budget (Requires 2 Board Members)"
+        elif is_budgeted == "No" and expense_type == "Emergency":
+            if est_cost <= 30000:
+                status = "⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)"
+            else:
+                status = "❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)"
+        elif is_budgeted == "No" and expense_type == "Operational":
+            if est_cost <= 30000:
+                status = "🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)"
+            else:
+                status = "❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)"
         else:
-            return "🟠 High-Value Operational: Within Budget (Requires 2 Board Members)"
-            
-    if is_budgeted == "No" and expense_type == "Emergency":
-        if est_cost <= 30000:
-            return "⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)"
-        else:
-            return "❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)"
-            
-    if is_budgeted == "No" and expense_type == "Operational": # Extraordinary mapping
-        if est_cost <= 30000:
-            return "🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)"
-        else:
-            return "❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)"
+            status = "Draft - In Progress"
 
-    return "Draft - In Progress"
+    return jsonify({"system_status": status})
 
 @app.route("/", methods=["GET", "POST"])
 def purchase_order_form():

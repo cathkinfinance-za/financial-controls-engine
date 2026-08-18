@@ -148,9 +148,9 @@
             </div>
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>SYSTEM STATUS</label>
-                <input type="text" value="" disabled>
+                <input type="text" name="system_status" value="" disabled>
             </div>
-            <div class="form-row" style="margin-bottom: 15px;">
+                        <div class="form-row" style="margin-bottom: 15px;">
                 <div class="form-group">
                     <label>Actioned By</label>
                     <input type="text" value="" disabled>
@@ -218,10 +218,49 @@
     if (fileInput) {
         fileInput.addEventListener('change', function() {
             const count = fileInput.files.length;
-            if (quotesProvidedInput) quotesProvidedInput.value = count;
-            // Trigger system status recalculation if needed
+            if (quotesProvidedInput) {
+                quotesProvidedInput.value = count;
+            }
+            // Trigger the status recalculation right after updating the count
+            evaluateSystemStatusLive();
         });
     }
+
+
+    // Live System Status evaluation function
+    async function evaluateSystemStatusLive() {
+        const payload = {
+            submission_status: document.querySelector('select[name="submission_status"]')?.value || '',
+            is_budgeted: document.querySelector('select[name="is_budgeted"]')?.value || '',
+            gl_code: document.querySelector('select[name="gl_code"]')?.value || '',
+            expense_type: document.querySelector('select[name="expense_type"]')?.value || '',
+            quotes_provided: document.querySelector('input[name="quotes_provided"]')?.value || 0,
+            estimated_cost: document.querySelector('input[name="estimated_cost"]')?.value || 0,
+            total_annual_budget: document.querySelector('input[name="total_annual_budget"]')?.value || 0,
+            ytd_actual: document.querySelector('input[name="ytd_actual"]')?.value || 0
+        };
+
+        try {
+            const response = await fetch('/api/evaluate-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await response.json();
+            const statusInput = document.querySelector('input[name="system_status"]');
+            if (statusInput) {
+                statusInput.value = data.system_status || '';
+            }
+        } catch (err) {
+            console.error("Error evaluating system status:", err);
+        }
+    }
+
+    // Attach listeners to all inputs to trigger live evaluation on the fly
+    document.querySelectorAll('input, select, textarea').forEach(element => {
+        element.addEventListener('change', evaluateSystemStatusLive);
+        element.addEventListener('input', evaluateSystemStatusLive);
+    });
 
 </script>
 
