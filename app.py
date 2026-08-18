@@ -100,7 +100,6 @@ def purchase_order_form():
     message = None
     
     if request.method == "POST":
-        # Extract form fields safely
         po_number = request.form.get("po_number")
         description = request.form.get("description")
         po_date = request.form.get("po_date") or None
@@ -116,7 +115,6 @@ def purchase_order_form():
         if po_number:
             try:
                 with conn.cursor() as cur:
-                    # Insert or Update the purchase order log table
                     cur.execute("""
                         INSERT INTO po_log (
                             po_number, description, po_date, is_budgeted, gl_code, 
@@ -143,6 +141,7 @@ def purchase_order_form():
                     conn.commit()
                 message = f"Purchase Order '{po_number}' saved successfully!"
             except Exception as e:
+                print(f"DATABASE ERROR: {e}")  # This will show up in your local terminal / Vercel logs
                 message = f"Error saving purchase order: {e}"
 
     try:
