@@ -116,18 +116,24 @@ def purchase_order_form():
         if po_number:
             try:
                 with conn.cursor() as cur:
+                    # Look up the integer ID for the selected gl_code string to satisfy the foreign key constraint
+                    cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
+                    gl_row = cur.fetchone()
+                    gl_code_id = gl_row['id'] if gl_row else None
+
                     cur.execute("""
                         INSERT INTO po_log (
-                            po_number, description, po_date, is_budgeted, gl_code, 
+                            po_number, description, po_date, is_budgeted, gl_code, gl_code_id,
                             expense_type, estimated_cost, recommended_vendor, 
                             justification_notes, submission_status, system_status
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (po_number) DO UPDATE SET
                             description = EXCLUDED.description,
                             po_date = EXCLUDED.po_date,
                             is_budgeted = EXCLUDED.is_budgeted,
                             gl_code = EXCLUDED.gl_code,
+                            gl_code_id = EXCLUDED.gl_code_id,
                             expense_type = EXCLUDED.expense_type,
                             estimated_cost = EXCLUDED.estimated_cost,
                             recommended_vendor = EXCLUDED.recommended_vendor,
@@ -135,14 +141,14 @@ def purchase_order_form():
                             submission_status = EXCLUDED.submission_status,
                             system_status = EXCLUDED.system_status;
                     """, (
-                        po_number, description, po_date, is_budgeted, gl_code,
+                        po_number, description, po_date, is_budgeted, gl_code, gl_code_id,
                         expense_type, estimated_cost, recommended_vendor,
                         justification_notes, submission_status, system_status
                     ))
                     conn.commit()
                 message = f"Purchase Order '{po_number}' saved successfully!"
             except Exception as e:
-                print(f"DATABASE ERROR: {e}")  # This will show up in your local terminal / Vercel logs
+                print(f"DATABASE ERROR: {e}")
                 message = f"Error saving purchase order: {e}"
 
     try:
