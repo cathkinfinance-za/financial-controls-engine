@@ -195,3 +195,32 @@ body {
     padding: 30px;
     overflow-y: auto;
 }
+
+/* Ensure all form elements inherit your global font family */
+input, select, textarea, button {
+    font-family: inherit;
+}
+
+/* Fix scrolling on the main workspace container */
+.app-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.main-content {
+    flex-grow: 1;
+    height: 100vh;
+    overflow-y: auto; /* Enables proper vertical scrolling */
+    padding: 30px;
+    box-sizing: border-box;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto 50px auto; /* Adds bottom breathing room so the last field isn't cut off */
+    background: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
