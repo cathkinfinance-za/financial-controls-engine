@@ -93,9 +93,10 @@ input, select, textarea, button {
 
 /* Main Content Area */
 .main-content {
-    flex-grow: 1;
+    flex: 1; /* Ensures it expands to fill the rest of the screen width */
+    width: 0; /* Prevents flex items from overflowing */
     height: 100vh;
-    overflow-y: auto; /* Enables proper vertical scrolling */
+    overflow-y: auto; 
     padding: 30px;
     background-color: #f4f6f9;
     box-sizing: border-box;
