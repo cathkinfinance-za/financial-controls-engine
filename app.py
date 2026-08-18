@@ -212,6 +212,7 @@ def simple_po_form():
     conn = get_connection()
     message = None
     selected_po = None
+    financial_summary = None
 
     if request.method == "POST":
         original_po = request.form.get("original_po_number", "").strip()
@@ -222,6 +223,12 @@ def simple_po_form():
         gl_code = request.form.get("gl_code")
         expense_type = request.form.get("expense_type")
         
+        # New Vendor fields
+        recommended_vendor = request.form.get("recommended_vendor", "").strip()
+        justification_notes = request.form.get("justification_notes", "").strip()
+        submission_status = request.form.get("submission_status")
+        system_status = request.form.get("system_status", "").strip()
+
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
         except ValueError:
@@ -230,7 +237,7 @@ def simple_po_form():
         if new_po:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Look up primary key for the selected GL account
+                    # Look up primary key for selected GL account
                     gl_code_id = None
                     if gl_code:
                         cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
@@ -238,7 +245,6 @@ def simple_po_form():
                         gl_code_id = gl_row['id'] if gl_row else None
 
                     if original_po:
-                        # Update existing row
                         cur.execute("""
                             UPDATE po_log 
                             SET po_number = %s,
@@ -248,20 +254,26 @@ def simple_po_form():
                                 gl_code = %s,
                                 gl_code_id = %s,
                                 expense_type = %s,
-                                estimated_cost = %s
+                                estimated_cost = %s,
+                                recommended_vendor = %s,
+                                justification_notes = %s,
+                                submission_status = %s,
+                                system_status = %s
                             WHERE po_number = %s;
                         """, (
                             new_po, description, po_date, is_budgeted, 
-                            gl_code, gl_code_id, expense_type, estimated_cost, original_po
+                            gl_code, gl_code_id, expense_type, estimated_cost,
+                            recommended_vendor, justification_notes, submission_status, system_status,
+                            original_po
                         ))
                     else:
-                        # Insert new row
                         cur.execute("""
                             INSERT INTO po_log (
                                 po_number, description, po_date, is_budgeted, 
-                                gl_code, gl_code_id, expense_type, estimated_cost
+                                gl_code, gl_code_id, expense_type, estimated_cost,
+                                recommended_vendor, justification_notes, submission_status, system_status
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (po_number) DO UPDATE SET
                                 description = EXCLUDED.description,
                                 po_date = EXCLUDED.po_date,
@@ -269,10 +281,15 @@ def simple_po_form():
                                 gl_code = EXCLUDED.gl_code,
                                 gl_code_id = EXCLUDED.gl_code_id,
                                 expense_type = EXCLUDED.expense_type,
-                                estimated_cost = EXCLUDED.estimated_cost;
+                                estimated_cost = EXCLUDED.estimated_cost,
+                                recommended_vendor = EXCLUDED.recommended_vendor,
+                                justification_notes = EXCLUDED.justification_notes,
+                                submission_status = EXCLUDED.submission_status,
+                                system_status = EXCLUDED.system_status;
                         """, (
                             new_po, description, po_date, is_budgeted, 
-                            gl_code, gl_code_id, expense_type, estimated_cost
+                            gl_code, gl_code_id, expense_type, estimated_cost,
+                            recommended_vendor, justification_notes, submission_status, system_status
                         ))
                     
                     conn.commit()
@@ -300,6 +317,15 @@ def simple_po_form():
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
+                # Fetch corresponding financial summary from master_budget
+                if selected_po and selected_po.get('gl_code'):
+                    cur.execute("""
+                        SELECT ytd_actual, total_annual_budget, budget_ytd, buffer_pool, variance 
+                        FROM master_budget 
+                        WHERE gl_code = %s;
+                    """, (selected_po['gl_code'],))
+                    financial_summary = cur.fetchone()
+
     finally:
         conn.close()
 
@@ -308,6 +334,7 @@ def simple_po_form():
         gl_records=gl_records,
         saved_pos=saved_pos,
         selected_po=selected_po,
+        financial_summary=financial_summary,
         message=message
     )
 

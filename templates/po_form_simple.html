@@ -108,6 +108,69 @@
     </fieldset>
 
     <button type="submit" class="submit-btn">Save</button>
+<!-- Vendor Selection & Rationale -->
+<fieldset style="margin-top: 20px;">
+    <legend>Vendor Selection & Rationale</legend>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Suggested Vendor</label>
+        <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Justification Notes</label>
+        <textarea name="justification_notes" rows="4">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Submission Status</label>
+        <select name="submission_status">
+            <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
+            <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+            <option value="Submitted for Approval" {% if selected_po and selected_po.submission_status == "Submitted for Approval" %}selected{% endif %}>Submitted for Approval</option>
+            <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+            <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+        </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Latest AI Status</label>
+        <input type="text" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
+    </div>
+</fieldset>
+
+<!-- Financial Summary (Read Only) -->
+<fieldset style="margin-top: 20px;">
+    <legend>Financial Summary</legend>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>YTD Actual</label>
+            <input type="text" id="fin-ytd-actual" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>Total Annual Budget</label>
+            <input type="text" id="fin-total-budget" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+    </div>
+
+    <div class="form-row" style="margin-top: 15px;">
+        <div class="form-group">
+            <label>Budget YTD</label>
+            <input type="text" id="fin-budget-ytd" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>2M Buffer Pool</label>
+            <input type="text" id="fin-buffer-pool" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+        <label>Variance</label>
+        <input type="text" id="fin-variance" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="background-color: #f8f9fa;">
+    </div>
+</fieldset>
+
 </form>
 
 <script>
@@ -130,6 +193,26 @@
             }
         });
     }
+
+
+    // Auto-fetch financial metrics when GL Code selection changes
+document.getElementById('gl-code-select').addEventListener('change', function() {
+    const glCode = this.value;
+    if (!glCode) return;
+
+    fetch(`/api/budget-details?gl_code=${encodeURIComponent(glCode)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data) {
+                document.getElementById('fin-ytd-actual').value = data.ytd_actual ?? '';
+                document.getElementById('fin-total-budget').value = data.total_annual_budget ?? '';
+                document.getElementById('fin-budget-ytd').value = data.budget_ytd ?? '';
+                document.getElementById('fin-buffer-pool').value = data.buffer_pool ?? '';
+                document.getElementById('fin-variance').value = data.variance ?? '';
+            }
+        })
+        .catch(err => console.error('Error fetching budget details:', err));
+});
 </script>
 
 </body>
