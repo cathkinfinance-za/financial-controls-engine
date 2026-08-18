@@ -170,24 +170,28 @@
 </fieldset>
 
 
-<!-- Approvals -->
+<!-- Approvals Fieldset -->
 <fieldset style="margin-top: 20px;">
     <legend>Approvals</legend>
 
     <div class="form-row">
         <div class="form-group">
+            <label>Attach Quotes (PDF / Images)</label>
+            <input type="file" id="attach_quotes" name="attach_quotes" multiple onchange="updateQuotesCount()">
+        </div>
+        <div class="form-group">
             <label>Quotes Provided</label>
-            <input type="number" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}">
+            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
         </div>
         <div class="form-group">
             <label>Actioned Date</label>
-            <input type="date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
+            <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
         </div>
     </div>
 
     <div class="form-group" style="margin-top: 15px;">
         <label>SYSTEM STATUS</label>
-        <input type="text" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa; font-weight: bold; width: 100%;">
+        <input type="text" id="system_status" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa; font-weight: bold; width: 100%;">
     </div>
 
     <div class="form-row" style="margin-top: 15px;">
@@ -251,6 +255,88 @@ document.getElementById('gl-code-select').addEventListener('change', function() 
         })
         .catch(err => console.error('Error fetching budget details:', err));
 }); 
+
+
+function updateQuotesCount() {
+    const fileInput = document.getElementById('attach_quotes');
+    const quotesField = document.getElementById('quotes_provided');
+    if (fileInput && fileInput.files) {
+        // Automatically count uploaded quote files
+        quotesField.value = fileInput.files.length;
+    }
+    calculateSystemStatus();
+}
+
+function calculateSystemStatus() {
+    const submissionStatus = document.querySelector('[name="submission_status"]')?.value || '';
+    const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value || '';
+    const glCode = document.querySelector('[name="gl_code"]')?.value || '';
+    const expenseType = document.querySelector('[name="expense_type"]')?.value || '';
+    const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+    const quotesProvided = parseInt(document.getElementById('quotes_provided')?.value) || 0;
+    
+    // Read financial summary fields dynamically
+    const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value || document.querySelector('[name="total_annual_budget"]')?.value) || 0;
+    const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value || document.querySelector('[name="ytd_actual"]')?.value) || 0;
+    const remainingBudget = totalBudget - ytdActual;
+
+    let status = '';
+
+    // Airtable Rule Evaluations
+    if (submissionStatus === 'Approved') {
+        status = '✅ APPROVED: Compliance Process Complete';
+    } else if (submissionStatus === 'Rejected') {
+        status = '🛑 REJECTED: Final Authorisation Declined';
+    } else if (isBudgeted === 'Yes' && !glCode) {
+        status = '⚠️ ACTION REQUIRED: Select a valid GL description';
+    } else if (!expenseType) {
+        status = '⚠️ ACTION REQUIRED: Select Expense Type If Not Approved';
+    } else if (
+        (estimatedCost <= 10000 && quotesProvided < 1) ||
+        (estimatedCost >= 10001 && estimatedCost <= 50000 && quotesProvided < 2) ||
+        (estimatedCost > 50000 && quotesProvided < 3) ||
+        (expenseType === 'Capital Expenditure & Infrastructure' && quotesProvided < 3)
+    ) {
+        status = '❌ BLOCKED: Insufficient Quotes Provided for this Threshold';
+    } else if (isBudgeted === 'Yes' && totalBudget > 0 && estimatedCost > remainingBudget) {
+        status = '❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget';
+    } else if (isBudgeted === 'Yes' && totalBudget > 0 && (remainingBudget - estimatedCost) < (totalBudget / 6.0)) {
+        status = '⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool';
+    } else if (expenseType === 'Capital Expenditure & Infrastructure') {
+        status = '🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)';
+    } else if (expenseType === 'Service Provider Contracts') {
+        status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)';
+    } else if (isBudgeted === 'Yes') {
+        if (estimatedCost <= 10000) {
+            status = '🟢 Routine Operational: Within Budget (No Approval Required)';
+        } else if (estimatedCost <= 50000) {
+            status = '🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)';
+        } else {
+            status = '🟠 High-Value Operational: Within Budget (Requires 2 Board Members)';
+        }
+    } else if (isBudgeted === 'No' && expenseType === 'Emergency') {
+        status = estimatedCost <= 30000 
+            ? '⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)' 
+            : '❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)';
+    } else if (isBudgeted === 'No' && expenseType === 'Extraordinary') {
+        status = estimatedCost <= 30000 
+            ? '🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)' 
+            : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)';
+    }
+
+    document.getElementById('system_status').value = status;
+}
+
+// Bind event listeners across form controls for live recalculation
+document.addEventListener('DOMContentLoaded', () => {
+    const inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', calculateSystemStatus);
+        input.addEventListener('change', calculateSystemStatus);
+    });
+    calculateSystemStatus();
+});
+
 </script>
 
 </body>
