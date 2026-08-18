@@ -150,6 +150,8 @@ def purchase_order_form():
             except Exception as e:
                 print(f"DATABASE ERROR: {e}")
                 message = f"Error saving purchase order: {e}"
+                conn.rollback()
+                raise e
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
