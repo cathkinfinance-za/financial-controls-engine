@@ -100,35 +100,56 @@ def purchase_order_form():
     message = None
     
     if request.method == "POST":
-        # Handle manual project or purchase order creation if submitted from form
-        proj_ref = request.form.get("project_reference")
-        proj_name = request.form.get("project_name")
-        price_weighting = request.form.get("price_weighting", 50.0)
-        bid_floor = request.form.get("lowest_project_bid_floor", 0.0)
-        
-        if proj_ref:
+        # Extract form fields safely
+        po_number = request.form.get("po_number")
+        description = request.form.get("description")
+        po_date = request.form.get("po_date") or None
+        is_budgeted = request.form.get("is_budgeted")
+        gl_code = request.form.get("gl_code")
+        expense_type = request.form.get("expense_type")
+        estimated_cost = request.form.get("estimated_cost") or 0.0
+        recommended_vendor = request.form.get("recommended_vendor")
+        justification_notes = request.form.get("justification_notes")
+        submission_status = request.form.get("submission_status")
+        system_status = request.form.get("system_status")
+
+        if po_number:
             try:
                 with conn.cursor() as cur:
+                    # Insert or Update the purchase order log table
                     cur.execute("""
-                        INSERT INTO projects (project_reference, name, price_weighting, lowest_project_bid_floor)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (project_reference) DO UPDATE SET
-                            name = EXCLUDED.name,
-                            price_weighting = EXCLUDED.price_weighting,
-                            lowest_project_bid_floor = EXCLUDED.lowest_project_bid_floor;
-                    """, (proj_ref, proj_name, price_weighting, bid_floor))
+                        INSERT INTO po_log (
+                            po_number, description, po_date, is_budgeted, gl_code, 
+                            expense_type, estimated_cost, recommended_vendor, 
+                            justification_notes, submission_status, system_status
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (po_number) DO UPDATE SET
+                            description = EXCLUDED.description,
+                            po_date = EXCLUDED.po_date,
+                            is_budgeted = EXCLUDED.is_budgeted,
+                            gl_code = EXCLUDED.gl_code,
+                            expense_type = EXCLUDED.expense_type,
+                            estimated_cost = EXCLUDED.estimated_cost,
+                            recommended_vendor = EXCLUDED.recommended_vendor,
+                            justification_notes = EXCLUDED.justification_notes,
+                            submission_status = EXCLUDED.submission_status,
+                            system_status = EXCLUDED.system_status;
+                    """, (
+                        po_number, description, po_date, is_budgeted, gl_code,
+                        expense_type, estimated_cost, recommended_vendor,
+                        justification_notes, submission_status, system_status
+                    ))
                     conn.commit()
-                message = f"Project '{proj_ref}' saved successfully!"
+                message = f"Purchase Order '{po_number}' saved successfully!"
             except Exception as e:
-                message = f"Error saving project: {e}"
+                message = f"Error saving purchase order: {e}"
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # 1. Fetch synced GL codes and descriptions from Neon master_budget table
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
             gl_records = cur.fetchall()
 
-            # 2. Fetch evaluated scores view for default or target project
             target_ref = request.args.get("project_ref", "2026_02")
             cur.execute("""
                 SELECT vendor_name, projected_5yr_total, calculated_price_score, 
@@ -141,7 +162,6 @@ def purchase_order_form():
     finally:
         conn.close()
 
-    # Renders your po_form.html template, passing the dynamic GL records and evaluated rows
     return render_template(
         "po_form.html", 
         gl_records=gl_records, 
