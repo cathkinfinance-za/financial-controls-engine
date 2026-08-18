@@ -1,6 +1,7 @@
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from flask import jsonify
 from flask import Flask, render_template, request, redirect, url_for
 
 app = Flask(__name__)
@@ -8,6 +9,24 @@ app = Flask(__name__)
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
+
+@app.route('/api/budget-details')
+def budget_details():
+    gl_code = request.args.get('gl_code')
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT ytd, budget_ytd, variance, total_budget 
+                FROM master_budget 
+                WHERE gl_code = %s;
+            """, (gl_code,))
+            row = cur.fetchone()
+            if row:
+                return jsonify(row)
+    finally:
+        conn.close()
+    return jsonify({})
 
 @app.route("/", methods=["GET", "POST"])
 def purchase_order_form():

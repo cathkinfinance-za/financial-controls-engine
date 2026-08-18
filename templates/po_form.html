@@ -62,12 +62,6 @@
                         <option value="Emergency">Emergency</option>
                     </select>
                 </div>
-            
-
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>GL Description (from Select GL Code)</label>
-                <input type="text" value="" disabled>
-            </div>
 
             <div class="form-group" style="margin-bottom: 15px;">
                 <label>Estimated Cost</label>
@@ -175,6 +169,48 @@
         <button type="submit" class="submit-btn">Save</button>
     </form>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const glSelect = document.querySelector('select[name="gl_code"]');
+        const budgetedSelect = document.querySelector('select[name="is_budgeted"]');
+
+        async function updateFinancials() {
+            const glCode = glSelect.value;
+            if (!glCode) return;
+
+            try {
+                const response = await fetch(`/api/budget-details?gl_code=${encodeURIComponent(glCode)}`);
+                const data = await response.json();
+
+                // Populate Financial Summary fields
+                document.querySelector('input[name="ytd_actual"]').value = data.ytd || 0;
+                document.querySelector('input[name="budget_ytd"]').value = data.budget_ytd || 0;
+                document.querySelector('input[name="variance"]').value = data.variance || 0;
+                document.querySelector('input[name="total_annual_budget"]').value = data.total_budget || 0;
+
+                calculateBufferPool(data.total_budget || 0);
+            } catch (err) {
+                console.error("Error fetching budget details:", err);
+            }
+        }
+
+        function calculateBufferPool(totalBudget) {
+            const isBudgeted = budgetedSelect.value;
+            let bufferPool = 0;
+            if (isBudgeted === "Yes") {
+                bufferPool = (parseFloat(totalBudget) / 12) * 2;
+            }
+            document.querySelector('input[name="buffer_pool"]').value = bufferPool.toFixed(2);
+        }
+
+        if (glSelect) glSelect.addEventListener('change', updateFinancials);
+        if (budgetedSelect) budgetedSelect.addEventListener('change', function() {
+            const totalBudget = document.querySelector('input[name="total_annual_budget"]').value || 0;
+            calculateBufferPool(totalBudget);
+        });
+    });
+</script>
 
 </body>
 </html>
