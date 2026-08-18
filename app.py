@@ -187,6 +187,7 @@ def po_form():
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
+                # Parse comma-separated URLs into a list for frontend loop rendering
                 if selected_po and selected_po.get('quote_filepath'):
                     selected_po['quote_urls'] = [
                         u.strip() for u in selected_po['quote_filepath'].split(',') if u.strip()

@@ -46,7 +46,7 @@
             </div>
         {% endif %}
 
-        <form action="/po_form" method="POST">
+        <form action="/po_form" method="POST" enctype="multipart/form-data">
     <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
 
     <fieldset>
@@ -200,7 +200,15 @@
                     {% for url in selected_po.quote_urls %}
                         <div style="margin-bottom: 6px; font-size: 0.9em;">
                             <a href="{{ url }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
-                                📄 View Quote {{ loop.index }}
+                                📄 View Uploaded Document {{ loop.index }}
+                            </a>
+                        </div>
+                    {% endfor %}
+                {% elif selected_po and selected_po.quote_filepath %}
+                    {% for url in selected_po.quote_filepath.split(',') %}
+                        <div style="margin-bottom: 6px; font-size: 0.9em;">
+                            <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
+                                📄 View Uploaded Document {{ loop.index }}
                             </a>
                         </div>
                     {% endfor %}
@@ -209,6 +217,7 @@
                 {% endif %}
             </div>
         </div>
+        
         <div class="form-group">
             <label>Quotes Provided</label>
             <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
