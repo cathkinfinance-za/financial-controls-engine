@@ -150,7 +150,7 @@ def purchase_order_form():
                             recommended_vendor = EXCLUDED.recommended_vendor,
                             justification_notes = EXCLUDED.justification_notes,
                             submission_status = EXCLUDED.submission_status,
-                            system_status = EXCLUDED.system_status;
+                            system_status = COALESCE(NULLIF(EXCLUDED.system_status, ''), po_log.system_status);
                     """, (
                         po_number, description, po_date, is_budgeted, gl_code, gl_code_id,
                         expense_type, estimated_cost, recommended_vendor,
