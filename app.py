@@ -217,29 +217,66 @@ def simple_po_form():
         original_po = request.form.get("original_po_number", "").strip()
         new_po = request.form.get("po_number", "").strip()
         description = request.form.get("description", "").strip()
+        po_date = request.form.get("po_date") or None
+        is_budgeted = request.form.get("is_budgeted")
+        gl_code = request.form.get("gl_code")
+        expense_type = request.form.get("expense_type")
+        
+        try:
+            estimated_cost = float(request.form.get("estimated_cost") or 0.0)
+        except ValueError:
+            estimated_cost = 0.0
 
         if new_po:
             try:
                 with conn.cursor() as cur:
+                    # Look up primary key for the selected GL account
+                    gl_code_id = None
+                    if gl_code:
+                        cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
+                        gl_row = cur.fetchone()
+                        gl_code_id = gl_row['id'] if gl_row else None
+
                     if original_po:
-                        # Updates existing PO row using original key
+                        # Update existing row
                         cur.execute("""
                             UPDATE po_log 
-                            SET po_number = %s, description = %s
+                            SET po_number = %s,
+                                description = %s,
+                                po_date = %s,
+                                is_budgeted = %s,
+                                gl_code = %s,
+                                gl_code_id = %s,
+                                expense_type = %s,
+                                estimated_cost = %s
                             WHERE po_number = %s;
-                        """, (new_po, description, original_po))
+                        """, (
+                            new_po, description, po_date, is_budgeted, 
+                            gl_code, gl_code_id, expense_type, estimated_cost, original_po
+                        ))
                     else:
-                        # Inserts new PO row
+                        # Insert new row
                         cur.execute("""
-                            INSERT INTO po_log (po_number, description)
-                            VALUES (%s, %s)
-                            ON CONFLICT (po_number) DO UPDATE 
-                            SET description = EXCLUDED.description;
-                        """, (new_po, description))
+                            INSERT INTO po_log (
+                                po_number, description, po_date, is_budgeted, 
+                                gl_code, gl_code_id, expense_type, estimated_cost
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (po_number) DO UPDATE SET
+                                description = EXCLUDED.description,
+                                po_date = EXCLUDED.po_date,
+                                is_budgeted = EXCLUDED.is_budgeted,
+                                gl_code = EXCLUDED.gl_code,
+                                gl_code_id = EXCLUDED.gl_code_id,
+                                expense_type = EXCLUDED.expense_type,
+                                estimated_cost = EXCLUDED.estimated_cost;
+                        """, (
+                            new_po, description, po_date, is_budgeted, 
+                            gl_code, gl_code_id, expense_type, estimated_cost
+                        ))
                     
                     conn.commit()
                 
-                # Redirects back to the simple route
                 return redirect(url_for('simple_po_form', po_number=new_po))
 
             except Exception as e:
@@ -249,20 +286,26 @@ def simple_po_form():
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # Fetch GL accounts for dropdown list
+            cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
+            gl_records = cur.fetchall()
+
+            # Sidebar records query
             cur.execute("SELECT po_number, description FROM po_log ORDER BY created_at DESC;")
             saved_pos = cur.fetchall()
 
+            # Active record fetch
             selected_po_num = request.args.get("po_number")
             if selected_po_num:
-                cur.execute("SELECT po_number, description FROM po_log WHERE po_number = %s;", (selected_po_num,))
+                cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
     finally:
         conn.close()
 
-    # Renders the simplified HTML file
     return render_template(
         "po_form_simple.html", 
+        gl_records=gl_records,
         saved_pos=saved_pos,
         selected_po=selected_po,
         message=message

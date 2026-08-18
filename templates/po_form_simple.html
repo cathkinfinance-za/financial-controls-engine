@@ -47,27 +47,90 @@
         {% endif %}
 
         <form action="/simple" method="POST">
-            <!-- Hidden field to track original PO key during edits -->
-            <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
+    <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
 
-            <fieldset>
-                <legend>Purchase Order Details</legend>
+    <fieldset>
+        <legend>Purchase Order Details</legend>
 
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label>PO Number</label>
-                    <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
-                </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>PO Number</label>
+            <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
+        </div>
 
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label>Description</label>
-                    <textarea name="description" rows="4">{{ selected_po.description if selected_po else '' }}</textarea>
-                </div>
-            </fieldset>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>Description</label>
+            <textarea name="description" rows="3">{{ selected_po.description if selected_po else '' }}</textarea>
+        </div>
 
-            <button type="submit" class="submit-btn">Save</button>
-        </form>
-    </div>
-</div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Date</label>
+                <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
+            </div>
+            <div class="form-group">
+                <label>Has this been budgeted for?</label>
+                <select name="is_budgeted">
+                    <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
+                    <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
+                    <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Select GL Code</label>
+            <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
+            <select name="gl_code" id="gl-code-select">
+                <option value="" disabled {% if not selected_po or not selected_po.gl_code %}selected{% endif %}>Select GL Code</option>
+                {% for gl in gl_records %}
+                    <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
+                        {{ gl.gl_code }} - {{ gl.description }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Expense Type</label>
+            <select name="expense_type">
+                <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
+                <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
+                <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
+                <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
+                <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+            <label>Estimated Cost</label>
+            <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
+        </div>
+    </fieldset>
+
+    <button type="submit" class="submit-btn">Save</button>
+</form>
+
+<script>
+    // Live filter JS for GL code dropdown search input
+    const searchInput = document.getElementById('gl-search-input');
+    const selectElement = document.getElementById('gl-code-select');
+
+    if (searchInput && selectElement) {
+        searchInput.addEventListener('input', function() {
+            const filter = searchInput.value.toLowerCase();
+            const options = selectElement.options;
+
+            for (let i = 0; i < options.length; i++) {
+                const text = options[i].text.toLowerCase();
+                if (i === 0) {
+                    options[i].style.display = "";
+                    continue;
+                }
+                options[i].style.display = text.includes(filter) ? "" : "none";
+            }
+        });
+    }
+</script>
 
 </body>
 </html>
