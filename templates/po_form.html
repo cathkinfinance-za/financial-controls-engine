@@ -67,12 +67,12 @@
 
                 <div class="form-group">
                     <label>Select GL Code</label>
-                    <select name="gl_code">
-                        <option value="" disabled selected>Select GL Code</option>
+                    <input type="text" list="gl_options" name="gl_code" placeholder="Type to search GL code or description..." value="{{ selected_po.gl_code if selected_po else '' }}">
+                    <datalist id="gl_options">
                         {% for gl in gl_records %}
-                            <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>{{ gl.gl_code }} - {{ gl.description }}</option>
+                            <option value="{{ gl.gl_code }}">{{ gl.gl_code }} - {{ gl.description }}</option>
                         {% endfor %}
-                    </select>
+                    </datalist>
                 </div>
                 <div class="form-group">
                     <label>Expense Type</label>
@@ -194,7 +194,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const glSelect = document.querySelector('select[name="gl_code"]');
+        const glSelect = document.querySelector('input[name="gl_code"]');
         const budgetedSelect = document.querySelector('select[name="is_budgeted"]');
 
         async function updateFinancials() {
@@ -231,8 +231,14 @@
             const totalBudget = document.querySelector('input[name="total_annual_budget"]').value || 0;
             calculateBufferPool(totalBudget);
         });
-    });
 
+        // Automatically trigger evaluation/financial fetch if a saved PO is loaded with values
+        if (glSelect && glSelect.value) {
+            updateFinancials().then(() => {
+                evaluateSystemStatusLive();
+            });
+        }
+    });
 
     const fileInput = document.getElementById('quote-files');
     const quotesProvidedInput = document.querySelector('input[name="quotes_provided"]');
@@ -243,11 +249,9 @@
             if (quotesProvidedInput) {
                 quotesProvidedInput.value = count;
             }
-            // Trigger the status recalculation right after updating the count
             evaluateSystemStatusLive();
         });
     }
-
 
     // Live System Status evaluation function
     async function evaluateSystemStatusLive() {
@@ -283,7 +287,6 @@
         element.addEventListener('change', evaluateSystemStatusLive);
         element.addEventListener('input', evaluateSystemStatusLive);
     });
-
 </script>
 
 </body>
