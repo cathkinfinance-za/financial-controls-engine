@@ -189,16 +189,26 @@
     <!-- UI FEEDBACK FOR NEWLY SELECTED FILES -->
     <div id="quotes_count_display" style="margin-top: 6px; font-size: 0.9em; color: #6c757d; display: none;"></div>
 
-        <!-- DISPLAY EXISTING QUOTE LINK(S) -->
-        {% if selected_po and selected_po.quote_filepath %}
-            <div style="margin-top: 10px; padding: 8px 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;">
-                <span style="font-size: 0.85em; color: #6c757d; display: block; margin-bottom: 4px;">Existing Attachment:</span>
-                <a href="{{ selected_po.quote_filepath }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
-                    📄 View / Download Uploaded Quote Document
-                </a>
+        <!-- DISPLAY ATTACHED QUOTES -->
+        <div id="attachments_list_container" style="margin-top: 10px; padding: 10px 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;">
+            <span style="font-size: 0.85em; color: #6c757d; display: block; margin-bottom: 6px; font-weight: 600;">
+                Attached Documents:
+            </span>
+            
+            <div id="attachments_list">
+                {% if selected_po and selected_po.quote_urls %}
+                    {% for url in selected_po.quote_urls %}
+                        <div style="margin-bottom: 6px; font-size: 0.9em;">
+                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
+                                📄 View Quote {{ loop.index }}
+                            </a>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <span id="no_attachments_text" style="font-size: 0.85em; color: #a0aec0;">No documents attached yet.</span>
+                {% endif %}
             </div>
-        {% endif %}
-    </div>
+        </div>
         <div class="form-group">
             <label>Quotes Provided</label>
             <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
@@ -243,7 +253,7 @@
 </form>
 
 <script>
-    // Live filter JS for GL code dropdown search input
+    // 1. Live filter JS for GL code dropdown search input
     const searchInput = document.getElementById('gl-search-input');
     const selectElement = document.getElementById('gl-code-select');
 
@@ -263,8 +273,8 @@
         });
     }
 
-    // Auto-fetch financial metrics when GL Code selection changes
-    document.getElementById('gl-code-select').addEventListener('change', function() {
+    // 2. Auto-fetch financial metrics when GL Code selection changes
+    document.getElementById('gl-code-select')?.addEventListener('change', function() {
         const glCode = this.value;
         if (!glCode) return;
 
@@ -283,31 +293,54 @@
             .catch(err => console.error('Error fetching budget details:', err));
     }); 
 
-    function updateQuotesCount() {
-        const fileInput = document.getElementById('attach_quotes');
-        const quotesField = document.getElementById('quotes_provided');
-        if (fileInput && fileInput.files) {
-            quotesField.value = fileInput.files.length;
-        }
-        calculateSystemStatus();
-    }
-
-
+    // 3. Single consolidated function for handling file uploads & quote count
     function updateQuotesCount(input) {
     const display = document.getElementById('quotes_count_display');
-    if (!display) return;
+    const quotesField = document.getElementById('quotes_provided');
+    const attachmentsList = document.getElementById('attachments_list');
+    const files = input.files ? Array.from(input.files) : [];
+    const count = files.length;
 
-    const count = input.files ? input.files.length : 0;
-    
-    if (count > 0) {
-        display.style.display = 'block';
-        display.textContent = `${count} file${count > 1 ? 's' : ''} selected for upload.`;
-    } else {
-        display.style.display = 'none';
-        display.textContent = '';
+    // Update Quotes Provided count dynamically
+    if (quotesField && count > 0) {
+        quotesField.value = count;
+    }
+
+    // Display helper message
+    if (display) {
+        if (count > 0) {
+            display.style.display = 'block';
+            display.textContent = `${count} file${count > 1 ? 's' : ''} selected for upload.`;
+        } else {
+            display.style.display = 'none';
+            display.textContent = '';
         }
     }
 
+    // Render client-side file links for selected files
+    if (attachmentsList && count > 0) {
+        attachmentsList.innerHTML = ''; // Clear previous/placeholder entries
+
+        files.forEach((file, index) => {
+            const objectUrl = URL.createObjectURL(file);
+            const item = document.createElement('div');
+            item.style.marginBottom = '6px';
+            item.style.fontSize = '0.9em';
+
+            item.innerHTML = `
+                <a href="${objectUrl}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
+                    📄 Preview ${file.name} (Ready to upload)
+                </a>
+            `;
+            attachmentsList.appendChild(item);
+        });
+    }
+
+    // Recalculate system compliance status
+    calculateSystemStatus();
+}
+
+    // 4. Dynamic calculation engine for SYSTEM STATUS
     function calculateSystemStatus() {
         const submissionStatus = document.querySelector('[name="submission_status"]')?.value || '';
         const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value || '';
@@ -369,22 +402,27 @@
         }
     }
 
+    // 5. Attach live listeners to form elements so system status updates on every field change
     document.addEventListener('DOMContentLoaded', function() {
-    const fileInput = document.querySelector('input[type="file"][name="attach_quotes"]') 
-                   || document.querySelector('input[type="file"][name="quote_attachment"]');
-    const quotesProvidedInput = document.getElementById('quotes_provided') 
-                             || document.querySelector('input[name="quotes_provided"]');
+        const formInputs = [
+            'submission_status', 
+            'is_budgeted', 
+            'gl_code', 
+            'expense_type', 
+            'estimated_cost'
+        ];
 
-    if (fileInput && quotesProvidedInput) {
-        fileInput.addEventListener('change', function() {
-            const count = this.files ? this.files.length : 0;
-            if (count > 0) {
-                quotesProvidedInput.value = count;
+        formInputs.forEach(fieldName => {
+            const el = document.querySelector(`[name="${fieldName}"]`);
+            if (el) {
+                el.addEventListener('change', calculateSystemStatus);
+                el.addEventListener('input', calculateSystemStatus);
             }
         });
-    }
-});
 
+        // Run initial evaluation on load
+        calculateSystemStatus();
+    });
 </script>   
 
 </body>
