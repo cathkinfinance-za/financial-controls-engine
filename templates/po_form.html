@@ -133,8 +133,7 @@
 
     <div class="form-group" style="margin-bottom: 15px;">
         <label>Latest AI Status</label>
-        <input type="text" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
-    </div>
+        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">    </div>
 </fieldset>
 
 <!-- Financial Summary (Read Only) -->
@@ -191,7 +190,7 @@
 
     <div class="form-group" style="margin-top: 15px;">
         <label>SYSTEM STATUS</label>
-        <input type="text" id="system_status" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa; font-weight: bold; width: 100%;">
+        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
     </div>
 
     <div class="form-row" style="margin-top: 15px;">
