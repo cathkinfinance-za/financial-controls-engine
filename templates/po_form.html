@@ -20,7 +20,8 @@
                 <li>
                     <a href="/?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
                         <strong>{{ po.po_number }}</strong><br>
-                        <span style="font-size: 0.8em; color: #bdc3c7;">{{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}</span>                    </a>
+                        <span style="font-size: 0.8em; color: #bdc3c7;">{{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}</span>                    
+                    </a>
                 </li>
                 {% endfor %}
             {% else %}
