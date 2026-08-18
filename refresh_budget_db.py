@@ -44,7 +44,9 @@ def fetch_and_sync_weconnectu_budget():
     
     containers = soup.find_all(['tr', 'div', 'p'])
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
-    currency_pattern = re.compile(r'\(?\d{1,3}(?:\s?\d{3})*(?:\.\d{2})?\)?')
+    
+    # Improved regex to capture digits with optional spaces, commas, decimals, or negative brackets
+    currency_pattern = re.compile(r'\(?\d{1,3}(?:[,\s]?\d{3})*(?:\.\d+)?\)?')
 
     for element in containers:
         text_line = element.text.strip()
@@ -55,8 +57,11 @@ def fetch_and_sync_weconnectu_budget():
         if gl_match:
             gl_code = gl_match.group(1)
             remainder = text_line.replace(gl_code, '', 1).strip()
+            
             all_numbers = currency_pattern.findall(remainder)
-            clean_metrics = [num.strip() for num in all_numbers if '.' in num or num.strip() == '0' or num.strip() == '0.00']
+            
+            # Keep all valid captured numbers (removed the strict '.' requirement that dropped whole numbers)
+            clean_metrics = [num.strip() for num in all_numbers if num.strip() != '']
             
             description = remainder
             for num in clean_metrics:
@@ -66,36 +71,33 @@ def fetch_and_sync_weconnectu_budget():
             if not description:
                 description = "Operational Portfolio Allocation"
 
-            # Safely parse metrics based on available length
-            if len(clean_metrics) >= 8:
-                # If July is present (e.g. Mar, Apr, May, Jun, Jul + YTD, Budget YTD, Variance, Total Budget)
+            # Safely parse mapping the last 4 fixed summary columns from the back
+            if len(clean_metrics) >= 4:
+                total_budget = clean_and_convert_number(clean_metrics[-1])
+                variance = clean_and_convert_number(clean_metrics[-2])
+                budget_ytd = clean_and_convert_number(clean_metrics[-3])
+                ytd = clean_and_convert_number(clean_metrics[-4])
+                
+                # Months are everything before the last 4 metrics
+                months = clean_metrics[:-4]
+                mar_2026 = clean_and_convert_number(months[0]) if len(months) > 0 else 0.0
+                apr_2026 = clean_and_convert_number(months[1]) if len(months) > 1 else 0.0
+                may_2026 = clean_and_convert_number(months[2]) if len(months) > 2 else 0.0
+                jun_2026 = clean_and_convert_number(months[3]) if len(months) > 3 else 0.0
+                jul_2026 = clean_and_convert_number(months[4]) if len(months) > 4 else 0.0
+
                 financial_data.append({
                     "gl_code": gl_code,
                     "description": description,
-                    "mar_2026": clean_and_convert_number(clean_metrics[0]),
-                    "apr_2026": clean_and_convert_number(clean_metrics[1]),
-                    "may_2026": clean_and_convert_number(clean_metrics[2]),
-                    "jun_2026": clean_and_convert_number(clean_metrics[3]),
-                    "jul_2026": clean_and_convert_number(clean_metrics[4]),
-                    "ytd": clean_and_convert_number(clean_metrics[5]),
-                    "budget_ytd": clean_and_convert_number(clean_metrics[6]),
-                    "variance": clean_and_convert_number(clean_metrics[7]),
-                    "total_budget": clean_and_convert_number(clean_metrics[8]) if len(clean_metrics) > 8 else 0.0
-                })
-            elif len(clean_metrics) == 7:
-                # Fallback if July isn't in the grid yet
-                financial_data.append({
-                    "gl_code": gl_code,
-                    "description": description,
-                    "mar_2026": clean_and_convert_number(clean_metrics[0]),
-                    "apr_2026": clean_and_convert_number(clean_metrics[1]),
-                    "may_2026": clean_and_convert_number(clean_metrics[2]),
-                    "jun_2026": clean_and_convert_number(clean_metrics[3]),
-                    "jul_2026": 0.0,
-                    "ytd": clean_and_convert_number(clean_metrics[4]),
-                    "budget_ytd": clean_and_convert_number(clean_metrics[5]),
-                    "variance": clean_and_convert_number(clean_metrics[6]),
-                    "total_budget": clean_and_convert_number(clean_metrics[7])
+                    "mar_2026": mar_2026,
+                    "apr_2026": apr_2026,
+                    "may_2026": may_2026,
+                    "jun_2026": jun_2026,
+                    "jul_2026": jul_2026,
+                    "ytd": ytd,
+                    "budget_ytd": budget_ytd,
+                    "variance": variance,
+                    "total_budget": total_budget
                 })
 
     df = pd.DataFrame(financial_data)
