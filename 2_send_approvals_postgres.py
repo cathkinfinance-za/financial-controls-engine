@@ -1,5 +1,7 @@
 import os
+import json
 import smtplib
+import urllib.request
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -8,6 +10,7 @@ import csv
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from duckduckgo_search import DDGS
 from google import genai
 from google.genai import types
 
@@ -57,31 +60,160 @@ def write_control_log(po_number, action_type, user_email, notes=""):
     except Exception as e:
         log(f"Control Log Error: {e}", "WARNING")
 
-def get_gemini_analysis(po_num, desc_val, expense_type, cost, remaining_budget):
-    """Uses Gemini API to generate live audit analysis."""
+def fetch_file_bytes_and_mime(location):
+    """Fetches binary data from a local filepath or remote Vercel Blob URL."""
+    try:
+        location_lower = location.lower().strip()
+        if location_lower.endswith(('thumbs.db', '.ds_store', '.txt', '.csv', '.xlsm', '.xlsx')):
+            return None, None
+
+        mime_type = "application/pdf" if location_lower.endswith('.pdf') else (
+            "image/jpeg" if location_lower.endswith(('.jpg', '.jpeg')) else (
+            "image/png" if location_lower.endswith('.png') else (
+            "image/webp" if location_lower.endswith('.webp') else None
+        )))
+
+        if not mime_type:
+            mime_type = "application/pdf" # Default fallback for quote attachments
+
+        if location.startswith("http://") or location.startswith("https://"):
+            req = urllib.request.Request(location, headers={'User-Agent': 'Mozilla/5.0'})
+            with urllib.request.urlopen(req) as resp:
+                data = resp.read()
+                return data, mime_type
+        elif os.path.exists(location):
+            with open(location, "rb") as f:
+                return f.read(), mime_type
+    except Exception as err:
+        log(f"Unable to read file/URL ({location}): {err}", "WARNING")
+    
+    return None, None
+
+def get_gemini_analysis(record):
+    """Executes multi-phase AI audit using exact PostgreSQL schema mapping."""
     api_key = os.getenv("GEMINI_API_KEY")
+    po_num = str(record.get('po_number', '')).strip()
+    
     if not api_key:
         log(f"PO {po_num}: Skipping Gemini API call (GEMINI_API_KEY not found).", "WARNING")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
 
     try:
-        log(f"PO {po_num}: Contacting Gemini API for AI analysis...")
         client = genai.Client(api_key=api_key)
-        prompt = f"""
-Perform a concise compliance and budget risk evaluation for Purchase Order {po_num}:
-- Description: {desc_val}
-- Expense Type: {expense_type}
-- Estimated Cost: R{cost:,.2f}
-- Remaining GL Budget: R{remaining_budget:,.2f}
+        
+        # Mapped directly from po_log & master_budget schemas
+        desc_val = str(record.get('description') or 'Operational Procurement').strip()
+        cost = float(record.get('estimated_cost') or 0.0)
+        gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
+        user_recommended_vendor = str(record.get('recommended_vendor') or 'N/A').strip()
+        user_justification = str(record.get('justification_notes') or 'N/A').strip()
+        coi_status = str(record.get('conflict_of_interest') or 'No').strip()
+        coi_details = str(record.get('conflict_details') or 'None').strip()
 
-Provide 2-3 bullet points analyzing spend risk, budget compliance, and procurement approval recommendations.
-"""
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
+        # Parse comma-separated quote URLs stored in 'quote_filepath'
+        raw_filepaths = record.get('quote_filepath') or ''
+        quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
+
+        # ----------------------------------------------------
+        # PHASE 1: DOCUMENT PARSING & METADATA EXTRACTION
+        # ----------------------------------------------------
+        parse_contents = [
+            f"""Examine the attached quote documentation for Purchase Order {po_num}.
+Extract and return ONLY a valid JSON object:
+{{
+    "legal_name": "Full Legal / Vendor Name",
+    "cipc_number": "Company Registration Number if found else N/A",
+    "vat_number": "VAT Number if found else N/A"
+}}"""
+        ]
+
+        for file_loc in quote_attachments:
+            file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
+            if file_data and mime_type:
+                parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
+
+        log(f"PO {po_num}: 📑 Parsing vendor metadata from quote documents...")
+        parse_response = client.models.generate_content(
+            model='gemini-3.5-flash-lite',
+            contents=parse_contents,
+            config=types.GenerateContentConfig(response_mime_type="application/json")
         )
-        log(f"PO {po_num}: Successfully generated Gemini analysis.")
-        return response.text.strip()
+
+        try:
+            vendor_meta = json.loads(parse_response.text or "{}")
+        except Exception:
+            vendor_meta = {}
+
+        extracted_vendor_name = vendor_meta.get("legal_name") or user_recommended_vendor
+        cipc_num = vendor_meta.get("cipc_number") or "N/A"
+        vat_num = vendor_meta.get("vat_number") or "N/A"
+
+        # ----------------------------------------------------
+        # PHASE 2: DUCKDUCKGO WEB SEARCH (OSINT)
+        # ----------------------------------------------------
+        log(f"PO {po_num}: 🌐 Fetching public OSINT records for '{extracted_vendor_name}' via DuckDuckGo...")
+        search_context = ""
+        try:
+            with DDGS() as ddgs:
+                query = f"{extracted_vendor_name} {cipc_num} South Africa compliance risk"
+                results = list(ddgs.text(query, max_results=5))
+                for r in results:
+                    search_context += f"- Title: {r.get('title')}\n  Snippet: {r.get('body')}\n"
+        except Exception as search_err:
+            log(f"PO {po_num}: DuckDuckGo search lookup failed for '{extracted_vendor_name}': {search_err}", "WARNING")
+            search_context = "No direct public OSINT web results returned."
+
+        if not search_context.strip():
+            search_context = "No direct public OSINT web results returned."
+
+        # ----------------------------------------------------
+        # PHASE 3: AUDIT SYNTHESIS
+        # ----------------------------------------------------
+        synthesis_prompt = f"""You are a corporate procurement officer conducting an automated intelligence audit for Purchase Order {po_num}.
+
+Context:
+- Item Description: {desc_val}
+- Estimated Cost: R{cost:,.2f}
+- General Ledger Code: {gl_code_val}
+- Recommended Vendor: {user_recommended_vendor}
+- User Justification: "{user_justification}"
+- Conflict of Interest Declared: {coi_status}
+- Conflict Details: "{coi_details}"
+
+Extracted Vendor Metadata:
+- Legal Name: {extracted_vendor_name}
+- CIPC Reg: {cipc_num}
+- VAT Reg: {vat_num}
+
+Public OSINT Web Findings (DuckDuckGo):
+{search_context}
+
+TASKS:
+1. FINANCIAL AUDIT & CROSS-VERIFICATION
+   - Cross-verify pricing across attached quote files against R{cost:,.2f}.
+   - Evaluate vendor choice and budget health impact.
+
+2. PUBLIC VENDOR DUE DILIGENCE (PUBLIC OSINT):
+   - Assess the public operational footprint and legitimacy of '{extracted_vendor_name}' in South Africa.
+   - Highlight required statutory / industry accreditations (e.g., PSIRA for security, ECA/ECB for electrical, CIDB/NHBRC for construction) relevant to '{desc_val}'.
+   - Note any public risk indicators (adverse litigation, insolvency notices, CIPC compliance status, or severe consumer complaint trends).
+   - Assign a Due Diligence status: Passed, Caution, or High Risk.
+
+CRITICAL STRUCTURAL REQUIREMENTS:
+Include a dedicated markdown section labeled '### PUBLIC VENDOR DUE DILIGENCE REPORT' in your main text.
+
+At the absolute end of your response, output exactly these two lines:
+VENDOR_DD_STATUS: [Passed / Caution / High Risk]
+AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
+
+        log(f"PO {po_num}: Generating Gemini audit synthesis...")
+        synthesis_response = client.models.generate_content(
+            model="gemini-3.5-flash",
+            contents=synthesis_prompt
+        )
+        
+        return synthesis_response.text.strip()
+
     except Exception as e:
         log(f"PO {po_num}: Gemini API Exception: {e}", "ERROR")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
@@ -169,19 +301,19 @@ def process_postgres_approvals():
                     log(f"⏩ Skipping PO {po_num}: Blocked by system status ('{system_status}').", "WARNING")
                     continue
                 
-                cost = float(record.get('estimated_cost', 0.0))
-                desc_val = str(record.get('description', 'Operational Procurement')).strip()
-                expense_type = str(record.get('expense_type', '')).strip()
-                gl_code_val = str(record.get('master_gl_code', 'N/A')).strip()
+                cost = float(record.get('estimated_cost') or 0.0)
+                desc_val = str(record.get('description') or 'Operational Procurement').strip()
+                expense_type = str(record.get('expense_type') or '').strip()
+                gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
                 
-                total_budget = float(record.get('total_annual_budget', 0.0))
-                ytd_actual = float(record.get('ytd_actual', 0.0))
-                remaining_budget = float(record.get('variance', 0.0))
+                total_budget = float(record.get('total_annual_budget') or 0.0)
+                ytd_actual = float(record.get('ytd_actual') or 0.0)
+                remaining_budget = float(record.get('variance') or 0.0)
                 
                 log(f"PO {po_num} Summary: Cost=R{cost:,.2f}, Type='{expense_type}', GL='{gl_code_val}'")
 
-                # Generate live Gemini analysis
-                ai_analysis_text = get_gemini_analysis(po_num, desc_val, expense_type, cost, remaining_budget)
+                # Run multi-phase Gemini analysis
+                ai_analysis_text = get_gemini_analysis(record)
                 
                 # Routing
                 to_list = [approver_emails.get("Estate Manager")]
