@@ -1,5 +1,6 @@
 import os
 import psycopg2
+import vercel_blob
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 
@@ -64,6 +65,19 @@ def po_form():
         ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
         system_status = request.form.get("system_status", "").strip()
 
+        # --- VERCEL BLOB UPLOAD LOGIC ---
+        quote_file = request.files.get('quote_attachment')
+        quote_url = None
+
+        if quote_file and quote_file.filename:
+            # Upload file directly to Vercel Blob cloud storage
+            blob_response = vercel_blob.put(
+                f"quotes/{quote_file.filename}", 
+                quote_file.read(), 
+                options={"access": "public"}
+            )
+            quote_url = blob_response.get('url')
+
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
         except ValueError:
@@ -91,13 +105,14 @@ def po_form():
                                 gl_code = %s, gl_code_id = %s, expense_type = %s, estimated_cost = %s,
                                 recommended_vendor = %s, justification_notes = %s, submission_status = %s,
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
-                                actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s
+                                actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
+                                quote_filepath = COALESCE(%s, quote_filepath)
                             WHERE po_number = %s;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary, original_po
+                            actioned_by, approval_notes, ai_recommendation_summary, quote_url, original_po
                         ))
                     else:
                         cur.execute("""
@@ -105,9 +120,9 @@ def po_form():
                                 po_number, description, po_date, is_budgeted, gl_code, gl_code_id, 
                                 expense_type, estimated_cost, recommended_vendor, justification_notes, 
                                 submission_status, system_status, quotes_provided, actioned_date, 
-                                actioned_by, approval_notes, ai_recommendation_summary
+                                actioned_by, approval_notes, ai_recommendation_summary, quote_filepath
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (po_number) DO UPDATE SET
                                 description = EXCLUDED.description,
                                 po_date = EXCLUDED.po_date,
@@ -124,12 +139,13 @@ def po_form():
                                 actioned_date = EXCLUDED.actioned_date,
                                 actioned_by = EXCLUDED.actioned_by,
                                 approval_notes = EXCLUDED.approval_notes,
-                                ai_recommendation_summary = EXCLUDED.ai_recommendation_summary;
+                                ai_recommendation_summary = EXCLUDED.ai_recommendation_summary,
+                                quote_filepath = COALESCE(EXCLUDED.quote_filepath, po_log.quote_filepath);
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary
+                            actioned_by, approval_notes, ai_recommendation_summary, quote_url
                         ))
                     
                     conn.commit()
