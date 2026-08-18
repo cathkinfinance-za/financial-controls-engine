@@ -50,7 +50,7 @@ Perform a concise compliance and budget risk evaluation for Purchase Order {po_n
 Provide 2-3 bullet points analyzing spend risk, budget compliance, and procurement approval recommendations.
 """
         response = client.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
         )
         return response.text.strip()
@@ -128,7 +128,7 @@ def process_postgres_approvals():
                 ytd_actual = float(record.get('ytd_actual', 0.0))
                 remaining_budget = float(record.get('variance', 0.0))
                 
-                # Dynamic Gemini Intelligence Summary
+                # Generate live Gemini analysis
                 ai_analysis_text = get_gemini_analysis(po_num, desc_val, expense_type, cost, remaining_budget)
                 
                 # Routing
@@ -165,12 +165,17 @@ Automated Compliance Engine"""
                 if send_approval_email(to_list, cc_list, email_subject, email_body):
                     with conn.cursor() as update_cursor:
                         update_cursor.execute(
-                            "UPDATE po_log SET submission_status = %s WHERE id = %s;",
-                            ("Sent", record['id'])
+                            """
+                            UPDATE po_log 
+                            SET submission_status = %s,
+                                ai_recommendation_summary = %s 
+                            WHERE id = %s;
+                            """,
+                            ("Sent", ai_analysis_text, record['id'])
                         )
                         conn.commit()
                     write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), "Emailed approvers.")
-                    print(f"🚀 Delivery successful for {po_num}.")
+                    print(f"🚀 Delivery successful for {po_num}. AI Summary saved to DB.")
     finally:
         conn.close()
 
