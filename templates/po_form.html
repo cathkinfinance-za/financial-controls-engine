@@ -369,14 +369,22 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const inputs = document.querySelectorAll('input, select, textarea');
-        inputs.forEach(input => {
-            input.addEventListener('input', calculateSystemStatus);
-            input.addEventListener('change', calculateSystemStatus);
+    document.addEventListener('DOMContentLoaded', function() {
+    const fileInput = document.querySelector('input[type="file"][name="attach_quotes"]') 
+                   || document.querySelector('input[type="file"][name="quote_attachment"]');
+    const quotesProvidedInput = document.getElementById('quotes_provided') 
+                             || document.querySelector('input[name="quotes_provided"]');
+
+    if (fileInput && quotesProvidedInput) {
+        fileInput.addEventListener('change', function() {
+            const count = this.files ? this.files.length : 0;
+            if (count > 0) {
+                quotesProvidedInput.value = count;
+            }
         });
-        calculateSystemStatus();
-    });
+    }
+});
+
 </script>   
 
 </body>
