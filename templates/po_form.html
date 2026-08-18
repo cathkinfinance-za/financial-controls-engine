@@ -189,8 +189,15 @@
     </div>
 
     <div class="form-group" style="margin-top: 15px;">
-        <label>SYSTEM STATUS</label>
-        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
+    <label>SYSTEM STATUS</label>
+    <input 
+        type="text" 
+        id="system_status" 
+        name="system_status" 
+        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+        readonly 
+        style="background-color: #f8f9fa;"
+    >
     </div>
 
     <div class="form-row" style="margin-top: 15px;">
@@ -319,7 +326,7 @@
                 : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)';
         }
 
-        const systemStatusInput = document.getElementById('system_status');
+        const systemStatusInput = document.getElementById('system_status') || document.querySelector('[name="system_status"]');
         if (systemStatusInput) {
             systemStatusInput.value = status;
         }
@@ -333,7 +340,7 @@
         });
         calculateSystemStatus();
     });
-</script>
+</script>   
 
 </body>
 </html>
