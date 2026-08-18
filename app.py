@@ -24,7 +24,10 @@ def budget_details():
                     COALESCE(ytd, 0.00) AS ytd_actual, 
                     COALESCE(total_budget, 0.00) AS total_annual_budget, 
                     COALESCE(budget_ytd, 0.00) AS budget_ytd, 
-                    0.00 AS buffer_pool, 
+                    LEAST(
+                        ROUND(COALESCE(total_budget, 0.00) / 6.0, 2),
+                        GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
+                    ) AS buffer_pool, 
                     COALESCE(variance, 0.00) AS variance 
                 FROM master_budget 
                 WHERE gl_code = %s;
@@ -33,6 +36,7 @@ def budget_details():
             return jsonify(row if row else {})
     finally:
         conn.close()
+        
     return jsonify({})
 
 @app.route('/api/evaluate-status', methods=['POST'])
@@ -335,7 +339,10 @@ def simple_po_form():
                                 COALESCE(ytd, 0.00) AS ytd_actual, 
                                 COALESCE(total_budget, 0.00) AS total_annual_budget, 
                                 COALESCE(budget_ytd, 0.00) AS budget_ytd, 
-                                0.00 AS buffer_pool, 
+                                LEAST(
+                                    ROUND(COALESCE(total_budget, 0.00) / 6.0, 2),
+                                    GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
+                                ) AS buffer_pool, 
                                 COALESCE(variance, 0.00) AS variance 
                             FROM master_budget 
                             WHERE gl_code = %s;
@@ -344,7 +351,6 @@ def simple_po_form():
                     except Exception as err:
                         print(f"Master budget fetch error: {err}")
                         financial_summary = None
-
     finally:
         conn.close()
 
