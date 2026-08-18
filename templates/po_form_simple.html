@@ -106,8 +106,6 @@
             <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
         </div>
     </fieldset>
-
-    <button type="submit" class="submit-btn">Save</button>
 <!-- Vendor Selection & Rationale -->
 <fieldset style="margin-top: 20px;">
     <legend>Vendor Selection & Rationale</legend>
@@ -171,6 +169,8 @@
     </div>
 </fieldset>
 
+<button type="submit" class="submit-btn">Save</button>
+
 </form>
 
 <script>
@@ -212,7 +212,7 @@ document.getElementById('gl-code-select').addEventListener('change', function() 
             }
         })
         .catch(err => console.error('Error fetching budget details:', err));
-});
+}); 
 </script>
 
 </body>

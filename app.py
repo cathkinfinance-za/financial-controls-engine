@@ -220,10 +220,11 @@ def simple_po_form():
         description = request.form.get("description", "").strip()
         po_date = request.form.get("po_date") or None
         is_budgeted = request.form.get("is_budgeted")
-        gl_code = request.form.get("gl_code")
+        
+        # Only extract GL Code if provided
+        gl_code = request.form.get("gl_code", "").strip() or None
         expense_type = request.form.get("expense_type")
         
-        # New Vendor fields
         recommended_vendor = request.form.get("recommended_vendor", "").strip()
         justification_notes = request.form.get("justification_notes", "").strip()
         submission_status = request.form.get("submission_status")
@@ -237,12 +238,14 @@ def simple_po_form():
         if new_po:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
-                    # Look up primary key for selected GL account
                     gl_code_id = None
+                    
+                    # Only look up GL ID if a GL Code was explicitly provided
                     if gl_code:
                         cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
                         gl_row = cur.fetchone()
-                        gl_code_id = gl_row['id'] if gl_row else None
+                        if gl_row:
+                            gl_code_id = gl_row['id']
 
                     if original_po:
                         cur.execute("""
@@ -303,28 +306,32 @@ def simple_po_form():
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch GL accounts for dropdown list
+            # Fetch GL accounts for dropdown
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
             gl_records = cur.fetchall()
 
-            # Sidebar records query
+            # Sidebar list
             cur.execute("SELECT po_number, description FROM po_log ORDER BY created_at DESC;")
             saved_pos = cur.fetchall()
 
-            # Active record fetch
+            # Selected record fetch
             selected_po_num = request.args.get("po_number")
             if selected_po_num:
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
-                # Fetch corresponding financial summary from master_budget
+                # Safely query financial metrics ONLY if a gl_code is attached
                 if selected_po and selected_po.get('gl_code'):
-                    cur.execute("""
-                        SELECT ytd_actual, total_annual_budget, budget_ytd, buffer_pool, variance 
-                        FROM master_budget 
-                        WHERE gl_code = %s;
-                    """, (selected_po['gl_code'],))
-                    financial_summary = cur.fetchone()
+                    try:
+                        cur.execute("""
+                            SELECT ytd_actual, total_annual_budget, budget_ytd, buffer_pool, variance 
+                            FROM master_budget 
+                            WHERE gl_code = %s;
+                        """, (selected_po['gl_code'],))
+                        financial_summary = cur.fetchone()
+                    except Exception as err:
+                        print(f"Master budget fetch error: {err}")
+                        financial_summary = None
 
     finally:
         conn.close()
