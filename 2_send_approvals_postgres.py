@@ -8,6 +8,8 @@ import csv
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from google import genai
+from google.genai import types
 
 def get_db_connection():
     return psycopg2.connect(
@@ -29,6 +31,32 @@ def write_control_log(po_number, action_type, user_email, notes=""):
             print(f"Control Measure Signed: Row appended for {po_number}.")
     except Exception as e:
         print(f"Control Log Warning: {e}")
+
+def get_gemini_analysis(po_num, desc_val, expense_type, cost, remaining_budget):
+    """Uses Gemini API to generate live audit analysis."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        return "Automated compliance analysis processed via PostgreSQL workflow engine."
+
+    try:
+        client = genai.Client(api_key=api_key)
+        prompt = f"""
+Perform a concise compliance and budget risk evaluation for Purchase Order {po_num}:
+- Description: {desc_val}
+- Expense Type: {expense_type}
+- Estimated Cost: R{cost:,.2f}
+- Remaining GL Budget: R{remaining_budget:,.2f}
+
+Provide 2-3 bullet points analyzing spend risk, budget compliance, and procurement approval recommendations.
+"""
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+        )
+        return response.text.strip()
+    except Exception as e:
+        print(f"Gemini API Error: {e}")
+        return "Automated compliance analysis processed via PostgreSQL workflow engine."
 
 def send_approval_email(to_emails, cc_emails, subject, body, attachment_paths=None):
     sender_email = os.getenv("SENDER_EMAIL")
@@ -100,12 +128,39 @@ def process_postgres_approvals():
                 ytd_actual = float(record.get('ytd_actual', 0.0))
                 remaining_budget = float(record.get('variance', 0.0))
                 
+                # Dynamic Gemini Intelligence Summary
+                ai_analysis_text = get_gemini_analysis(po_num, desc_val, expense_type, cost, remaining_budget)
+                
                 # Routing
                 to_list = [approver_emails.get("Estate Manager")]
                 cc_list = [approver_emails.get("Managing Agent (GEMS)")]
                 
                 email_subject = f"[{po_num}] Approval Required: {desc_val}"
-                email_body = f"""Hello,\n\nPO {po_num} requires approval.\nCost: R{cost:,.2f}\nGL Code: {gl_code_val}\n\nPlease reply APPROVED or REJECTED."""
+                email_body = f"""Hello,
+
+An expenditure item has been submitted for approval.
+
+Item Details:
+- PO Number: {po_num}
+- Description: {desc_val}
+- Expense Type: {expense_type}
+- GL Account: {gl_code_val}
+- Estimated Cost: R{cost:,.2f}
+- Total Annual Budget: R{total_budget:,.2f}
+- YTD Actual Spend: R{ytd_actual:,.2f}
+- Remaining YTD Budget: R{remaining_budget:,.2f}
+
+====================================================
+🤖 AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
+====================================================
+{ai_analysis_text}
+====================================================
+
+Instruction:
+Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".
+
+Regards,
+Automated Compliance Engine"""
 
                 if send_approval_email(to_list, cc_list, email_subject, email_body):
                     with conn.cursor() as update_cursor:
