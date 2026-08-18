@@ -9,18 +9,21 @@
 <body>
 
 <div class="app-layout">
+    <!-- Sidebar List -->
     <div class="sidebar">
         <div class="sidebar-header">
-            <span>Saved POs  Test</span>
-            <a href="/" class="new-po-btn">+ New PO</a>
+            <span>Saved POs</span>
+            <a href="/simple" class="new-po-btn">+ New PO</a>
         </div>
         <ul class="sidebar-list">
             {% if saved_pos %}
                 {% for po in saved_pos %}
                 <li>
-                    <a href="/?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
+                    <a href="/simple?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
                         <strong>{{ po.po_number }}</strong><br>
-                        <span style="font-size: 0.8em; color: #bdc3c7;">{{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}</span>                    
+                        <span style="font-size: 0.8em; color: #bdc3c7;">
+                            {{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}
+                        </span>                    
                     </a>
                 </li>
                 {% endfor %}
@@ -30,281 +33,190 @@
         </ul>
     </div>
 
-<div class="container">
-    <div class="header-bar">
-        <h1>Purchase Order</h1>
-        <a href="#" class="back-btn">Back to Dashboard &gt;</a>
-    </div>
+    <!-- Main Container -->
+    <div class="container">
+        <div class="header-bar">
+            <h1>Purchase Order</h1>
+            <a href="#" class="back-btn">Back to Dashboard &gt;</a>
+        </div>
 
-    <form action="#" method="POST">
-        
-        <fieldset>
-            <legend>Purchase Order Details</legend>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>PO Number</label>
-                <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}">
+        {% if message %}
+            <div style="padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border-radius: 4px;">
+                {{ message }}
             </div>
+        {% endif %}
 
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Description</label>
-                <textarea name="description">{{ selected_po.description if selected_po else '' }}</textarea>
-            </div>
+        <form action="/simple" method="POST">
+    <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Date</label>
-                    <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
-                </div>
-                <div class="form-group">
-                    <label>Has this been budgeted for?</label>
-                    <select name="is_budgeted">
-                        <option value="" disabled selected>Select option</option>
-                        <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
-                        <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
-                    </select>
-                </div>
-            </div>
+    <fieldset>
+        <legend>Purchase Order Details</legend>
 
-                <div class="form-group">
-                    <label>Select GL Code</label>
-                    <!-- Quick filter input -->
-                    <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
-                    
-                    <!-- Original select dropdown -->
-                    <select name="gl_code" id="gl-code-select">
-                        <option value="" disabled {% if not selected_po %}selected{% endif %}>Select GL Code</option>
-                        {% for gl in gl_records %}
-                            <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
-                                {{ gl.gl_code }} - {{ gl.description }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Expense Type</label>
-                    <select name="expense_type">
-                        <option value="" disabled selected>Select expense type</option>
-                        <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
-                        <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
-                        <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
-                        <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
-                    </select>
-                </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>PO Number</label>
+            <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
+        </div>
 
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Estimated Cost</label>
-                <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
-            </div>
+        <div class="form-group" style="margin-bottom: 15px;">
+            <label>Description</label>
+            <textarea name="description" rows="3">{{ selected_po.description if selected_po else '' }}</textarea>
+        </div>
 
+        <div class="form-row">
             <div class="form-group">
-                <label>Attach Quotes</label>
-                <div class="file-box">
-                    <input type="file" name="quotes" id="quote-files" multiple>
-                </div>
-                <div class="file-preview"></div>
+                <label>Date</label>
+                <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
             </div>
-        </fieldset>
-
-        <fieldset>
-            <legend>Vendor Selection & Rationale</legend>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Suggested Vendor</label>
-                <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po else '' }}">
-            </div>
-
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Justification Notes</label>
-                <textarea name="justification_notes">{{ selected_po.justification_notes if selected_po else '' }}</textarea>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>Submission Status</label>
-                <select name="submission_status">
-                    <option value="" disabled selected>Select status</option>
-                    <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
-                    <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
-                    <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent</option>
-                    <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+            <div class="form-group">
+                <label>Has this been budgeted for?</label>
+                <select name="is_budgeted">
+                    <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
+                    <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
+                    <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
                 </select>
             </div>
+        </div>
 
-            <div class="form-group">
-                <label>Latest AI Status</label>
-                <input type="text" value="" disabled>
-            </div>
-        </fieldset>
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Select GL Code</label>
+            <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
+            <select name="gl_code" id="gl-code-select">
+                <option value="" disabled {% if not selected_po or not selected_po.gl_code %}selected{% endif %}>Select GL Code</option>
+                {% for gl in gl_records %}
+                    <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
+                        {{ gl.gl_code }} - {{ gl.description }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
 
-        <fieldset>
-            <legend>Financial Summary</legend>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>YTD Actual</label>
-                    <input type="text" name="ytd_actual" value="" disabled>
-                </div>
-                <div class="form-group">
-                    <label>Total Annual Budget</label>
-                    <input type="text" name="total_annual_budget" value="" disabled>
-                </div>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>Budget YTD</label>
-                    <input type="text" name="budget_ytd" value="" disabled>
-                </div>
-                <div class="form-group">
-                    <label>2M Buffer Pool</label>
-                    <input type="text" name="buffer_pool" value="" disabled>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>Variance</label>
-                <input type="text" name="variance" value="" disabled>
-            </div>
-        </fieldset>
+        <div class="form-group" style="margin-top: 15px;">
+            <label>Expense Type</label>
+            <select name="expense_type">
+                <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
+                <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
+                <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
+                <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
+                <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
+            </select>
+        </div>
 
-        <fieldset>
-            <legend>Approvals</legend>
-            <div class="form-row">
-                <div class="form-group">
-                <label>Quotes Provided</label>
-                <input type="text" name="quotes_provided" value="0" disabled>
-            </div>
-                <div class="form-group">
-                    <label>Actioned Date</label>
-                    <input type="text" value="" disabled>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom: 15px;">
-                <label>SYSTEM STATUS</label>
-                <!-- Hidden input to ensure value posts when form submits -->
-                <input type="hidden" name="system_status" id="system_status_hidden" value="{{ selected_po.system_status if selected_po else '' }}">
-                <input type="text" id="system_status_display" value="{{ selected_po.system_status if selected_po else '' }}" disabled>
-            </div>
-                        <div class="form-row" style="margin-bottom: 15px;">
-                <div class="form-group">
-                    <label>Actioned By</label>
-                    <input type="text" value="" disabled>
-                </div>
-                <div class="form-group">
-                    <label>Approval Notes</label>
-                    <input type="text" value="" disabled>
-                </div>
-            </div>
-            <div class="form-group">
-                <label>AI Recommendation Summary</label>
-                <textarea disabled></textarea>
-            </div>
-        </fieldset>
+        <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+            <label>Estimated Cost</label>
+            <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
+        </div>
+    </fieldset>
+<!-- Vendor Selection & Rationale -->
+<fieldset style="margin-top: 20px;">
+    <legend>Vendor Selection & Rationale</legend>
 
-        <button type="submit" class="submit-btn">Save</button>
-    </form>
-</div>
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Suggested Vendor</label>
+        <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Justification Notes</label>
+        <textarea name="justification_notes" rows="4">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Submission Status</label>
+        <select name="submission_status">
+            <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
+            <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+            <option value="Submitted for Approval" {% if selected_po and selected_po.submission_status == "Submitted for Approval" %}selected{% endif %}>Submitted for Approval</option>
+            <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+            <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+        </select>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 15px;">
+        <label>Latest AI Status</label>
+        <input type="text" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
+    </div>
+</fieldset>
+
+<!-- Financial Summary (Read Only) -->
+<fieldset style="margin-top: 20px;">
+    <legend>Financial Summary</legend>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>YTD Actual</label>
+            <input type="text" id="fin-ytd-actual" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>Total Annual Budget</label>
+            <input type="text" id="fin-total-budget" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+    </div>
+
+    <div class="form-row" style="margin-top: 15px;">
+        <div class="form-group">
+            <label>Budget YTD</label>
+            <input type="text" id="fin-budget-ytd" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>2M Buffer Pool</label>
+            <input type="text" id="fin-buffer-pool" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="background-color: #f8f9fa;">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+        <label>Variance</label>
+        <input type="text" id="fin-variance" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="background-color: #f8f9fa;">
+    </div>
+</fieldset>
+
+
+<!-- Approvals Fieldset -->
+<fieldset style="margin-top: 20px;">
+    <legend>Approvals</legend>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Attach Quotes (PDF / Images)</label>
+            <input type="file" id="attach_quotes" name="attach_quotes" multiple onchange="updateQuotesCount()">
+        </div>
+        <div class="form-group">
+            <label>Quotes Provided</label>
+            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
+        </div>
+        <div class="form-group">
+            <label>Actioned Date</label>
+            <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px;">
+        <label>SYSTEM STATUS</label>
+        <input type="text" id="system_status" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa; font-weight: bold; width: 100%;">
+    </div>
+
+    <div class="form-row" style="margin-top: 15px;">
+        <div class="form-group">
+            <label>Actioned By</label>
+            <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Approval Notes</label>
+            <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+        <label>AI Recommendation Summary</label>
+        <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+    </div>
+</fieldset>
+
+<button type="submit" class="submit-btn">Save</button>
+
+</form>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const glSelect = document.querySelector('select[name="gl_code"]');
-        const budgetedSelect = document.querySelector('select[name="is_budgeted"]');
-        
-
-        async function updateFinancials() {
-            const glCode = glSelect.value;
-            if (!glCode) return;
-
-            try {
-                const response = await fetch(`/api/budget-details?gl_code=${encodeURIComponent(glCode)}`);
-                const data = await response.json();
-
-                // Populate Financial Summary fields
-                document.querySelector('input[name="ytd_actual"]').value = data.ytd || 0;
-                document.querySelector('input[name="budget_ytd"]').value = data.budget_ytd || 0;
-                document.querySelector('input[name="variance"]').value = data.variance || 0;
-                document.querySelector('input[name="total_annual_budget"]').value = data.total_budget || 0;
-
-                calculateBufferPool(data.total_budget || 0);
-            } catch (err) {
-                console.error("Error fetching budget details:", err);
-            }
-        }
-
-        function calculateBufferPool(totalBudget) {
-            const isBudgeted = budgetedSelect.value;
-            let bufferPool = 0;
-            if (isBudgeted === "Yes") {
-                bufferPool = (parseFloat(totalBudget) / 12) * 2;
-            }
-            document.querySelector('input[name="buffer_pool"]').value = bufferPool.toFixed(2);
-        }
-
-        if (glSelect) glSelect.addEventListener('change', updateFinancials);
-        if (budgetedSelect) budgetedSelect.addEventListener('change', function() {
-            const totalBudget = document.querySelector('input[name="total_annual_budget"]').value || 0;
-            calculateBufferPool(totalBudget);
-        });
-
-        // Automatically trigger evaluation/financial fetch if a saved PO is loaded with values
-        if (glSelect && glSelect.value) {
-            updateFinancials().then(() => {
-                evaluateSystemStatusLive();
-            });
-        }
-    });
-
-    const fileInput = document.getElementById('quote-files');
-    const quotesProvidedInput = document.querySelector('input[name="quotes_provided"]');
-
-    if (fileInput) {
-        fileInput.addEventListener('change', function() {
-            const count = fileInput.files.length;
-            if (quotesProvidedInput) {
-                quotesProvidedInput.value = count;
-            }
-            evaluateSystemStatusLive();
-        });
-    }
-
-    // Live System Status evaluation function
-    async function evaluateSystemStatusLive() {
-    const payload = {
-        submission_status: document.querySelector('select[name="submission_status"]')?.value || '',
-        is_budgeted: document.querySelector('select[name="is_budgeted"]')?.value || '',
-        gl_code: document.querySelector('select[name="gl_code"]')?.value || '',
-        expense_type: document.querySelector('select[name="expense_type"]')?.value || '',
-        quotes_provided: document.querySelector('input[name="quotes_provided"]')?.value || 0,
-        estimated_cost: document.querySelector('input[name="estimated_cost"]')?.value || 0,
-        total_annual_budget: document.querySelector('input[name="total_annual_budget"]')?.value || 0,
-        ytd_actual: document.querySelector('input[name="ytd_actual"]')?.value || 0
-    };
-
-    try {
-        const response = await fetch('/api/evaluate-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const data = await response.json();
-        
-        // Target both the hidden field (for POST submissions) and display field (for UI)
-        const statusHidden = document.getElementById('system_status_hidden');
-        const statusDisplay = document.getElementById('system_status_display');
-        
-        if (statusHidden) {
-            statusHidden.value = data.system_status || '';
-        }
-        if (statusDisplay) {
-            statusDisplay.value = data.system_status || '';
-        }
-    } catch (err) {
-        console.error("Error evaluating system status:", err);
-    }
-}
-
-    // Attach listeners to all inputs to trigger live evaluation on the fly
-    document.querySelectorAll('input, select, textarea').forEach(element => {
-        element.addEventListener('change', evaluateSystemStatusLive);
-        element.addEventListener('input', evaluateSystemStatusLive);
-    });
-
-
+    // Live filter JS for GL code dropdown search input
     const searchInput = document.getElementById('gl-search-input');
     const selectElement = document.getElementById('gl-code-select');
 
@@ -316,17 +228,115 @@
             for (let i = 0; i < options.length; i++) {
                 const text = options[i].text.toLowerCase();
                 if (i === 0) {
-                    options[i].style.display = ""; // Keep placeholder visible
+                    options[i].style.display = "";
                     continue;
                 }
-                if (text.includes(filter)) {
-                    options[i].style.display = "";
-                } else {
-                    options[i].style.display = "none";
-                }
+                options[i].style.display = text.includes(filter) ? "" : "none";
             }
         });
     }
+
+
+    // Auto-fetch financial metrics when GL Code selection changes
+document.getElementById('gl-code-select').addEventListener('change', function() {
+    const glCode = this.value;
+    if (!glCode) return;
+
+    fetch(`/api/budget-details?gl_code=${encodeURIComponent(glCode)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data) {
+                document.getElementById('fin-ytd-actual').value = data.ytd_actual ?? '';
+                document.getElementById('fin-total-budget').value = data.total_annual_budget ?? '';
+                document.getElementById('fin-budget-ytd').value = data.budget_ytd ?? '';
+                document.getElementById('fin-buffer-pool').value = data.buffer_pool ?? '';
+                document.getElementById('fin-variance').value = data.variance ?? '';
+            }
+        })
+        .catch(err => console.error('Error fetching budget details:', err));
+}); 
+
+
+function updateQuotesCount() {
+    const fileInput = document.getElementById('attach_quotes');
+    const quotesField = document.getElementById('quotes_provided');
+    if (fileInput && fileInput.files) {
+        // Automatically count uploaded quote files
+        quotesField.value = fileInput.files.length;
+    }
+    calculateSystemStatus();
+}
+
+function calculateSystemStatus() {
+    const submissionStatus = document.querySelector('[name="submission_status"]')?.value || '';
+    const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value || '';
+    const glCode = document.querySelector('[name="gl_code"]')?.value || '';
+    const expenseType = document.querySelector('[name="expense_type"]')?.value || '';
+    const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+    const quotesProvided = parseInt(document.getElementById('quotes_provided')?.value) || 0;
+    
+    // Read financial summary fields dynamically
+    const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value || document.querySelector('[name="total_annual_budget"]')?.value) || 0;
+    const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value || document.querySelector('[name="ytd_actual"]')?.value) || 0;
+    const remainingBudget = totalBudget - ytdActual;
+
+    let status = '';
+
+    // Rule Evaluations
+    if (submissionStatus === 'Approved') {
+        status = '✅ APPROVED: Compliance Process Complete';
+    } else if (submissionStatus === 'Rejected') {
+        status = '🛑 REJECTED: Final Authorisation Declined';
+    } else if (isBudgeted === 'Yes' && !glCode) {
+        status = '⚠️ ACTION REQUIRED: Select a valid GL description';
+    } else if (!expenseType) {
+        status = '⚠️ ACTION REQUIRED: Select Expense Type If Not Approved';
+    } else if (
+        (estimatedCost <= 10000 && quotesProvided < 1) ||
+        (estimatedCost >= 10001 && estimatedCost <= 50000 && quotesProvided < 2) ||
+        (estimatedCost > 50000 && quotesProvided < 3) ||
+        (expenseType === 'Capital Expenditure & Infrastructure' && quotesProvided < 3)
+    ) {
+        status = '❌ BLOCKED: Insufficient Quotes Provided for this Threshold';
+    } else if (isBudgeted === 'Yes' && totalBudget > 0 && estimatedCost > remainingBudget) {
+        status = '❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget';
+    } else if (isBudgeted === 'Yes' && totalBudget > 0 && (remainingBudget - estimatedCost) < (totalBudget / 6.0)) {
+        status = '⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool';
+    } else if (expenseType === 'Capital Expenditure & Infrastructure') {
+        status = '🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)';
+    } else if (expenseType === 'Service Provider Contracts') {
+        status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)';
+    } else if (isBudgeted === 'Yes') {
+        if (estimatedCost <= 10000) {
+            status = '🟢 Routine Operational: Within Budget (No Approval Required)';
+        } else if (estimatedCost <= 50000) {
+            status = '🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)';
+        } else {
+            status = '🟠 High-Value Operational: Within Budget (Requires 2 Board Members)';
+        }
+    } else if (isBudgeted === 'No' && expenseType === 'Emergency') {
+        status = estimatedCost <= 30000 
+            ? '⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)' 
+            : '❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)';
+    } else if (isBudgeted === 'No' && expenseType === 'Extraordinary') {
+        status = estimatedCost <= 30000 
+            ? '🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)' 
+            : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)';
+    }
+
+    document.getElementById('system_status').value = status;
+}
+
+// Bind event listeners across form controls for live recalculation
+document.addEventListener('DOMContentLoaded', () => {
+    const inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('input', calculateSystemStatus);
+        input.addEventListener('change', calculateSystemStatus);
+    });
+    calculateSystemStatus();
+});
+
 </script>
 
 </body>
