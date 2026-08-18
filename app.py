@@ -1,4 +1,5 @@
 import os
+import io
 import json
 import psycopg2
 import vercel_blob
@@ -19,6 +20,60 @@ app = Flask(__name__)
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
+
+def analyze_po_with_gemini(uploaded_files_data, form_data):
+    """
+    Sends uploaded file streams to Gemini Flash for extraction & compliance checking.
+    uploaded_files_data: list of tuples -> (file_bytes, filename, mime_type)
+    """
+    if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
+        return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
+
+    gemini_file_objects = []
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        for file_bytes, filename, mime_type in uploaded_files_data:
+            # Use io.BytesIO so genai receives a readable stream
+            bio = io.BytesIO(file_bytes)
+            bio.name = filename
+            
+            uploaded_gemini_file = genai.upload_file(
+                bio, 
+                mime_type=mime_type or "application/pdf"
+            )
+            gemini_file_objects.append(uploaded_gemini_file)
+
+        prompt = f"""
+        Analyze the attached purchase order documents and quote attachments for vendor compliance.
+        
+        Form Details:
+        - PO Number: {form_data.get('po_number')}
+        - Description: {form_data.get('description')}
+        - Estimated Cost: R{form_data.get('estimated_cost')}
+        - Suggested Vendor: {form_data.get('recommended_vendor')}
+        - Justification: {form_data.get('justification_notes')}
+        
+        Tasks:
+        1. Extract and summarize key line items, total amounts, and vendor details from attached documents.
+        2. Highlight any discrepancies between quotes and the submitted form data.
+        3. Provide a 2-3 sentence executive recommendation.
+        """
+
+        response = model.generate_content([*gemini_file_objects, prompt])
+        return response.text.strip() if response and response.text else "AI analysis produced no text."
+
+    except Exception as err:
+        print(f"Gemini Processing Error: {err}")
+        return f"AI Analysis failed: {str(err)}"
+        
+    finally:
+        # Clean up files uploaded to Gemini File API
+        for file_obj in gemini_file_objects:
+            try:
+                genai.delete_file(file_obj.name)
+            except Exception as e:
+                print(f"Gemini File Cleanup Error: {e}")
 
 @app.route("/api/budget-details")
 def budget_details():
@@ -50,6 +105,7 @@ def budget_details():
 
 @app.route("/", methods=["GET", "POST"])
 @app.route("/po_form", methods=["GET", "POST"])
+@app.route("/simple", methods=["GET", "POST"])
 def po_form():
     conn = get_connection()
     message = None
@@ -75,36 +131,68 @@ def po_form():
         ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
         system_status = request.form.get("system_status", "").strip()
 
-        # --- MULTI-FILE VERCEL BLOB UPLOAD LOGIC ---
-        uploaded_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
-        uploaded_urls = []
-
-        for quote_file in uploaded_files:
-            if quote_file and quote_file.filename:
-                try:
-                    blob_response = vercel_blob.put(
-                        f"quotes/{quote_file.filename}", 
-                        quote_file.read(), 
-                        options={"access": "public"}
-                    )
-                    url = blob_response.get('url')
-                    if url:
-                        uploaded_urls.append(url)
-                except Exception as upload_err:
-                    print(f"Blob Upload Error: {upload_err}")
-
-        # Store multiple URLs as a comma-separated string
-        quote_url = ",".join(uploaded_urls) if uploaded_urls else None
-
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
         except ValueError:
             estimated_cost = 0.0
 
-        try:
-            quotes_provided = int(request.form.get("quotes_provided") or 0)
-        except ValueError:
-            quotes_provided = 0
+        # Fetch existing record if updating to preserve old attachment URLs
+        existing_filepath_str = ""
+        if original_po or new_po:
+            try:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                    lookup_target = original_po if original_po else new_po
+                    cur.execute("SELECT quote_filepath FROM po_log WHERE po_number = %s;", (lookup_target,))
+                    existing_row = cur.fetchone()
+                    if existing_row and existing_row.get("quote_filepath"):
+                        existing_filepath_str = existing_row["quote_filepath"]
+            except Exception as e:
+                print(f"Error fetching existing PO filepath: {e}")
+
+        existing_urls = [u.strip() for u in existing_filepath_str.split(",") if u.strip()]
+
+        # --- MULTI-FILE VERCEL BLOB UPLOAD & GEMINI PREPARATION ---
+        raw_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
+        new_urls = []
+        gemini_file_payloads = []
+
+        for quote_file in raw_files:
+            if quote_file and quote_file.filename:
+                try:
+                    file_bytes = quote_file.read()
+                    safe_filename = secure_filename(quote_file.filename)
+                    
+                    # 1. Save to Vercel Blob
+                    blob_response = vercel_blob.put(
+                        f"quotes/{safe_filename}", 
+                        file_bytes, 
+                        options={"access": "public"}
+                    )
+                    url = blob_response.get('url')
+                    if url:
+                        new_urls.append(url)
+
+                    # 2. Collect bytes for Gemini
+                    gemini_file_payloads.append((
+                        file_bytes, 
+                        safe_filename, 
+                        quote_file.mimetype
+                    ))
+                except Exception as upload_err:
+                    print(f"File Processing Error ({quote_file.filename}): {upload_err}")
+
+        # Combine existing and newly uploaded attachment URLs
+        all_urls = existing_urls + new_urls
+        combined_quote_filepath = ",".join(all_urls) if all_urls else None
+        
+        # Dynamically set quotes_provided to match total attached files count
+        quotes_provided = len(all_urls)
+
+        # Run Gemini Analysis on newly uploaded attachments
+        if gemini_file_payloads:
+            ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
+            if ai_summary:
+                ai_recommendation_summary = ai_summary
 
         if new_po:
             try:
@@ -124,13 +212,14 @@ def po_form():
                                 recommended_vendor = %s, justification_notes = %s, submission_status = %s,
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
-                                quote_filepath = COALESCE(%s, quote_filepath)
+                                quote_filepath = %s
                             WHERE po_number = %s;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary, quote_url, original_po
+                            actioned_by, approval_notes, ai_recommendation_summary, 
+                            combined_quote_filepath, original_po
                         ))
                     else:
                         cur.execute("""
@@ -158,12 +247,12 @@ def po_form():
                                 actioned_by = EXCLUDED.actioned_by,
                                 approval_notes = EXCLUDED.approval_notes,
                                 ai_recommendation_summary = EXCLUDED.ai_recommendation_summary,
-                                quote_filepath = COALESCE(EXCLUDED.quote_filepath, po_log.quote_filepath);
+                                quote_filepath = EXCLUDED.quote_filepath;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary, quote_url
+                            actioned_by, approval_notes, ai_recommendation_summary, combined_quote_filepath
                         ))
                     
                     conn.commit()
@@ -174,6 +263,7 @@ def po_form():
                 conn.rollback()
                 message = f"Error saving purchase order: {e}"
 
+    # --- GET REQUEST / DATA RENDERING ---
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
@@ -187,31 +277,29 @@ def po_form():
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
-                # Parse comma-separated URLs into a list for frontend loop rendering
-                if selected_po and selected_po.get('quote_filepath'):
+                if selected_po:
+                    raw_filepath = selected_po.get('quote_filepath') or ''
                     selected_po['quote_urls'] = [
-                        u.strip() for u in selected_po['quote_filepath'].split(',') if u.strip()
+                        u.strip() for u in raw_filepath.split(',') if u.strip()
                     ]
-                elif selected_po:
-                    selected_po['quote_urls'] = []
 
-                if selected_po and selected_po.get('gl_code'):
-                    try:
-                        cur.execute("""
-                            SELECT 
-                                COALESCE(ytd, 0.00) AS ytd_actual, 
-                                COALESCE(total_budget, 0.00) AS total_annual_budget, 
-                                COALESCE(budget_ytd, 0.00) AS budget_ytd, 
-                                LEAST(
-                                    ROUND(COALESCE(total_budget, 0.00) / 6.0, 2),
-                                    GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
-                                ) AS buffer_pool, 
-                                COALESCE(variance, 0.00) AS variance 
-                            FROM master_budget WHERE gl_code = %s;
-                        """, (selected_po['gl_code'],))
-                        financial_summary = cur.fetchone()
-                    except Exception:
-                        financial_summary = None
+                    if selected_po.get('gl_code'):
+                        try:
+                            cur.execute("""
+                                SELECT 
+                                    COALESCE(ytd, 0.00) AS ytd_actual, 
+                                    COALESCE(total_budget, 0.00) AS total_annual_budget, 
+                                    COALESCE(budget_ytd, 0.00) AS budget_ytd, 
+                                    LEAST(
+                                        ROUND(COALESCE(total_budget, 0.00) / 6.0, 2),
+                                        GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
+                                    ) AS buffer_pool, 
+                                    COALESCE(variance, 0.00) AS variance 
+                                FROM master_budget WHERE gl_code = %s;
+                            """, (selected_po['gl_code'],))
+                            financial_summary = cur.fetchone()
+                        except Exception:
+                            financial_summary = None
 
     finally:
         conn.close()
@@ -224,74 +312,6 @@ def po_form():
         financial_summary=financial_summary,
         message=message
     )
-
-def analyze_po_with_gemini(gemini_files, form_data):
-    if not GEMINI_AVAILABLE:
-        return "Gemini AI SDK is not installed or configured."
-        
-    model = genai.GenerativeModel('gemini-3.5-flash')
-    prompt = f"""
-    Please review the attached purchase order documents and extract vendor details, 
-    line items, and total pricing. Verify if the figures match across all attached documents.
-    
-    Form Context:
-    - Vendor Name: {form_data.get('vendor_name')}
-    - Department: {form_data.get('department')}
-    """
-
-    contents = [*gemini_files, prompt]
-    response = model.generate_content(contents)
-    
-    for file_obj in gemini_files:
-        try:
-            genai.delete_file(file_obj.name)
-        except Exception as e:
-            print(f"Gemini File Deletion Error: {e}")
-
-    return response.text
-
-@app.route('/submit-po', methods=['POST'])
-def submit_po():
-    uploaded_files = request.files.getlist('attachments')
-    saved_urls = []
-    gemini_file_objects = []
-
-    for file in uploaded_files:
-        if file and file.filename != '':
-            try:
-                # Read stream directly for Vercel Blob without local disk write
-                file_bytes = file.read()
-                blob_response = vercel_blob.put(
-                    f"quotes/{secure_filename(file.filename)}", 
-                    file_bytes, 
-                    options={"access": "public"}
-                )
-                url = blob_response.get('url')
-                if url:
-                    saved_urls.append(url)
-
-                # Pass bytes to Gemini File API using in-memory byte streams
-                uploaded_gemini_file = genai.upload_file(
-                    file_bytes, 
-                    mime_type=file.mimetype or "application/pdf"
-                )
-                gemini_file_objects.append(uploaded_gemini_file)
-            except Exception as err:
-                print(f"Error processing attachment {file.filename}: {err}")
-
-    analysis_result = None
-    if gemini_file_objects:
-        analysis_result = analyze_po_with_gemini(gemini_file_objects, request.form)
-
-    return render_template('po_detail.html', attachments=saved_urls, result=analysis_result)
-
-@app.route("/simple")
-def simple_redirect():
-    """Redirect legacy /simple route to master form route."""
-    po_number = request.args.get("po_number")
-    if po_number:
-        return redirect(url_for("po_form", po_number=po_number))
-    return redirect(url_for("po_form"))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
