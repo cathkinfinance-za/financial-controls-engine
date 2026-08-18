@@ -104,12 +104,14 @@ input, select, textarea, button {
 
 /* Workspace Container */
 .container {
-    max-width: 1000px;
-    margin: 0 auto 60px auto; /* Adds bottom breathing room so the last field/button isn't cut off */
+    max-width: 1200px; /* Expands the workspace width */
+    width: 100%;       /* Ensures it fills available space */
+    margin: 0 auto 60px auto; 
     background: #ffffff;
     padding: 30px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    box-sizing: border-box; /* Ensures padding doesn't push it out of bounds */
 }
 
 /* ==========================================
