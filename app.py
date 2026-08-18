@@ -102,6 +102,7 @@ def purchase_order_form():
     selected_po = None
     
     if request.method == "POST":
+        original_po_number = request.args.get("po_number") or request.form.get("original_po_number")
         po_number = request.form.get("po_number")
         description = request.form.get("description")
         po_date = request.form.get("po_date") or None
@@ -120,7 +121,9 @@ def purchase_order_form():
         submission_status = request.form.get("submission_status")
         system_status = request.form.get("system_status")
 
-        if po_number:
+        target_key = original_po_number if original_po_number else po_number
+
+        if target_key:
             try:
                 with conn.cursor() as cur:
                     gl_code_id = None
