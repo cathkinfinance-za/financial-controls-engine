@@ -95,6 +95,7 @@ def evaluate_status():
     return jsonify({"system_status": status})
 
 @app.route("/", methods=["GET", "POST"])
+@app.route("/", methods=["GET", "POST"])
 def purchase_order_form():
     conn = get_connection()
     message = None
@@ -107,7 +108,13 @@ def purchase_order_form():
         is_budgeted = request.form.get("is_budgeted")
         gl_code = request.form.get("gl_code")
         expense_type = request.form.get("expense_type")
-        estimated_cost = request.form.get("estimated_cost") or 0.0
+        
+        # Safely convert inputs to float or default to 0.0
+        try:
+            estimated_cost = float(request.form.get("estimated_cost") or 0.0)
+        except ValueError:
+            estimated_cost = 0.0
+
         recommended_vendor = request.form.get("recommended_vendor")
         justification_notes = request.form.get("justification_notes")
         submission_status = request.form.get("submission_status")
@@ -116,10 +123,11 @@ def purchase_order_form():
         if po_number:
             try:
                 with conn.cursor() as cur:
-                    # Look up the integer ID for the selected gl_code string to satisfy the foreign key constraint
-                    cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
-                    gl_row = cur.fetchone()
-                    gl_code_id = gl_row['id'] if gl_row else None
+                    gl_code_id = None
+                    if gl_code:
+                        cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
+                        gl_row = cur.fetchone()
+                        gl_code_id = gl_row['id'] if gl_row else None
 
                     cur.execute("""
                         INSERT INTO po_log (
@@ -148,10 +156,10 @@ def purchase_order_form():
                     conn.commit()
                 message = f"Purchase Order '{po_number}' saved successfully!"
             except Exception as e:
-                print(f"DATABASE ERROR: {e}")
-                message = f"Error saving purchase order: {e}"
                 conn.rollback()
-                raise e
+                print(f"DATABASE ERROR: {e}")
+                # Set user friendly message instead of re-raising uncaught exception
+                message = f"Error saving purchase order: {e}"
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
