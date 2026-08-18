@@ -206,5 +206,67 @@ def purchase_order_form():
         message=message
     )
 
+
+@app.route("/simple", methods=["GET", "POST"])
+def simple_po_form():
+    conn = get_connection()
+    message = None
+    selected_po = None
+
+    if request.method == "POST":
+        original_po = request.form.get("original_po_number", "").strip()
+        new_po = request.form.get("po_number", "").strip()
+        description = request.form.get("description", "").strip()
+
+        if new_po:
+            try:
+                with conn.cursor() as cur:
+                    if original_po:
+                        # Updates existing PO row using original key
+                        cur.execute("""
+                            UPDATE po_log 
+                            SET po_number = %s, description = %s
+                            WHERE po_number = %s;
+                        """, (new_po, description, original_po))
+                    else:
+                        # Inserts new PO row
+                        cur.execute("""
+                            INSERT INTO po_log (po_number, description)
+                            VALUES (%s, %s)
+                            ON CONFLICT (po_number) DO UPDATE 
+                            SET description = EXCLUDED.description;
+                        """, (new_po, description))
+                    
+                    conn.commit()
+                
+                # Redirects back to the simple route
+                return redirect(url_for('simple_po_form', po_number=new_po))
+
+            except Exception as e:
+                conn.rollback()
+                print(f"DATABASE ERROR: {e}")
+                message = f"Error saving purchase order: {e}"
+
+    try:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("SELECT po_number, description FROM po_log ORDER BY created_at DESC;")
+            saved_pos = cur.fetchall()
+
+            selected_po_num = request.args.get("po_number")
+            if selected_po_num:
+                cur.execute("SELECT po_number, description FROM po_log WHERE po_number = %s;", (selected_po_num,))
+                selected_po = cur.fetchone()
+
+    finally:
+        conn.close()
+
+    # Renders the simplified HTML file
+    return render_template(
+        "po_form_simple.html", 
+        saved_pos=saved_pos,
+        selected_po=selected_po,
+        message=message
+    )
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

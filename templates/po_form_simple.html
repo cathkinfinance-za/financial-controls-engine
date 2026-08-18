@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="app-layout">
+    <!-- Sidebar List -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <span>Saved POs</span>
+            <a href="/simple" class="new-po-btn">+ New PO</a>
+        </div>
+        <ul class="sidebar-list">
+            {% if saved_pos %}
+                {% for po in saved_pos %}
+                <li>
+                    <a href="/simple?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
+                        <strong>{{ po.po_number }}</strong><br>
+                        <span style="font-size: 0.8em; color: #bdc3c7;">
+                            {{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}
+                        </span>                    
+                    </a>
+                </li>
+                {% endfor %}
+            {% else %}
+                <li style="padding: 20px; color: #95a5a6; text-align: center; font-size: 0.9em;">No saved purchase orders</li>
+            {% endif %}
+        </ul>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <div class="header-bar">
+            <h1>Purchase Order</h1>
+            <a href="#" class="back-btn">Back to Dashboard &gt;</a>
+        </div>
+
+        {% if message %}
+            <div style="padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border-radius: 4px;">
+                {{ message }}
+            </div>
+        {% endif %}
+
+        <form action="/simple" method="POST">
+            <!-- Hidden field to track original PO key during edits -->
+            <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
+
+            <fieldset>
+                <legend>Purchase Order Details</legend>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>PO Number</label>
+                    <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Description</label>
+                    <textarea name="description" rows="4">{{ selected_po.description if selected_po else '' }}</textarea>
+                </div>
+            </fieldset>
+
+            <button type="submit" class="submit-btn">Save</button>
+        </form>
+    </div>
+</div>
+
+</body>
+</html>
