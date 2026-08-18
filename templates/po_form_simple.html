@@ -169,6 +169,44 @@
     </div>
 </fieldset>
 
+
+<!-- Approvals -->
+<fieldset style="margin-top: 20px;">
+    <legend>Approvals</legend>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Quotes Provided</label>
+            <input type="number" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}">
+        </div>
+        <div class="form-group">
+            <label>Actioned Date</label>
+            <input type="date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px;">
+        <label>SYSTEM STATUS</label>
+        <input type="text" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa; font-weight: bold; width: 100%;">
+    </div>
+
+    <div class="form-row" style="margin-top: 15px;">
+        <div class="form-group">
+            <label>Actioned By</label>
+            <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
+        </div>
+        <div class="form-group">
+            <label>Approval Notes</label>
+            <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
+        </div>
+    </div>
+
+    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+        <label>AI Recommendation Summary</label>
+        <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+    </div>
+</fieldset>
+
 <button type="submit" class="submit-btn">Save</button>
 
 </form>

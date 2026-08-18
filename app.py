@@ -36,7 +36,7 @@ def budget_details():
             return jsonify(row if row else {})
     finally:
         conn.close()
-        
+
     return jsonify({})
 
 @app.route('/api/evaluate-status', methods=['POST'])
@@ -217,6 +217,82 @@ def purchase_order_form():
         message=message
     )
 
+def calculate_system_status(form_data, financial_summary):
+    submission_status = form_data.get("submission_status")
+    is_budgeted = form_data.get("is_budgeted")
+    gl_code = form_data.get("gl_code")
+    expense_type = form_data.get("expense_type")
+    
+    try:
+        estimated_cost = float(form_data.get("estimated_cost") or 0.0)
+    except ValueError:
+        estimated_cost = 0.0
+
+    try:
+        quotes_provided = int(form_data.get("quotes_provided") or 0)
+    except ValueError:
+        quotes_provided = 0
+
+    has_quotes_input = form_data.get("quotes_provided") is not None and form_data.get("quotes_provided") != ""
+
+    # Status Rules
+    if submission_status == "Approved":
+        return "✅ APPROVED: Compliance Process Complete"
+    if submission_status == "Rejected":
+        return "🛑 REJECTED: Final Authorisation Declined"
+    if is_budgeted == "Yes" and not gl_code:
+        return "⚠️ ACTION REQUIRED: Select a valid GL description"
+    if not expense_type:
+        return "⚠️ ACTION REQUIRED: Select Expense Type If Not Approved"
+    if not has_quotes_input:
+        return "⚠️ ACTION REQUIRED: Enter number of quotes provided"
+
+    if (
+        (estimated_cost <= 10000 and quotes_provided < 1) or
+        (10001 <= estimated_cost <= 50000 and quotes_provided < 2) or
+        (estimated_cost > 50000 and quotes_provided < 3) or
+        (expense_type == "Capital Expenditure & Infrastructure" and quotes_provided < 3)
+    ):
+        return "❌ BLOCKED: Insufficient Quotes Provided for this Threshold"
+
+    if financial_summary and is_budgeted == "Yes":
+        total_budget = float(financial_summary.get("total_annual_budget") or 0.0)
+        ytd_actual = float(financial_summary.get("ytd_actual") or 0.0)
+        remaining_budget = total_budget - ytd_actual
+
+        if estimated_cost > remaining_budget:
+            return "❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget"
+        
+        if (remaining_budget - estimated_cost) < (total_budget / 6.0):
+            return "⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool"
+
+    if expense_type == "Capital Expenditure & Infrastructure":
+        return "🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)"
+    if expense_type == "Service Provider Contracts":
+        return "📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)"
+
+    if is_budgeted == "Yes":
+        if estimated_cost <= 10000:
+            return "🟢 Routine Operational: Within Budget (No Approval Required)"
+        elif estimated_cost <= 50000:
+            return "🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)"
+        else:
+            return "🟠 High-Value Operational: Within Budget (Requires 2 Board Members)"
+
+    if is_budgeted == "No" and expense_type == "Emergency":
+        if estimated_cost <= 30000:
+            return "⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)"
+        else:
+            return "❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)"
+
+    if is_budgeted == "No" and expense_type == "Extraordinary":
+        if estimated_cost <= 30000:
+            return "🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)"
+        else:
+            return "❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)"
+
+    return ""
+
 
 @app.route("/simple", methods=["GET", "POST"])
 def simple_po_form():
@@ -231,27 +307,46 @@ def simple_po_form():
         description = request.form.get("description", "").strip()
         po_date = request.form.get("po_date") or None
         is_budgeted = request.form.get("is_budgeted")
-        
-        # Only extract GL Code if provided
         gl_code = request.form.get("gl_code", "").strip() or None
         expense_type = request.form.get("expense_type")
-        
         recommended_vendor = request.form.get("recommended_vendor", "").strip()
         justification_notes = request.form.get("justification_notes", "").strip()
         submission_status = request.form.get("submission_status")
-        system_status = request.form.get("system_status", "").strip()
+
+        # New Approvals Fields
+        actioned_date = request.form.get("actioned_date") or None
+        actioned_by = request.form.get("actioned_by", "").strip()
+        approval_notes = request.form.get("approval_notes", "").strip()
+        ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
 
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
         except ValueError:
             estimated_cost = 0.0
 
+        try:
+            quotes_provided = int(request.form.get("quotes_provided") or 0)
+        except ValueError:
+            quotes_provided = 0
+
+        # Fetch financial summary if GL code is present for status formula calculation
+        if gl_code:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT 
+                        COALESCE(ytd, 0.00) AS ytd_actual, 
+                        COALESCE(total_budget, 0.00) AS total_annual_budget
+                    FROM master_budget WHERE gl_code = %s;
+                """, (gl_code,))
+                financial_summary = cur.fetchone()
+
+        # Compute SYSTEM STATUS dynamically
+        system_status = calculate_system_status(request.form, financial_summary)
+
         if new_po:
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     gl_code_id = None
-                    
-                    # Only look up GL ID if a GL Code was explicitly provided
                     if gl_code:
                         cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
                         gl_row = cur.fetchone()
@@ -261,33 +356,27 @@ def simple_po_form():
                     if original_po:
                         cur.execute("""
                             UPDATE po_log 
-                            SET po_number = %s,
-                                description = %s,
-                                po_date = %s,
-                                is_budgeted = %s,
-                                gl_code = %s,
-                                gl_code_id = %s,
-                                expense_type = %s,
-                                estimated_cost = %s,
-                                recommended_vendor = %s,
-                                justification_notes = %s,
-                                submission_status = %s,
-                                system_status = %s
+                            SET po_number = %s, description = %s, po_date = %s, is_budgeted = %s,
+                                gl_code = %s, gl_code_id = %s, expense_type = %s, estimated_cost = %s,
+                                recommended_vendor = %s, justification_notes = %s, submission_status = %s,
+                                system_status = %s, quotes_provided = %s, actioned_date = %s,
+                                actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s
                             WHERE po_number = %s;
                         """, (
-                            new_po, description, po_date, is_budgeted, 
-                            gl_code, gl_code_id, expense_type, estimated_cost,
-                            recommended_vendor, justification_notes, submission_status, system_status,
-                            original_po
+                            new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
+                            expense_type, estimated_cost, recommended_vendor, justification_notes, 
+                            submission_status, system_status, quotes_provided, actioned_date, 
+                            actioned_by, approval_notes, ai_recommendation_summary, original_po
                         ))
                     else:
                         cur.execute("""
                             INSERT INTO po_log (
-                                po_number, description, po_date, is_budgeted, 
-                                gl_code, gl_code_id, expense_type, estimated_cost,
-                                recommended_vendor, justification_notes, submission_status, system_status
+                                po_number, description, po_date, is_budgeted, gl_code, gl_code_id, 
+                                expense_type, estimated_cost, recommended_vendor, justification_notes, 
+                                submission_status, system_status, quotes_provided, actioned_date, 
+                                actioned_by, approval_notes, ai_recommendation_summary
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (po_number) DO UPDATE SET
                                 description = EXCLUDED.description,
                                 po_date = EXCLUDED.po_date,
@@ -299,39 +388,40 @@ def simple_po_form():
                                 recommended_vendor = EXCLUDED.recommended_vendor,
                                 justification_notes = EXCLUDED.justification_notes,
                                 submission_status = EXCLUDED.submission_status,
-                                system_status = EXCLUDED.system_status;
+                                system_status = EXCLUDED.system_status,
+                                quotes_provided = EXCLUDED.quotes_provided,
+                                actioned_date = EXCLUDED.actioned_date,
+                                actioned_by = EXCLUDED.actioned_by,
+                                approval_notes = EXCLUDED.approval_notes,
+                                ai_recommendation_summary = EXCLUDED.ai_recommendation_summary;
                         """, (
-                            new_po, description, po_date, is_budgeted, 
-                            gl_code, gl_code_id, expense_type, estimated_cost,
-                            recommended_vendor, justification_notes, submission_status, system_status
+                            new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
+                            expense_type, estimated_cost, recommended_vendor, justification_notes, 
+                            submission_status, system_status, quotes_provided, actioned_date, 
+                            actioned_by, approval_notes, ai_recommendation_summary
                         ))
                     
                     conn.commit()
-                
+
                 return redirect(url_for('simple_po_form', po_number=new_po))
 
             except Exception as e:
                 conn.rollback()
-                print(f"DATABASE ERROR: {e}")
                 message = f"Error saving purchase order: {e}"
 
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            # Fetch GL accounts for dropdown
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
             gl_records = cur.fetchall()
 
-            # Sidebar list
             cur.execute("SELECT po_number, description FROM po_log ORDER BY created_at DESC;")
             saved_pos = cur.fetchall()
 
-            # Selected record fetch
             selected_po_num = request.args.get("po_number")
             if selected_po_num:
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
-                # Safely query financial metrics ONLY if a gl_code is attached
                 if selected_po and selected_po.get('gl_code'):
                     try:
                         cur.execute("""
@@ -344,13 +434,12 @@ def simple_po_form():
                                     GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
                                 ) AS buffer_pool, 
                                 COALESCE(variance, 0.00) AS variance 
-                            FROM master_budget 
-                            WHERE gl_code = %s;
+                            FROM master_budget WHERE gl_code = %s;
                         """, (selected_po['gl_code'],))
                         financial_summary = cur.fetchone()
                     except Exception as err:
-                        print(f"Master budget fetch error: {err}")
                         financial_summary = None
+
     finally:
         conn.close()
 
@@ -362,6 +451,7 @@ def simple_po_form():
         financial_summary=financial_summary,
         message=message
     )
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
