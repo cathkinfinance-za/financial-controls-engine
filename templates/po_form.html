@@ -125,7 +125,7 @@
         <select name="submission_status">
             <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
             <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
-            <option value="Submitted for Approval" {% if selected_po and selected_po.submission_status == "Submitted for Approval" %}selected{% endif %}>Submitted for Approval</option>
+            <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
             <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
             <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
         </select>
