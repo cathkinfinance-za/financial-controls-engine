@@ -1,8 +1,10 @@
 import os
+import json
 import psycopg2
 import vercel_blob
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, request, redirect, url_for, jsonify
+from werkzeug.utils import secure_filename
 import google.generativeai as genai
 
 app = Flask(__name__)
@@ -39,8 +41,6 @@ def budget_details():
     finally:
         conn.close()
 
-
-
 @app.route("/", methods=["GET", "POST"])
 @app.route("/po_form", methods=["GET", "POST"])
 def po_form():
@@ -68,18 +68,26 @@ def po_form():
         ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
         system_status = request.form.get("system_status", "").strip()
 
-        # --- VERCEL BLOB UPLOAD LOGIC ---
-        quote_file = request.files.get('quote_attachment')
-        quote_url = None
+        # --- MULTI-FILE VERCEL BLOB UPLOAD LOGIC ---
+        uploaded_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
+        uploaded_urls = []
 
-        if quote_file and quote_file.filename:
-            # Upload file directly to Vercel Blob cloud storage
-            blob_response = vercel_blob.put(
-                f"quotes/{quote_file.filename}", 
-                quote_file.read(), 
-                options={"access": "public"}
-            )
-            quote_url = blob_response.get('url')
+        for quote_file in uploaded_files:
+            if quote_file and quote_file.filename:
+                try:
+                    blob_response = vercel_blob.put(
+                        f"quotes/{quote_file.filename}", 
+                        quote_file.read(), 
+                        options={"access": "public"}
+                    )
+                    url = blob_response.get('url')
+                    if url:
+                        uploaded_urls.append(url)
+                except Exception as upload_err:
+                    print(f"Blob Upload Error: {upload_err}")
+
+        # Store multiple URLs as a comma-separated string
+        quote_url = ",".join(uploaded_urls) if uploaded_urls else None
 
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
@@ -172,6 +180,13 @@ def po_form():
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
+                if selected_po and selected_po.get('quote_filepath'):
+                    selected_po['quote_urls'] = [
+                        u.strip() for u in selected_po['quote_filepath'].split(',') if u.strip()
+                    ]
+                elif selected_po:
+                    selected_po['quote_urls'] = []
+
                 if selected_po and selected_po.get('gl_code'):
                     try:
                         cur.execute("""
@@ -214,43 +229,51 @@ def analyze_po_with_gemini(gemini_files, form_data):
     - Department: {form_data.get('department')}
     """
 
-    # Unpack file objects and prompt into a single contents list
     contents = [*gemini_files, prompt]
-
     response = model.generate_content(contents)
     
-    # Optional cleanup of remote Gemini files after processing
     for file_obj in gemini_files:
-        genai.delete_file(file_obj.name)
+        try:
+            genai.delete_file(file_obj.name)
+        except Exception as e:
+            print(f"Gemini File Deletion Error: {e}")
 
     return response.text
 
 @app.route('/submit-po', methods=['POST'])
 def submit_po():
     uploaded_files = request.files.getlist('attachments')
-    saved_file_paths = []
+    saved_urls = []
     gemini_file_objects = []
 
     for file in uploaded_files:
         if file and file.filename != '':
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            saved_file_paths.append(filename)
+            try:
+                # Read stream directly for Vercel Blob without local disk write
+                file_bytes = file.read()
+                blob_response = vercel_blob.put(
+                    f"quotes/{secure_filename(file.filename)}", 
+                    file_bytes, 
+                    options={"access": "public"}
+                )
+                url = blob_response.get('url')
+                if url:
+                    saved_urls.append(url)
 
-            # Upload to Gemini File API if using large/PDF files, 
-            # or pass file bytes directly depending on SDK setup
-            uploaded_gemini_file = genai.upload_file(filepath)
-            gemini_file_objects.append(uploaded_gemini_file)
+                # Pass bytes to Gemini File API using in-memory byte streams
+                uploaded_gemini_file = genai.upload_file(
+                    file_bytes, 
+                    mime_type=file.mimetype or "application/pdf"
+                )
+                gemini_file_objects.append(uploaded_gemini_file)
+            except Exception as err:
+                print(f"Error processing attachment {file.filename}: {err}")
 
-    # Call Gemini with all attached files
+    analysis_result = None
     if gemini_file_objects:
         analysis_result = analyze_po_with_gemini(gemini_file_objects, request.form)
 
-    # Save saved_file_paths (e.g. as JSON array) in your database
-    # ... database save logic ...
-
-    return render_template('po_detail.html', attachments=saved_file_paths, result=analysis_result)
+    return render_template('po_detail.html', attachments=saved_urls, result=analysis_result)
 
 @app.route("/simple")
 def simple_redirect():
