@@ -10,20 +10,27 @@ def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
 
-@app.route('/api/budget-details')
+@app.route("/api/budget-details")
 def budget_details():
-    gl_code = request.args.get('gl_code')
+    gl_code = request.args.get("gl_code")
+    if not gl_code:
+        return jsonify({})
+
     conn = get_connection()
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute("""
-                SELECT ytd, budget_ytd, variance, total_budget 
+                SELECT 
+                    COALESCE(ytd, 0.00) AS ytd_actual, 
+                    COALESCE(total_budget, 0.00) AS total_annual_budget, 
+                    COALESCE(budget_ytd, 0.00) AS budget_ytd, 
+                    0.00 AS buffer_pool, 
+                    COALESCE(variance, 0.00) AS variance 
                 FROM master_budget 
                 WHERE gl_code = %s;
             """, (gl_code,))
             row = cur.fetchone()
-            if row:
-                return jsonify(row)
+            return jsonify(row if row else {})
     finally:
         conn.close()
     return jsonify({})
@@ -324,7 +331,12 @@ def simple_po_form():
                 if selected_po and selected_po.get('gl_code'):
                     try:
                         cur.execute("""
-                            SELECT ytd_actual, total_annual_budget, budget_ytd, buffer_pool, variance 
+                            SELECT 
+                                COALESCE(ytd, 0.00) AS ytd_actual, 
+                                COALESCE(total_budget, 0.00) AS total_annual_budget, 
+                                COALESCE(budget_ytd, 0.00) AS budget_ytd, 
+                                0.00 AS buffer_pool, 
+                                COALESCE(variance, 0.00) AS variance 
                             FROM master_budget 
                             WHERE gl_code = %s;
                         """, (selected_po['gl_code'],))
