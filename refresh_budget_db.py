@@ -55,34 +55,38 @@ def fetch_and_sync_weconnectu_budget():
         if gl_match:
             gl_code = gl_match.group(1)
             
-            # Extract description by stripping GL code out of text cells
-            description_parts = []
+            # Find the cell containing the GL code and extract everything after it
+            description = "Operational Portfolio Allocation"
+            for cell in cells:
+                if gl_code in cell:
+                    extracted_desc = cell.replace(gl_code, '').strip()
+                    if extracted_desc:
+                        description = extracted_desc
+                    break
+
+            # Collect all numeric values across row cells
+            clean_metrics = []
             for cell in cells:
                 cleaned_cell = re.sub(r'[\s\xa0R]', '', cell)
-                if not re.match(r'^\(?\-?\d+(?:[\.,]\d+)?\)?$', cleaned_cell):
-                    text_only = gl_pattern.sub('', cell).strip()
-                    if text_only:
-                        description_parts.append(text_only)
+                if re.match(r'^\(?\-?\d+(?:[\.,]\d+)?\)?$', cleaned_cell):
+                    clean_metrics.append(cell)
             
-            description = " ".join(description_parts) if description_parts else "Operational Portfolio Allocation"
+            vals = [clean_and_convert_number(m) for m in clean_metrics]
 
-            # Parse all cells to floats based on their exact column positions
-            vals = [clean_and_convert_number(c) for c in cells]
-
-            # Map directly to exact column indices
-            if len(vals) >= 10:
+            # Map numbers with March hardcoded to 0.0
+            if len(vals) >= 8:
                 financial_data.append({
                     "gl_code": gl_code,
                     "description": description,
-                    "mar_2026": vals[1] if len(vals) > 1 else 0.0,
-                    "apr_2026": vals[2] if len(vals) > 2 else 0.0,
-                    "may_2026": vals[3] if len(vals) > 3 else 0.0,
-                    "jun_2026": vals[4] if len(vals) > 4 else 0.0,
-                    "jul_2026": vals[5] if len(vals) > 5 else 0.0,
-                    "ytd": vals[6] if len(vals) > 6 else 0.0,
-                    "budget_ytd": vals[7] if len(vals) > 7 else 0.0,
-                    "variance": vals[8] if len(vals) > 8 else 0.0,
-                    "total_budget": vals[9] if len(vals) > 9 else 0.0
+                    "mar_2026": 0.0,
+                    "apr_2026": vals[0],
+                    "may_2026": vals[1],
+                    "jun_2026": vals[2],
+                    "jul_2026": vals[3],
+                    "ytd": vals[4],
+                    "budget_ytd": vals[5],
+                    "variance": vals[6],
+                    "total_budget": vals[7]
                 })
 
     df = pd.DataFrame(financial_data)

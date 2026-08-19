@@ -1,6 +1,5 @@
 import os
 import re
-import json
 import imaplib
 import email
 from email.header import decode_header
@@ -8,9 +7,6 @@ import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-# ==========================================
-# 1. LOGGING & DATABASE HELPERS
-# ==========================================
 def log(msg, level="INFO"):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{timestamp}] [{level}] {msg}")
@@ -22,7 +18,6 @@ def get_db_connection():
     )
 
 def ensure_audit_log_table(conn):
-    """Ensures the workflow_control_log table exists in PostgreSQL."""
     with conn.cursor() as cursor:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS workflow_control_log (
@@ -37,7 +32,6 @@ def ensure_audit_log_table(conn):
         conn.commit()
 
 def write_control_log(conn, po_number, action_type, user_email, notes=""):
-    """Writes an immutable control log entry directly into PostgreSQL."""
     try:
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -45,21 +39,17 @@ def write_control_log(conn, po_number, action_type, user_email, notes=""):
                 VALUES (%s, %s, %s, %s);
             """, (po_number, action_type, user_email, notes))
             conn.commit()
-            log(f"Control log recorded in PostgreSQL for PO {po_number}.")
+            log(f"Control log recorded in DB for PO '{po_number}'.")
     except Exception as e:
-        log(f"Failed to write control log for PO {po_number}: {e}", "WARNING")
+        log(f"Failed to write control log: {e}", "WARNING")
 
-# ==========================================
-# 2. INBOX PROCESSING ENGINE
-# ==========================================
 def fetch_approval_replies():
-    """Connects via IMAP and extracts APPROVED/REJECTED responses."""
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
     email_password = os.getenv("SENDER_PASSWORD")
 
     if not email_account or not email_password:
-        log("SENDER_EMAIL or SENDER_PASSWORD missing. Aborting inbox check.", "ERROR")
+        log("SENDER_EMAIL or SENDER_PASSWORD missing.", "ERROR")
         return {}, {}
 
     log(f"Connecting to IMAP inbox at {imap_server}...")
@@ -68,21 +58,24 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        # Use broader UNSEEN search to ensure Gmail doesn't drop partial subject matches
-        status, messages = mail.search(None, 'UNSEEN')
+        # Search for ALL recent messages with "Approval Required" in subject (handles read/unread/self-sent)
+        status, messages = mail.search(None, 'SUBJECT "Approval Required"')
         if status != "OK" or not messages or messages == [b'']:
-            log("No unseen emails found in inbox.")
+            log("No matching approval emails found in inbox.")
             mail.logout()
             return {}, {}
 
         raw_data = messages[0]
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
-        log(f"Found {len(email_ids)} unread email(s). Filtering for workflow replies...")
+        
+        # Take the most recent 20 emails to keep runs fast
+        latest_email_ids = email_ids[-20:]
+        log(f"Scanning latest {len(latest_email_ids)} workflow email(s)...")
 
         approvals = {}
         rejections = {}
 
-        for e_id in email_ids:
+        for e_id in latest_email_ids:
             res, msg_data = mail.fetch(e_id, '(RFC822)')
             for response_part in msg_data:
                 if isinstance(response_part, tuple) and len(response_part) > 1:
@@ -101,14 +94,9 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    # Filter: Subject must contain 'Approval Required'
-                    if "approval required" not in decoded_subject.lower():
-                        continue
-
-                    # Flexible Regex: Captures bracketed POs like [PO-101], [101], or [Test]
+                    # Extract PO number from brackets [PO_NUM]
                     po_match = re.search(r'\[([A-Za-z0-9_-]+)\]', decoded_subject)
                     if not po_match:
-                        log(f"Skipping email '{decoded_subject}': No bracketed identifier found.", "WARNING")
                         continue
 
                     po_number = po_match.group(1).strip()
@@ -127,25 +115,22 @@ def fetch_approval_replies():
                         if isinstance(payload, bytes):
                             body = payload.decode(errors='ignore')
 
-                    # Parse top message reply or subject
                     top_reply = body.strip()
                     reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
                     for splitter in reply_splitters:
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    # Combine top reply and subject line to detect decision keywords
-                    combined_text = f"{decoded_subject} {top_reply}".upper()
+                    # Combine subject + body for keyword check
+                    full_payload = f"{decoded_subject} {top_reply}".upper()
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    if "REJECTED" in combined_text or "REJECT" in combined_text:
+                    if "REJECTED" in full_payload or "REJECT" in full_payload:
                         rejections[po_number] = {"sender": sender_clean}
-                        mail.store(e_id, '+FLAGS', '\\Seen')
-                    elif "APPROVED" in combined_text or "APPROVE" in combined_text:
+                    elif "APPROVED" in full_payload or "APPROVE" in full_payload:
                         approvals[po_number] = {"sender": sender_clean}
-                        mail.store(e_id, '+FLAGS', '\\Seen')
 
         mail.logout()
         return approvals, rejections
@@ -154,13 +139,10 @@ def fetch_approval_replies():
         log(f"IMAP Processing Error: {e}", "ERROR")
         return {}, {}
 
-# ==========================================
-# 3. POSTGRESQL STATE SYNCHRONIZER
-# ==========================================
 def process_replies():
     log("Starting Inbox Reply Processor...")
-    
     approvals, rejections = fetch_approval_replies()
+    
     if not approvals and not rejections:
         log("No actionable email replies detected. Processing complete.")
         return
@@ -170,25 +152,23 @@ def process_replies():
         ensure_audit_log_table(conn)
         
         all_po_numbers = list(set(list(rejections.keys()) + list(approvals.keys())))
-        log(f"Matching {len(all_po_numbers)} PO number(s) in PostgreSQL database...")
+        log(f"Found replies for PO numbers: {all_po_numbers}")
 
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM po_log WHERE po_number = ANY(%s);",
-                (all_po_numbers,)
+                "SELECT * FROM po_log WHERE LOWER(po_number) = ANY(%s);",
+                ([p.lower() for p in all_po_numbers],)
             )
             records = cursor.fetchall()
-            po_map = {row['po_number'].strip(): row for row in records if row.get('po_number')}
+            po_map = {str(row['po_number']).strip().lower(): row for row in records if row.get('po_number')}
 
-            current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
-            # ------------------------------------
             # 1. PROCESS REJECTIONS
-            # ------------------------------------
             for po_num, meta in rejections.items():
-                record = po_map.get(po_num)
+                record = po_map.get(po_num.lower())
                 if not record:
-                    log(f"PO {po_num} found in rejection email, but record does not exist in DB.", "WARNING")
+                    log(f"PO '{po_num}' not found in database records.", "WARNING")
                     continue
 
                 rejector_email = meta.get("sender", "Approver (Via Email)")
@@ -202,78 +182,29 @@ def process_replies():
                 """, (rejector_email, current_timestamp, record['id']))
                 conn.commit()
 
-                write_control_log(conn, po_num, "Inbound Rejection", rejector_email, "Marked as rejected via email reply.")
-                log(f"❌ PO {po_num} marked as REJECTED by {rejector_email}.")
+                write_control_log(conn, record['po_number'], "Inbound Rejection", rejector_email, "Marked as rejected via email reply.")
+                log(f"❌ PO '{record['po_number']}' successfully updated to REJECTED in database!")
 
-            # ------------------------------------
             # 2. PROCESS APPROVALS
-            # ------------------------------------
             for po_num, meta in approvals.items():
-                record = po_map.get(po_num)
+                record = po_map.get(po_num.lower())
                 if not record:
-                    log(f"PO {po_num} found in approval email, but record does not exist in DB.", "WARNING")
+                    log(f"PO '{po_num}' not found in database records.", "WARNING")
                     continue
 
-                approver_email = meta.get("sender", "Unknown Approver")
-                current_status = str(record.get('submission_status') or '').strip().lower()
-                system_status = str(record.get('system_status') or '').strip()
+                approver_email = meta.get("sender", "Approver (Via Email)")
+                
+                cursor.execute("""
+                    UPDATE po_log 
+                    SET submission_status = 'Approved',
+                        actioned_by = %s,
+                        actioned_date = %s
+                    WHERE id = %s;
+                """, (approver_email, current_timestamp, record['id']))
+                conn.commit()
 
-                # Rule Check: Dual Sign-off required if category requires Chairman / Second sign-off
-                requires_dual_signoff = "requires chairman sign-off" in system_status.lower() or "high-value" in system_status.lower()
-
-                if requires_dual_signoff:
-                    if current_status in ['sent', 'submitted', 'awaiting approval', 'pending']:
-                        # First Vote
-                        cursor.execute("""
-                            UPDATE po_log 
-                            SET submission_status = 'Approved (1/2)',
-                                actioned_by = %s,
-                                actioned_date = %s
-                            WHERE id = %s;
-                        """, (approver_email, current_timestamp, record['id']))
-                        conn.commit()
-
-                        write_control_log(conn, po_num, "Inbound Partial Approval", approver_email, "First sign-off captured.")
-                        log(f"🔒 PO {po_num} updated to 'Approved (1/2)' by {approver_email}. Awaiting 2nd sign-off.")
-
-                    elif '1/2' in current_status:
-                        first_voter = str(record.get('actioned_by') or '').strip()
-
-                        # Prevent double-voting by the same individual
-                        if approver_email.lower() in first_voter.lower():
-                            log(f"⚠️ Double-voting blocked for PO {po_num} by {approver_email}.", "WARNING")
-                            continue
-
-                        # Second Vote
-                        combined_voters = f"{first_voter} | {approver_email}"
-                        cursor.execute("""
-                            UPDATE po_log 
-                            SET submission_status = 'Approved',
-                                actioned_by = %s,
-                                actioned_date = %s
-                            WHERE id = %s;
-                        """, (combined_voters, current_timestamp, record['id']))
-                        conn.commit()
-
-                        write_control_log(conn, po_num, "Inbound Final Approval", approver_email, "Dual authorization complete.")
-                        log(f"✅ PO {po_num} fully APPROVED (2/2). Combined sign-offs: {combined_voters}.")
-
-                else:
-                    # Single Sign-off Standard Logic
-                    if current_status in ['sent', 'submitted', 'awaiting approval', 'pending']:
-                        cursor.execute("""
-                            UPDATE po_log 
-                            SET submission_status = 'Approved',
-                                actioned_by = %s,
-                                actioned_date = %s
-                            WHERE id = %s;
-                        """, (approver_email, current_timestamp, record['id']))
-                        conn.commit()
-
-                        write_control_log(conn, po_num, "Inbound Approval", approver_email, "Single sign-off complete.")
-                        log(f"✅ PO {po_num} fully APPROVED by {approver_email}.")
-                    else:
-                        log(f"⏩ Skipping PO {po_num}: Current status is already '{current_status}'.")
+                write_control_log(conn, record['po_number'], "Inbound Approval", approver_email, "Marked as approved via email reply.")
+                log(f"✅ PO '{record['po_number']}' successfully updated to APPROVED in database!")
 
     except Exception as db_err:
         log(f"Database sync error: {db_err}", "CRITICAL")
