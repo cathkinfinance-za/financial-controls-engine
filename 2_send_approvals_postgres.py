@@ -139,10 +139,10 @@ def get_gemini_analysis(record, cursor):
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
         # ----------------------------------------------------
-        # PHASE 1: QUOTE EVALUATION (If Active)
+        # PHASE 1: QUOTE EVALUATION
         # ----------------------------------------------------
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
-        
+
         if quote_eval_template:
             parse_prompt_text = quote_eval_template.format(
                 po_num=po_num,
@@ -167,22 +167,15 @@ def get_gemini_analysis(record, cursor):
                 if file_data and mime_type:
                     parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
 
-            log(f"PO {po_num}: 📑 Parsing quote metadata...")
+            log(f"PO {po_num}: 📑 Executing quote evaluation...")
+            
+            # Remove application/json mime_type constraint to allow free-text markdown response
             parse_response = client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=parse_contents,
-                config=types.GenerateContentConfig(response_mime_type="application/json")
+                model='gemini-3.5-flash',
+                contents=parse_contents
             )
 
-            try:
-                vendor_meta = json.loads(parse_response.text or "{}")
-                extracted_vendor_name = vendor_meta.get("legal_name") or user_recommended_vendor
-                cipc_num = vendor_meta.get("cipc_number") or "N/A"
-                vat_num = vendor_meta.get("vat_number") or "N/A"
-                quoted_amount = vendor_meta.get("quoted_amount") or "N/A"
-                includes_vat = vendor_meta.get("includes_vat") or "Unspecified"
-            except Exception as meta_err:
-                log(f"PO {po_num}: Failed to parse JSON metadata response: {meta_err}", "WARNING")
+            return parse_response.text.strip()
 
         # ----------------------------------------------------
         # PHASE 2: OSINT WEB SEARCH (DuckDuckGo)
