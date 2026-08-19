@@ -393,23 +393,37 @@ def view_audit_log():
     conn.close()
     return render_template('audit_log.html', logs=logs)
 
-# 1. Route: Render Project Dashboard & Form
-@app.route("/project/<int:project_id>")
-def project_dashboard(project_id):
+# Route to list or access projects dashboard
+@app.route("/projects")
+def projects_page():
     conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
-    # Fetch project details
-    cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+    # Check for a project ID query parameter, e.g. /projects?id=1
+    project_id = request.args.get("id", type=int)
+    
+    if project_id:
+        cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+    else:
+        # Fallback to the most recent active project
+        cursor.execute("SELECT * FROM projects ORDER BY id DESC LIMIT 1;")
+        
     project = cursor.fetchone()
     
-    # Fetch linked vendor options
-    cursor.execute("SELECT id, vendor_name, quote_filename, public_dd_status, final_weighted_score_output FROM procurement_options WHERE project_id = %s;", (project_id,))
-    vendors = cursor.fetchall()
-    
+    vendors = []
+    if project:
+        cursor.execute("""
+            SELECT id, vendor_name, quote_filename, projected_5yr_total, public_dd_status 
+            FROM procurement_options 
+            WHERE project_id = %s;
+        """, (project['id'],))
+        vendors = cursor.fetchall()
+
     cursor.close()
     conn.close()
-    return render_template("project_dashboard.html", project=project, vendors=vendors)
+    
+    return render_template("projects.html", project=project, vendors=vendors)
+
 # 2. Route: Handle PDF Upload and Store Bytes in PostgreSQL
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
