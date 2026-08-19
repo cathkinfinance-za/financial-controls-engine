@@ -79,13 +79,14 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             })
 
     with conn.cursor() as cursor:
-        cursor.execute("DELETE FROM option_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
-        for item in items:
+        cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
+        for idx, item in enumerate(items):
+            line_item_id = f"PRICE_{v_id}_{idx}_{int(time.time())}"
             cursor.execute("""
-                INSERT INTO option_line_items_pricing 
-                (procurement_option_id, cost_component_name, cost_type_category, amount)
-                VALUES (%s, %s, %s, %s);
-            """, (v_id, item["cost_component_name"], item["cost_type_category"], item["amount"]))
+                INSERT INTO options_line_items_pricing 
+                (line_item_id, procurement_option_id, cost_component_name, cost_type_category, amount)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (line_item_id, v_id, item["cost_component_name"], item["cost_type_category"], item["amount"]))
     conn.commit()
     log_to_db(conn, project_id, "Pricing Extractor", f"✅ Pricing items inserted for {v_name}.")
 
@@ -146,7 +147,7 @@ def execute_phase1(project_id):
 
         log_to_db(conn, project_id, "AI Matrix Drafter", "🧠 Running qualitative evaluation via Gemini...")
         ai_response = ai_client.models.generate_content(
-            model='gemini-3.5-flash-lite',
+            model='gemini-3.5-flash',
             contents=gemini_contents,
             config=types.GenerateContentConfig(response_mime_type="application/json")
         )
@@ -164,7 +165,7 @@ def execute_phase1(project_id):
 
             # Clear previous criteria and non-pricing items
             cursor.execute("""
-                DELETE FROM option_line_items_non_pricing 
+                DELETE FROM options_line_items_non_pricing 
                 WHERE procurement_option_id IN (SELECT id FROM procurement_options WHERE project_id = %s);
             """, (project_id,))
             cursor.execute("DELETE FROM project_weightings WHERE project_id = %s;", (project_id,))
@@ -181,11 +182,12 @@ def execute_phase1(project_id):
                 for v_name in vendor_names:
                     v_id = vendor_map.get(v_name)
                     v_score = float(scores_map.get(v_name, 5.0))
+                    line_item_id = f"NON_PRICE_{v_id}_{weighting_id}"
                     cursor.execute("""
-                        INSERT INTO option_line_items_non_pricing 
-                        (procurement_option_id, project_weighting_id, score)
-                        VALUES (%s, %s, %s);
-                    """, (v_id, weighting_id, v_score))
+                        INSERT INTO options_line_items_non_pricing 
+                        (line_item_id, procurement_option_id, weighting_id, score)
+                        VALUES (%s, %s, %s, %s);
+                    """, (line_item_id, v_id, weighting_id, v_score))
         conn.commit()
 
         # Parse line-item pricing for each vendor
