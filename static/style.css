@@ -338,4 +338,42 @@ textarea {
     font-size: 0.85rem;
     color: #94a3b8;
 }
+
+/* Custom File Upload Button Styling */
+.file-upload-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+/* Hide the default browser input */
+.hidden-file-input {
+    display: none !important;
+}
+
+/* Styled label acting as the primary button */
+.custom-file-upload-btn {
+    display: inline-block;
+    background-color: #0066cc;
+    color: #ffffff;
+    padding: 10px 18px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+    margin-bottom: 0; /* Reset global label margin */
+    user-select: none;
+}
+
+.custom-file-upload-btn:hover {
+    background-color: #0052a3;
+}
+
+.file-chosen-text {
+    font-size: 14px;
+    color: #64748b;
+    font-style: italic;
+}
 }

@@ -184,8 +184,15 @@
             accept=".pdf, image/*" 
             multiple 
             onchange="updateQuotesCount(this)"
-            class="file-input-custom"
+            class="hidden-file-input"
         >
+        
+        <label for="attach_quotes" class="custom-file-upload-btn">
+            📁 Choose Files
+        </label>
+        <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
+        </div>
+
         <div id="quotes_count_display" class="upload-feedback"></div>
 
         <!-- Document Grid -->
@@ -308,8 +315,23 @@
     const display = document.getElementById('quotes_count_display');
     const quotesField = document.getElementById('quotes_provided');
     const attachmentsList = document.getElementById('attachments_list');
+    const statusText = document.getElementById('file_chosen_status')
     const files = input.files ? Array.from(input.files) : [];
     const count = files.length;
+
+    // Update status text next to the button
+    if (statusText) {
+        if (count === 1) {
+            statusText.textContent = files[0].name;
+            statusText.style.fontStyle = 'normal';
+        } else if (count > 1) {
+            statusText.textContent = `${count} files selected`;
+            statusText.style.fontStyle = 'normal';
+        } else {
+            statusText.textContent = 'No file chosen';
+            statusText.style.fontStyle = 'italic';
+        }
+    }
 
     // Update Quotes Provided count dynamically
     if (quotesField && count > 0) {
