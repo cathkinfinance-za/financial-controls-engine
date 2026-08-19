@@ -430,37 +430,56 @@ def projects_page(project_id=None):
 def view_project(project_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        # Fetch project and vendors
         cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
         project = cursor.fetchone()
 
         cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
         vendors = cursor.fetchall()
 
-        # Fetch Line Items per Vendor
+        # 1. Fetch unified project criteria weightings
+        cursor.execute("""
+            SELECT * FROM project_weightings 
+            WHERE project_id = %s 
+            ORDER BY id ASC;
+        """, (project_id,))
+        criteria_list = cursor.fetchall()
+
+        # 2. Fetch pricing line items per vendor
         for vendor in vendors:
-            v_id = vendor['id']
-            
-            # Pricing line items
             cursor.execute("""
                 SELECT * FROM options_line_items_pricing 
                 WHERE procurement_option_id = %s 
                 ORDER BY id ASC;
-            """, (v_id,))
-            vendor['pricing_items'] = cursor.fetchall()
+            """, (vendor["id"],))
+            vendor["pricing_items"] = cursor.fetchall()
 
-            # Non-pricing line items
-            cursor.execute("""
-                SELECT n.*, w.criteria_name, w.weighting_percent 
-                FROM options_line_items_non_pricing n
-                JOIN project_weightings w ON n.weighting_id = w.id
-                WHERE n.procurement_option_id = %s;
-            """, (v_id,))
-            vendor['non_pricing_items'] = cursor.fetchall()
+        # 3. Map non-pricing scores by (weighting_id, vendor_id)
+        cursor.execute("""
+            SELECT line_item_id, procurement_option_id, weighting_id, score 
+            FROM options_line_items_non_pricing 
+            WHERE procurement_option_id IN (
+                SELECT id FROM procurement_options WHERE project_id = %s
+            );
+        """, (project_id,))
+        scores_raw = cursor.fetchall()
+        
+        # Build score map: scores_map[weighting_id][vendor_id] = {id, score}
+        scores_map = {}
+        for row in scores_raw:
+            w_id = row["weighting_id"]
+            v_id = row["procurement_option_id"]
+            if w_id not in scores_map:
+                scores_map[w_id] = {}
+            scores_map[w_id][v_id] = row
 
     conn.close()
-    return render_template('projects.html', project=project, vendors=vendors)
-
+    return render_template(
+        "projects.html", 
+        project=project, 
+        vendors=vendors, 
+        criteria_list=criteria_list, 
+        scores_map=scores_map
+    )
 # --- 2. QUOTE UPLOAD ROUTE ---
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
