@@ -181,16 +181,13 @@
 </div>
 
 <script>
-    const placeholdersMap = {
-        "Quote evaluation": ["{po_num}"],
-        "Company assessment": [
-            "{po_num}", "{desc_val}", "{cost}", "{gl_code_val}", 
-            "{user_recommended_vendor}", "{user_justification}", 
-            "{coi_status}", "{coi_details}", "{extracted_vendor_name}", 
-            "{cipc_num}", "{vat_num}", "{quoted_amount}", 
-            "{includes_vat}", "{search_context}"
-        ]
-    };
+    const allPlaceholders = [
+        "{po_num}", "{desc_val}", "{cost}", "{gl_code_val}", 
+        "{user_recommended_vendor}", "{user_justification}", 
+        "{coi_status}", "{coi_details}", "{extracted_vendor_name}", 
+        "{cipc_num}", "{vat_num}", "{quoted_amount}", 
+        "{includes_vat}", "{search_context}"
+    ];
 
     function updateBadgeState() {
         const isActive = document.getElementById("isActiveToggle").checked;
@@ -208,7 +205,7 @@
         const process = document.getElementById("processSelect").value;
         document.getElementById("alertBox").style.display = "none";
 
-        document.getElementById("placeholders").innerHTML = (placeholdersMap[process] || [])
+        document.getElementById("placeholders").innerHTML = allPlaceholders
             .map(p => `<span class="variable-tag">${p}</span>`)
             .join("");
 

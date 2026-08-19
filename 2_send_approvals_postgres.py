@@ -133,16 +133,27 @@ def get_gemini_analysis(record, cursor):
         # PHASE 1: QUOTE EVALUATION (If Active)
         # ----------------------------------------------------
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
-        
+
         if quote_eval_template:
-            parse_prompt_text = quote_eval_template.format(po_num=po_num)
+            # Pass all system variables into Phase 1 formatting
+            parse_prompt_text = quote_eval_template.format(
+                po_num=po_num,
+                desc_val=str(record.get('description') or 'Operational Procurement').strip(),
+                cost=float(record.get('estimated_cost') or 0.0),
+                gl_code_val=str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip(),
+                user_recommended_vendor=user_recommended_vendor,
+                user_justification=str(record.get('justification_notes') or 'N/A').strip(),
+                coi_status=str(record.get('conflict_of_interest') or 'No').strip(),
+                coi_details=str(record.get('conflict_details') or 'None').strip(),
+                extracted_vendor_name=extracted_vendor_name,
+                cipc_num=cipc_num,
+                vat_num=vat_num,
+                quoted_amount=quoted_amount,
+                includes_vat=includes_vat,
+                search_context=search_context
+            )
             parse_contents = [parse_prompt_text]
-
-            for file_loc in quote_attachments:
-                file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
-                if file_data and mime_type:
-                    parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
-
+            
             log(f"PO {po_num}: 📑 Parsing quote metadata...")
             parse_response = client.models.generate_content(
                 model='gemini-3.5-flash-lite',
