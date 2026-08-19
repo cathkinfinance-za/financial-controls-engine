@@ -743,7 +743,24 @@ def update_project(project_id):
         cursor.close()
         conn.close()
 
-    return redirect(url_for("projects_page", project_id=project_id))     
+    return redirect(url_for("projects_page", project_id=project_id))   
+
+
+@app.route('/delete-vendor/<int:vendor_id>', methods=['POST'])
+def delete_vendor(vendor_id):
+    vendor = VendorOption.query.get_or_404(vendor_id)
+    project_id = vendor.project_id
+
+    # Remove associated line items and scores
+    PricingItem.query.filter_by(vendor_id=vendor_id).delete()
+    VendorScore.query.filter_by(vendor_id=vendor_id).delete()
+
+    # Delete vendor option record
+    db.session.delete(vendor)
+    db.session.commit()
+
+    flash(f'Option "{vendor.vendor_name}" was successfully removed.')
+    return redirect(url_for('view_project', project_id=project_id))  
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

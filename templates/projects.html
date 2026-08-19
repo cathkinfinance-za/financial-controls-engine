@@ -12,6 +12,7 @@
             --text-muted: #6c757d;
             --primary-blue: #0d6efd;
             --card-bg: #ffffff;
+            --danger-red: #dc3545;
         }
 
         body {
@@ -123,6 +124,22 @@
         .btn-primary { background-color: #212529; color: white; }
         .btn-secondary { background-color: #e9ecef; color: var(--text-main); border-color: #ced4da; }
         .btn-blue { background-color: var(--primary-blue); color: white; }
+
+        .btn-icon-danger {
+            background: transparent;
+            border: none;
+            color: #adb5bd;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 16px;
+            border-radius: 4px;
+            transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+        }
+
+        .btn-icon-danger:hover {
+            color: var(--danger-red);
+            background-color: #f8d7da;
+        }
 
         .status-badge {
             font-size: 13px;
@@ -334,6 +351,7 @@
                     </div>
                 </div>
 
+                <!-- Procurement Options with Delete Action -->
                 <div class="form-row">
                     <label class="form-label">Procurement Options</label>
                     <div style="width: 100%;">
@@ -344,12 +362,20 @@
                                     <strong style="font-size: 16px; display: block; margin-bottom: 6px;">{{ vendor.vendor_name }}</strong>
                                     <div class="vendor-info">
                                         <span style="color: var(--text-muted); font-size: 13px;">Selected Option: <strong>A</strong></span>
-                                        <span style="font-size: 13px;">Projected Total: <strong>ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}</strong></span>
+                                        <span style="font-size: 13px;">Projected Total: <strong id="cardTotal_{{ vendor.id }}">ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}</strong></span>
                                     </div>
                                 </div>
-                                <div style="display: flex; align-items: center; gap: 12px;">
-                                    <div class="pdf-icon">PDF</div>
-                                    <span style="font-size: 12px; color: var(--text-muted);">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
+                                <div style="display: flex; align-items: center; gap: 16px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div class="pdf-icon">PDF</div>
+                                        <span style="font-size: 12px; color: var(--text-muted);">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
+                                    </div>
+                                    <!-- Delete Option Form -->
+                                    <button type="submit" formaction="/delete-vendor/{{ vendor.id }}" formmethod="POST" 
+                                            class="btn-icon-danger" title="Delete Option"
+                                            onclick="return confirm('Are you sure you want to delete option {{ vendor.vendor_name }}?');">
+                                        &#128465;
+                                    </button>
                                 </div>
                             </div>
                             {% endfor %}
@@ -364,6 +390,7 @@
                 </div>
 
                 {% if project %}
+                <!-- Qualitative & Pricing Criteria Matrix -->
                 <div class="section-header" style="margin-top: 40px;">Qualitative & Pricing Criteria Matrix</div>
                 <table class="matrix-table" id="criteriaMatrix">
                     <thead>
@@ -376,7 +403,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Integrated Commercial/Pricing Evaluation Row -->
                         <tr class="pricing-row">
                             <td>
                                 <strong>Commercial / Price Evaluation</strong><br>
@@ -391,17 +417,16 @@
                             </td>
                             {% for vendor in vendors %}
                                 <td>
-                                    <span class="score-display vendor-score-{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0 }}">
-                                        {{ vendor.price_score or '0.00' }}
+                                    <span class="score-display vendor-price-score" id="priceScoreDisplay_{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0 }}">
+                                        {{ "%.2f"|format(vendor.price_score or 0) }}
                                     </span>
-                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="matrixCostDisplay_{{ vendor.id }}">
                                         ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
                                     </div>
                                 </td>
                             {% endfor %}
                         </tr>
 
-                        <!-- Non-Pricing Qualitative Criteria -->
                         {% for criteria in criteria_list %}
                         <tr class="criteria-row">
                             <td><strong>{{ criteria.criteria_name }}</strong></td>
@@ -416,7 +441,7 @@
                                 {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id) %}
                                 {% set current_score = score_entry.score if score_entry else 0 %}
                                 <td>
-                                    <span class="score-display vendor-score-{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ current_score }}">
+                                    <span class="score-display score-qualitative" data-vendor-id="{{ vendor.id }}" data-score="{{ current_score }}">
                                         {{ "%.2f"|format(current_score) }}
                                     </span>
                                 </td>
@@ -443,41 +468,90 @@
                     </tfoot>
                 </table>
 
+                <!-- Consolidated Side-by-Side Detailed Line Items Table -->
                 <div class="section-header" style="margin-top: 40px;">Detailed Option Line Items</div>
-                {% for vendor in vendors %}
-                <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; margin-bottom: 12px; color: #333;">{{ vendor.vendor_name }} Quote Items</h4>
-                    <table class="matrix-table" style="margin-bottom: 0;">
-                        <thead>
-                            <tr>
-                                <th>Cost Component Description</th>
-                                <th style="width: 180px;">Category</th>
-                                <th style="width: 160px;">Amount (ZAR)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for item in vendor.pricing_items %}
-                            <tr>
-                                <td>
-                                    <input type="text" name="pricing_name_{{ item.id }}" class="form-control" value="{{ item.cost_component_name }}">
-                                </td>
-                                <td>
-                                    <select name="pricing_category_{{ item.id }}" class="form-control">
-                                        <option value="One-Off Cost" {% if item.cost_type_category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                        <option value="Annual Cost" {% if item.cost_type_category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" class="form-control" value="{{ item.amount }}">
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="3" style="color: var(--text-muted);">No pricing line items recorded.</td></tr>
+                <table class="matrix-table" id="lineItemsMatrix">
+                    <thead>
+                        <tr>
+                            <th>Cost Component Description</th>
+                            <th style="width: 180px;">Category</th>
+                            {% for vendor in vendors %}
+                                <th style="width: 220px;">{{ vendor.vendor_name }} Amount (ZAR)</th>
                             {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% set component_names = [] %}
+                        {% for vendor in vendors %}
+                            {% for item in vendor.pricing_items %}
+                                {% if item.cost_component_name not in component_names %}
+                                    {% set _ = component_names.append(item.cost_component_name) %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+
+                        {% for comp_name in component_names %}
+                        <tr>
+                            <td>
+                                <strong>{{ comp_name }}</strong>
+                            </td>
+                            <td>
+                                {% set sample_cat = 'One-Off Cost' %}
+                                {% for vendor in vendors %}
+                                    {% for item in vendor.pricing_items %}
+                                        {% if item.cost_component_name == comp_name %}
+                                            {% set sample_cat = item.cost_type_category %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endfor %}
+                                <select name="category_{{ loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                    <option value="One-Off Cost" {% if sample_cat == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                    <option value="Annual Cost" {% if sample_cat == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                </select>
+                            </td>
+                            {% for vendor in vendors %}
+                                {% set match_item = [] %}
+                                {% for item in vendor.pricing_items %}
+                                    {% if item.cost_component_name == comp_name %}
+                                        {% set _ = match_item.append(item) %}
+                                    {% endif %}
+                                {% endfor %}
+                                <td>
+                                    {% if match_item %}
+                                        <input type="number" step="0.01" name="pricing_amount_{{ match_item[0].id }}" 
+                                               class="form-control item-amount" 
+                                               data-vendor-id="{{ vendor.id }}" 
+                                               data-comp-name="{{ comp_name }}"
+                                               value="{{ match_item[0].amount }}">
+                                    {% else %}
+                                        <input type="number" step="0.01" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" 
+                                               class="form-control item-amount" 
+                                               data-vendor-id="{{ vendor.id }}" 
+                                               data-comp-name="{{ comp_name }}"
+                                               value="0.00">
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td colspan="2">Projected 5-Year Total Cost</td>
+                            {% for vendor in vendors %}
+                                <td>
+                                    <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
+                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
+                                    </strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
+                </table>
                 {% endif %}
 
                 <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
@@ -522,10 +596,64 @@
     </div>
 </div>
 
-<!-- Dynamic Matrix Live Recalculation -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    function calculateTotals() {
+    function formatCurrency(val) {
+        return 'ZAR ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function calculateAll() {
+        const vendorCosts = {};
+        const amountInputs = document.querySelectorAll('#lineItemsMatrix .item-amount');
+
+        amountInputs.forEach(input => {
+            const vendorId = input.getAttribute('data-vendor-id');
+            const row = input.closest('tr');
+            const categorySelect = row ? row.querySelector('.item-category') : null;
+
+            if (!vendorCosts[vendorId]) {
+                vendorCosts[vendorId] = 0;
+            }
+
+            const category = categorySelect ? categorySelect.value : 'One-Off Cost';
+            const amount = parseFloat(input.value) || 0;
+
+            if (category === 'Annual Cost') {
+                vendorCosts[vendorId] += amount * 5;
+            } else {
+                vendorCosts[vendorId] += amount;
+            }
+        });
+
+        let lowestCost = Infinity;
+        for (const [vId, total] of Object.entries(vendorCosts)) {
+            if (total > 0 && total < lowestCost) {
+                lowestCost = total;
+            }
+        }
+
+        for (const [vId, total] of Object.entries(vendorCosts)) {
+            let priceScore = 0;
+            if (lowestCost !== Infinity && total > 0) {
+                priceScore = (lowestCost / total) * 10;
+            }
+
+            const cardTotal = document.getElementById('cardTotal_' + vId);
+            if (cardTotal) cardTotal.innerText = formatCurrency(total);
+
+            const tableVendorTotal = document.getElementById('tableVendorTotal_' + vId);
+            if (tableVendorTotal) tableVendorTotal.innerText = formatCurrency(total);
+
+            const matrixCost = document.getElementById('matrixCostDisplay_' + vId);
+            if (matrixCost) matrixCost.innerText = formatCurrency(total);
+
+            const priceScoreElem = document.getElementById('priceScoreDisplay_' + vId);
+            if (priceScoreElem) {
+                priceScoreElem.innerText = priceScore.toFixed(2);
+                priceScoreElem.setAttribute('data-score', priceScore);
+            }
+        }
+
         const matrix = document.getElementById('criteriaMatrix');
         if (!matrix) return;
 
@@ -568,12 +696,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    const inputs = document.querySelectorAll('.weight-input');
-    inputs.forEach(input => {
-        input.addEventListener('input', calculateTotals);
-    });
+    const weightInputs = document.querySelectorAll('.weight-input');
+    weightInputs.forEach(input => input.addEventListener('input', calculateAll));
 
-    calculateTotals();
+    const lineAmountInputs = document.querySelectorAll('#lineItemsMatrix .item-amount');
+    lineAmountInputs.forEach(input => input.addEventListener('input', calculateAll));
+
+    const lineCatSelects = document.querySelectorAll('#lineItemsMatrix .item-category');
+    lineCatSelects.forEach(select => select.addEventListener('change', calculateAll));
+
+    calculateAll();
 });
 </script>
 
