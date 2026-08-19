@@ -493,11 +493,16 @@ def draft_matrix(project_id):
 
     return redirect(url_for("projects_page", project_id=project_id))
 
-# --- 4. RECALCULATE MATRIX (PHASE 2) ROUTE ---
 @app.route("/recalculate-matrix/<int:project_id>", methods=["POST"])
 def recalculate_matrix(project_id):
-    price_weighting = request.form.get("price_weighting", 30.00)
+    # Safely parse and convert the weight input
+    try:
+        raw_weight = float(request.form.get("price_weighting", 30))
+    except (ValueError, TypeError):
+        raw_weight = 30.0
 
+    # Normalize whole percentage (e.g., 50.0) to decimal (0.50)
+    price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -516,7 +521,52 @@ def recalculate_matrix(project_id):
     except Exception as e:
         flash(f"Error recalculating matrix: {str(e)}")
 
-    return redirect(url_for("projects_page", project_id=project_id))    
+    return redirect(url_for("projects_page", project_id=project_id))
+
+# --- 5. UPDATE PROJECT DEFINITIONS ROUTE ---
+@app.route("/update-project/<int:project_id>", methods=["POST"])
+def update_project(project_id):
+    project_reference = request.form.get("project_reference", "")
+    name = request.form.get("name", "")
+    project_description = request.form.get("project_description", "")
+    project_objective = request.form.get("project_objective", "")
+    ai_prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
+    gl_code = request.form.get("gl_code", "")
+    gl_title = request.form.get("gl_title", "")
+    gl_sub = request.form.get("gl_sub", "")
+    price_weighting = request.form.get("price_weighting", 30.00)
+    executive_sourcing_recommendation = request.form.get("executive_sourcing_recommendation", "")
+    raw_weight = float(request.form.get("price_weighting", 30))
+    price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        UPDATE projects 
+        SET project_reference = %s,
+            name = %s,
+            project_description = %s,
+            project_objective = %s,
+            ai_prompt_adjustments = %s,
+            gl_code = %s,
+            gl_title = %s,
+            gl_sub = %s,
+            price_weighting = %s,
+            executive_sourcing_recommendation = %s
+        WHERE id = %s;
+    """, (
+        project_reference, name, project_description, project_objective, 
+        ai_prompt_adjustments, gl_code, gl_title, gl_sub, 
+        price_weighting, executive_sourcing_recommendation, project_id
+    ))
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("Project definitions updated successfully.")
+    return redirect(url_for("projects_page", project_id=project_id))     
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
