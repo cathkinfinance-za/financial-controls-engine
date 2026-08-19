@@ -1,3 +1,13 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Details</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
 <div class="app-layout">
     <!-- Sidebar List -->
     <div class="sidebar">
@@ -120,6 +130,7 @@
                             <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
                             <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
                             <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                            <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
                             <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
                             <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
                         </select>
@@ -377,7 +388,9 @@
 
         if (submissionStatus === 'Approved') {
             status = '✅ APPROVED: Compliance Process Complete';
-        } else if (submissionStatus === 'Rejected') {
+        } else if (submissionStatus === 'Sent') {
+            status = '📬 SENT: Approval Request Dispatched via Email'; 
+        }    else if (submissionStatus === 'Rejected') {
             status = '🛑 REJECTED: Final Authorisation Declined';
         } else if (isBudgeted === 'Yes' && !glCode) {
             status = '⚠️ ACTION REQUIRED: Select a valid GL description';
@@ -443,3 +456,6 @@
         calculateSystemStatus();
     });
 </script>
+
+</body>
+</html>
