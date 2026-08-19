@@ -749,95 +749,137 @@ def update_project(project_id):
 
 @app.route('/delete-vendor/<int:vendor_id>', methods=['POST'])
 def delete_vendor(vendor_id):
-    vendor = VendorOption.query.get_or_404(vendor_id)
-    project_id = vendor.project_id
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # Get project_id before deleting
+            cursor.execute("SELECT project_id, vendor_name FROM procurement_options WHERE id = %s;", (vendor_id,))
+            vendor = cursor.fetchone()
+            
+            if not vendor:
+                flash("Vendor option not found.")
+                return redirect(url_for('new_project_page'))
 
-    # Remove associated line items and scores
-    PricingItem.query.filter_by(vendor_id=vendor_id).delete()
-    VendorScore.query.filter_by(vendor_id=vendor_id).delete()
+            project_id = vendor['project_id']
+            vendor_name = vendor['vendor_name']
 
-    # Delete vendor option record
-    db.session.delete(vendor)
-    db.session.commit()
+            # Delete child line items
+            cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (vendor_id,))
+            cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (vendor_id,))
 
-    flash(f'Option "{vendor.vendor_name}" was successfully removed.')
-    return redirect(url_for('view_project', project_id=project_id))  
+            # Delete vendor parent row
+            cursor.execute("DELETE FROM procurement_options WHERE id = %s;", (vendor_id,))
+            
+            conn.commit()
+            flash(f'Option "{vendor_name}" was successfully removed.')
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error deleting vendor: {str(e)}')
+    finally:
+        conn.close()
 
+    return redirect(url_for('projects_page', project_id=project_id))
 
 @app.route('/generate-recommendation/<int:project_id>', methods=['POST'])
 def generate_recommendation(project_id):
     if not GEMINI_AVAILABLE:
         flash('Gemini API library is not installed or configured.')
-        return redirect(url_for('view_project', project_id=project_id))
+        return redirect(url_for('projects_page', project_id=project_id))
 
-    project = Project.query.get_or_404(project_id)
-    vendors = VendorOption.query.filter_by(project_id=project_id).all()
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            # 1. Fetch Project Details
+            cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+            project = cursor.fetchone()
 
-    if not vendors:
-        flash('Cannot generate recommendation without vendor options.')
-        return redirect(url_for('view_project', project_id=project_id))
+            if not project:
+                flash('Project not found.')
+                return redirect(url_for('projects_page', project_id=project_id))
 
-    # 1. Fetch system prompts from database
-    rec_prompt_row = SystemPrompt.query.filter_by(process='executive_recommendation', is_active=True).first()
-    company_prompt_row = SystemPrompt.query.filter_by(process='Company assessment', is_active=True).first()
+            # 2. Fetch Vendors (Procurement Options)
+            cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
+            vendors = cursor.fetchall()
 
-    prompt_template = rec_prompt_row.prompt_template if rec_prompt_row else ""
-    company_assessment_context = company_prompt_row.prompt_template if company_prompt_row else ""
+            if not vendors:
+                flash('Cannot generate recommendation without vendor options.')
+                return redirect(url_for('projects_page', project_id=project_id))
 
-    # 2. Identify winner and lowest cost options
-    sorted_by_score = sorted(vendors, key=lambda v: v.final_weighted_score_output or 0, reverse=True)
-    sorted_by_cost = sorted(vendors, key=lambda v: v.projected_5yr_total or float('inf'))
+            # 3. Fetch System Prompts
+            cursor.execute("SELECT prompt_template FROM system_prompts WHERE process = 'executive_recommendation' AND is_active = TRUE;")
+            rec_row = cursor.fetchone()
+            
+            cursor.execute("SELECT prompt_template FROM system_prompts WHERE process = 'Company assessment' AND is_active = TRUE;")
+            company_row = cursor.fetchone()
 
-    winner = sorted_by_score[0] if sorted_by_score else None
-    cheapest = sorted_by_cost[0] if sorted_by_cost else None
+            prompt_template = rec_row['prompt_template'] if rec_row else ""
+            company_assessment_context = company_row['prompt_template'] if company_row else ""
 
-    winner_name = winner.vendor_name if winner else "N/A"
-    winning_score = f"{winner.final_weighted_score_output:.1f}" if winner and winner.final_weighted_score_output else "0.0"
-    cheapest_vendor = cheapest.vendor_name if cheapest else "N/A"
-    min_cost = f"{int(round(cheapest.projected_5yr_total)):,}" if cheapest and cheapest.projected_5yr_total else "0"
+            # 4. Identify winner and cheapest option
+            # Fallback keys check for common field names in database schema
+            sorted_by_score = sorted(vendors, key=lambda v: v.get('final_weighted_score_output') or v.get('weighted_score') or 0, reverse=True)
+            sorted_by_cost = sorted(vendors, key=lambda v: v.get('projected_5yr_total') or v.get('total_cost') or float('inf'))
 
-    # 3. Inject variables into prompt template
-    formatted_task_prompt = prompt_template.format(
-        winner_name=winner_name,
-        winning_score=winning_score,
-        cheapest_vendor=cheapest_vendor,
-        min_cost=min_cost
-    )
+            winner = sorted_by_score[0] if sorted_by_score else None
+            cheapest = sorted_by_cost[0] if sorted_by_cost else None
 
-    # 4. Construct payload context
-    full_prompt = f"""
+            winner_name = winner.get('vendor_name', 'N/A') if winner else "N/A"
+            raw_score = winner.get('final_weighted_score_output') or winner.get('weighted_score') or 0.0
+            winning_score = f"{float(raw_score):.1f}"
+
+            cheapest_vendor = cheapest.get('vendor_name', 'N/A') if cheapest else "N/A"
+            raw_cost = cheapest.get('projected_5yr_total') or cheapest.get('total_cost') or 0
+            min_cost = f"{int(round(float(raw_cost))):,}"
+
+            # 5. Inject variables into task template
+            formatted_task_prompt = prompt_template.format(
+                winner_name=winner_name,
+                winning_score=winning_score,
+                cheapest_vendor=cheapest_vendor,
+                min_cost=min_cost
+            )
+
+            # 6. Construct full prompt payload
+            full_prompt = f"""
 === COMPANY & SYSTEM DIRECTIVES ===
 {company_assessment_context}
 
 === PROJECT DETAILS ===
-Project Name: {project.name}
-Project Reference: {project.project_reference}
-Project Description: {project.project_description}
-Project Objectives: {project.project_objective}
+Project Name: {project.get('name', '')}
+Project Reference: {project.get('project_reference', '')}
+Project Description: {project.get('project_description', '')}
+Project Objectives: {project.get('project_objective', '')}
 
 === USER SPECIFIC INSTRUCTIONS ===
-{project.ai_prompt_adjustments or 'None provided.'}
+{project.get('ai_prompt_adjustments') or 'None provided.'}
 
 === EVALUATION DATA & INSTRUCTIONS ===
 {formatted_task_prompt}
 """
 
-    # 5. Call Gemini API
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(full_prompt)
-        
-        # 6. Save result to database
-        project.executive_sourcing_recommendation = response.text
-        project.latest_ai_status = 'Recommendation Generated'
-        db.session.commit()
-        
-        flash('Executive sourcing recommendation successfully generated!')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error generating recommendation: {str(e)}')
+            # 7. Call Gemini API
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            response = model.generate_content(full_prompt)
+            generated_text = response.text if response and response.text else "No content generated."
 
-    return redirect(url_for('view_project', project_id=project_id))
+            # 8. Save output back to Neon PostgreSQL
+            cursor.execute("""
+                UPDATE projects 
+                SET executive_sourcing_recommendation = %s, 
+                    latest_ai_status = 'Recommendation Generated' 
+                WHERE id = %s;
+            """, (generated_text, project_id))
+            
+            conn.commit()
+            flash('Executive sourcing recommendation successfully generated!')
+
+    except Exception as e:
+        conn.rollback()
+        flash(f'Error generating recommendation: {str(e)}')
+    finally:
+        conn.close()
+
+    return redirect(url_for('projects_page', project_id=project_id))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
