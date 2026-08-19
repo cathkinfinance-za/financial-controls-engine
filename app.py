@@ -39,7 +39,7 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
 
     gemini_file_objects = []
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-3.5-flash')
         
         for file_bytes, filename, mime_type in uploaded_files_data:
             # Use io.BytesIO so genai receives a readable stream
@@ -858,7 +858,7 @@ Project Objectives: {project.get('project_objective', '')}
 """
 
             # 7. Call Gemini API
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3.5-flash')
             response = model.generate_content(full_prompt)
             generated_text = response.text if response and response.text else "No content generated."
 
