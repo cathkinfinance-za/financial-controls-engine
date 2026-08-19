@@ -2,113 +2,367 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Project Evaluation Management</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects Management Dashboard</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
-        .container { max-width: 1100px; margin: 0 auto; }
-        .card { background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-        h1, h2 { color: #1e293b; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .btn { display: inline-block; background: #2563eb; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
-        .btn-secondary { background: #475569; }
-        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; background: #e2e8f0; color: #334155; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border-bottom: 1px solid #e2e8f0; padding: 12px; text-align: left; }
-        th { background: #f8fafc; font-size: 0.85rem; text-transform: uppercase; color: #64748b; }
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        /* Top Action / Control Bar */
+        .control-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-size: 14px;
+        }
+
+        .btn-primary { background-color: #212529; color: white; }
+        .btn-secondary { background-color: #e9ecef; color: var(--text-main); border-color: #ced4da; }
+        .btn-blue { background-color: var(--primary-blue); color: white; }
+
+        .status-badge {
+            font-size: 13px;
+            color: var(--text-muted);
+            background: #f1f3f5;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        /* Form Layout Rules */
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-main);
+            padding-top: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+
+        textarea.form-control {
+            min-height: 70px;
+            resize: vertical;
+        }
+
+        /* GL Code Inputs */
+        .gl-inline-group {
+            display: grid;
+            grid-template-columns: 140px 1fr;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Procurement Cards */
+        .vendor-card {
+            background-color: #fdfdfd;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vendor-info {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+        }
+
+        .pdf-icon {
+            width: 32px;
+            height: 38px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        /* Matrix Tables */
+        table.matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        table.matrix-table th, table.matrix-table td {
+            border: 1px solid var(--border-color);
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        table.matrix-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        /* Flash Message Styling */
+        .flash-message {
+            padding: 12px 18px;
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>Project Management: {{ project.project_reference }}</h1>
+<div class="dashboard-container">
 
+    <!-- Flash Feedback Banner -->
     {% with messages = get_flashed_messages() %}
-    {% if messages %}
+      {% if messages %}
         {% for message in messages %}
-        <div style="padding: 12px 18px; background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; border-radius: 6px; margin-bottom: 20px;">
-            {{ message }}
-        </div>
+          <div class="flash-message">{{ message }}</div>
         {% endfor %}
-    {% endif %}
+      {% endif %}
     {% endwith %}
-    
-    <!-- SECTION 1: Quote Upload & Ingestion -->
-    <div class="card">
-        <h2>1. Vendor Quote Ingestion</h2>
-        <form action="/upload-quote" method="POST" enctype="multipart/form-data" class="grid">
-            <!-- Hidden input with fallback project_id -->
-            <input type="hidden" name="project_id" value="{{ project.id if project else 1 }}">
+
+    <!-- Top Action Bar -->
+    <div class="control-bar">
+        <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
+        <div class="control-buttons">
+            <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-primary">Draft Matrix via AI</button>
+            </form>
             
-            <div>
-                <label>Vendor / Option Name</label>
-                <input type="text" name="vendor_name" placeholder="e.g. Acme Security" required style="width: 100%; padding: 8px; margin-top: 5px;">
+            <form action="/recalculate-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                <button type="submit" class="btn btn-secondary">Recalculate Matrix</button>
+            </form>
+            
+            <span class="status-badge">
+                Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
+            </span>
+        </div>
+    </div>
+
+    <!-- Main Project Input Form -->
+    <form action="/update-project/{{ project.id if project else 1 }}" method="POST">
+        
+        <div class="section-header">Project Definitions</div>
+
+        <div class="form-row">
+            <label class="form-label">Project Reference</label>
+            <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '2026_02' }}" style="width: 200px;">
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">Name</label>
+            <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Security System Replacement - 2">
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">Project Description</label>
+            <textarea name="project_description" class="form-control">{{ project.project_description if project else '' }}</textarea>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">Project Objective</label>
+            <textarea name="project_objective" class="form-control">{{ project.project_objective if project else '' }}</textarea>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">AI Prompt Adjustments (Qualitative)</label>
+            <textarea name="ai_prompt_adjustments" class="form-control" placeholder="Price weighting should be at least 20%">{{ project.ai_prompt_adjustments if project else '' }}</textarea>
+        </div>
+
+        <div class="form-row">
+            <label class="form-label">GL Code</label>
+            <div class="gl-inline-group">
+                <input type="text" name="gl_code" class="form-control" value="{{ project.gl_code if project else '2400/040' }}">
+                <div>
+                    <input type="text" name="gl_title" class="form-control" value="{{ project.gl_title if project else 'Operations' }}" placeholder="Title" style="margin-bottom: 4px;">
+                    <input type="text" name="gl_sub" class="form-control" value="{{ project.gl_sub if project else 'Security Bit 20/12 subscription' }}" placeholder="Sub Description">
+                </div>
             </div>
-            <div>
-                <label>Quote PDF File</label>
-                <input type="file" name="quote_file" accept="application/pdf" required style="width: 100%; padding: 8px; margin-top: 5px;">
-            </div>
-            <div style="grid-column: span 2;">
-                <!-- Removed 'disabled' attribute -->
-                <button type="submit" class="btn">
-                    Upload Quote PDF to Database
+        </div>
+
+        <!-- Procurement Options Cards -->
+        <div class="form-row">
+            <label class="form-label">Procurement Options</label>
+            <div style="width: 100%;">
+                
+                {% if vendors %}
+                    {% for vendor in vendors %}
+                    <div class="vendor-card">
+                        <div>
+                            <strong style="font-size: 16px; display: block; margin-bottom: 6px;">{{ vendor.vendor_name }}</strong>
+                            <div class="vendor-info">
+                                <span style="color: var(--text-muted); font-size: 13px;">Selected Option: <strong>A</strong></span>
+                                <span style="font-size: 13px;">Projected Total: <strong>ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}</strong></span>
+                            </div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="pdf-icon">PDF</div>
+                            <span style="font-size: 12px; color: var(--text-muted);">{{ vendor.quote_filename }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="color: var(--text-muted); font-size: 14px;">No procurement quotes uploaded yet.</p>
+                {% endif %}
+
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('uploadModal').style.display='block'" style="margin-top: 8px;">
+                    + Add Option
                 </button>
             </div>
+        </div>
+
+        <!-- Calculations & Weightings Table -->
+        <div class="section-header" style="margin-top: 40px;">Project Output: Calculations</div>
+
+        <div class="form-row">
+            <label class="form-label">Price Weighting</label>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" name="price_weighting" class="form-control" value="{{ project.price_weighting if project else 30 }}" style="width: 100px;">
+                <span>%</span>
+            </div>
+        </div>
+
+        <!-- Executive Summary Section -->
+        <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
+
+        <div class="form-row">
+            <label class="form-label">Executive Sourcing Recommendation</label>
+            <textarea name="executive_sourcing_recommendation" class="form-control" style="min-height: 140px;">{{ project.executive_sourcing_recommendation if project else '' }}</textarea>
+        </div>
+
+        <!-- Matrix Results Table -->
+        <div style="margin-top: 24px;">
+            <h4 style="margin-bottom: 12px;">Procurement Matrix Summary Chart</h4>
+            <table class="matrix-table">
+                <thead>
+                    <tr>
+                        <th>Evaluation Criteria & Metrics</th>
+                        {% for vendor in vendors %}
+                            <th>{{ vendor.vendor_name }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Lifespan Projected Cost</strong></td>
+                        {% for vendor in vendors %}
+                            <td>ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Price Score (Inverse Rank)</strong></td>
+                        {% for vendor in vendors %}
+                            <td>{{ vendor.price_score if vendor.price_score else '-' }}</td>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <td><strong>Final Weighted Score</strong></td>
+                        {% for vendor in vendors %}
+                            <td><strong>{{ vendor.final_weighted_score_output if vendor.final_weighted_score_output else '-' }}</strong></td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top: 30px; text-align: right;">
+            <button type="submit" class="btn btn-blue">Save Project Definitions</button>
+        </div>
+
+    </form>
+</div>
+
+<!-- Modal for PDF Upload -->
+<div id="uploadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
+    <div style="background:white; max-width:500px; margin:100px auto; padding:24px; border-radius:6px;">
+        <h3 style="margin-top:0;">Upload Vendor Quote</h3>
+        <form action="/upload-quote" method="POST" enctype="multipart/form-data">
+            <input type="hidden" name="project_id" value="{{ project.id if project else 1 }}">
+            
+            <div style="margin-bottom: 16px;">
+                <label style="display:block; margin-bottom: 6px; font-weight:600;">Vendor Name</label>
+                <input type="text" name="vendor_name" class="form-control" required placeholder="e.g. Glovent">
+            </div>
+
+            <div style="margin-bottom: 20px;">
+                <label style="display:block; margin-bottom: 6px; font-weight:600;">Quote PDF File</label>
+                <input type="file" name="quote_file" accept="application/pdf" class="form-control" required>
+            </div>
+
+            <div style="text-align:right; gap:8px; display:flex; justify-content:flex-end;">
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('uploadModal').style.display='none'">Cancel</button>
+                <button type="submit" class="btn btn-blue">Upload PDF</button>
+            </div>
         </form>
-
-        <!-- Uploaded Options List -->
-        <h3>Uploaded Procurement Options</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th>Vendor Name</th>
-                    <th>PDF File Name</th>
-                    <th>5-Yr Projected Total</th>
-                    <th>DD Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for vendor in vendors %}
-                <tr>
-                    <td><strong>{{ vendor.vendor_name }}</strong></td>
-                    <td>{{ vendor.quote_filename }}</td>
-                    <td>R {{ "{:,.2f}".format(vendor.projected_5yr_total or 0) }}</td>
-                    <td><span class="status-badge">{{ vendor.public_dd_status or 'Pending' }}</span></td>
-                </tr>
-                {% else %}
-                <tr><td colspan="4">No vendor quotes uploaded yet.</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
     </div>
-
-    <!-- SECTION 2: Workflow Controls & Execution -->
-    <div class="card">
-        <h2>2. AI Evaluation Pipeline</h2>
-        <p>Current Workflow Status: <strong>{{ project.draft_matrix_via_ai or 'Not Started' }}</strong></p>
-        
-        <div style="display: flex; gap: 15px;">
-            <!-- Trigger Phase 1 -->
-            <form action="/run-phase1/{{ project.id }}" method="POST">
-                <button type="submit" class="btn">Run Phase 1: AI Matrix Drafter</button>
-            </form>
-
-            <!-- Trigger Phase 2 -->
-            <form action="/run-phase2/{{ project.id }}" method="POST">
-                <button type="submit" class="btn btn-secondary">Run Phase 2: Calculate & Due Diligence</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- SECTION 3: Executive Summary Output (Populated after Phase 2) -->
-    {% if project.executive_sourcing_recommendation %}
-    <div class="card">
-        <h2>3. Executive Board Recommendation</h2>
-        <div style="white-space: pre-line; background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb;">
-            {{ project.executive_sourcing_recommendation }}
-        </div>
-    </div>
-    {% endif %}
-
 </div>
 
 </body>
