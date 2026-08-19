@@ -1,13 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Purchase Order Details</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-<body>
-
 <div class="app-layout">
     <!-- Sidebar List -->
     <div class="sidebar">
@@ -34,242 +24,246 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container">
-        <div class="header-bar">
-            <h1>Purchase Order</h1>
-            <a href="#" class="back-btn">Back to Dashboard &gt;</a>
-        </div>
-
-        {% if message %}
-            <div style="padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border-radius: 4px;">
-                {{ message }}
+    <div class="main-content">
+        <div class="container">
+            <div class="header-bar">
+                <h1>Purchase Order</h1>
+                <a href="#" class="back-btn">Back to Dashboard &gt;</a>
             </div>
-        {% endif %}
 
-        <form action="/po_form" method="POST" enctype="multipart/form-data">
-    <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
-    <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
+            {% if message %}
+                <div style="padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border-radius: 4px;">
+                    {{ message }}
+                </div>
+            {% endif %}
 
-    <fieldset>
-        <legend>Purchase Order Details</legend>
+            <form action="/po_form" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
+                <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
 
-        <div class="form-group" style="margin-bottom: 15px;">
-            <label>PO Number</label>
-            <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
+                <!-- Purchase Order Details -->
+                <fieldset>
+                    <legend>Purchase Order Details</legend>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>PO Number</label>
+                        <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Description</label>
+                        <textarea name="description" rows="3">{{ selected_po.description if selected_po else '' }}</textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Date</label>
+                            <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Has this been budgeted for?</label>
+                            <select name="is_budgeted">
+                                <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
+                                <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
+                                <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Select GL Code</label>
+                        <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
+                        <select name="gl_code" id="gl-code-select">
+                            <option value="" disabled {% if not selected_po or not selected_po.gl_code %}selected{% endif %}>Select GL Code</option>
+                            {% for gl in gl_records %}
+                                <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
+                                    {{ gl.gl_code }} - {{ gl.description }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Expense Type</label>
+                        <select name="expense_type">
+                            <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
+                            <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
+                            <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
+                            <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
+                            <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+                        <label>Estimated Cost</label>
+                        <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
+                    </div>
+                </fieldset>
+
+                <!-- Vendor Selection & Rationale -->
+                <fieldset style="margin-top: 20px;">
+                    <legend>Vendor Selection & Rationale</legend>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Suggested Vendor</label>
+                        <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Justification Notes</label>
+                        <textarea name="justification_notes" rows="4">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Submission Status</label>
+                        <select name="submission_status">
+                            <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
+                            <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                            <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                            <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+                            <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label>Latest AI Status</label>
+                        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
+                    </div>
+                </fieldset>
+
+                <!-- Financial Summary (Read Only) -->
+                <fieldset style="margin-top: 20px;">
+                    <legend>Financial Summary</legend>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>YTD Actual</label>
+                            <input type="text" id="fin-ytd-actual" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="background-color: #f8f9fa;">
+                        </div>
+                        <div class="form-group">
+                            <label>Total Annual Budget</label>
+                            <input type="text" id="fin-total-budget" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="background-color: #f8f9fa;">
+                        </div>
+                    </div>
+
+                    <div class="form-row" style="margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Budget YTD</label>
+                            <input type="text" id="fin-budget-ytd" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="background-color: #f8f9fa;">
+                        </div>
+                        <div class="form-group">
+                            <label>2M Buffer Pool</label>
+                            <input type="text" id="fin-buffer-pool" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="background-color: #f8f9fa;">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+                        <label>Variance</label>
+                        <input type="text" id="fin-variance" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="background-color: #f8f9fa;">
+                    </div>
+                </fieldset>
+
+                <!-- Approvals Fieldset -->
+                <fieldset class="approvals-fieldset">
+                    <legend>Approvals & Attachments</legend>
+
+                    <!-- Document Upload & List Section -->
+                    <div class="form-group full-width">
+                        <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
+                        <div class="file-upload-wrapper">
+                            <input 
+                                type="file" 
+                                id="attach_quotes" 
+                                name="attach_quotes" 
+                                accept=".pdf, image/*" 
+                                multiple 
+                                onchange="updateQuotesCount(this)"
+                                class="hidden-file-input"
+                            >
+                            
+                            <label for="attach_quotes" class="custom-file-upload-btn">
+                                📁 Choose Files
+                            </label>
+                            <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
+                        </div>
+
+                        <div id="quotes_count_display" class="upload-feedback"></div>
+
+                        <!-- Document Grid -->
+                        <div class="attachments-card-container">
+                            <span class="attachments-label">Attached Documents</span>
+                            <div id="attachments_list" class="doc-grid">
+                                {% if selected_po and selected_po.quote_urls %}
+                                    {% for url in selected_po.quote_urls %}
+                                        {% set ext = url.split('.')[-1].split('?')[0]|lower %}
+                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                                            <span class="doc-icon">
+                                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                                            </span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                    {% endfor %}
+                                {% elif selected_po and selected_po.quote_filepath %}
+                                    {% for url in selected_po.quote_filepath.split(',') %}
+                                        {% set ext = url.strip().split('.')[-1].split('?')[0]|lower %}
+                                        <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                                            <span class="doc-icon">
+                                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                                            </span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                    {% endfor %}
+                                {% else %}
+                                    <span id="no_attachments_text" class="no-docs-text">No documents attached yet.</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Structured Form Grid -->
+                    <div class="form-row three-col">
+                        <div class="form-group">
+                            <label>Quotes Provided</label>
+                            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly class="readonly-input">
+                        </div>
+                        <div class="form-group">
+                            <label>Actioned Date</label>
+                            <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
+                        </div>
+                        <div class="form-group">
+                            <label>Actioned By</label>
+                            <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
+                        </div>
+                    </div>
+
+                    <div class="form-group full-width" style="margin-top: 15px;">
+                        <label>System Compliance Status</label>
+                        <input 
+                            type="text" 
+                            id="system_status" 
+                            name="system_status" 
+                            value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+                            readonly 
+                            class="readonly-input status-banner"
+                        >
+                    </div>
+
+                    <div class="form-group full-width" style="margin-top: 15px;">
+                        <label>Approval Notes</label>
+                        <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
+                    </div>
+
+                    <div class="form-group full-width" style="margin-top: 15px;">
+                        <label>AI Recommendation Summary</label>
+                        <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                    </div>
+                </fieldset>
+
+                <button type="submit" class="submit-btn" style="margin-top: 20px;">Save</button>
+            </form>
         </div>
-
-        <div class="form-group" style="margin-bottom: 15px;">
-            <label>Description</label>
-            <textarea name="description" rows="3">{{ selected_po.description if selected_po else '' }}</textarea>
-        </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label>Date</label>
-                <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
-            </div>
-            <div class="form-group">
-                <label>Has this been budgeted for?</label>
-                <select name="is_budgeted">
-                    <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
-                    <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
-                    <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
-                </select>
-            </div>
-        </div>
-
-        <div class="form-group" style="margin-top: 15px;">
-            <label>Select GL Code</label>
-            <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
-            <select name="gl_code" id="gl-code-select">
-                <option value="" disabled {% if not selected_po or not selected_po.gl_code %}selected{% endif %}>Select GL Code</option>
-                {% for gl in gl_records %}
-                    <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
-                        {{ gl.gl_code }} - {{ gl.description }}
-                    </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-group" style="margin-top: 15px;">
-            <label>Expense Type</label>
-            <select name="expense_type">
-                <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
-                <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
-                <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
-                <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
-                <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
-            </select>
-        </div>
-
-        <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
-            <label>Estimated Cost</label>
-            <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
-        </div>
-    </fieldset>
-<!-- Vendor Selection & Rationale -->
-<fieldset style="margin-top: 20px;">
-    <legend>Vendor Selection & Rationale</legend>
-
-    <div class="form-group" style="margin-bottom: 15px;">
-        <label>Suggested Vendor</label>
-        <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
     </div>
-
-    <div class="form-group" style="margin-bottom: 15px;">
-        <label>Justification Notes</label>
-        <textarea name="justification_notes" rows="4">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
-    </div>
-
-    <div class="form-group" style="margin-bottom: 15px;">
-        <label>Submission Status</label>
-        <select name="submission_status">
-            <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
-            <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
-            <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
-            <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
-            <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
-        </select>
-    </div>
-
-    <div class="form-group" style="margin-bottom: 15px;">
-        <label>Latest AI Status</label>
-        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">    </div>
-</fieldset>
-
-<!-- Financial Summary (Read Only) -->
-<fieldset style="margin-top: 20px;">
-    <legend>Financial Summary</legend>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label>YTD Actual</label>
-            <input type="text" id="fin-ytd-actual" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="background-color: #f8f9fa;">
-        </div>
-        <div class="form-group">
-            <label>Total Annual Budget</label>
-            <input type="text" id="fin-total-budget" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="background-color: #f8f9fa;">
-        </div>
-    </div>
-
-    <div class="form-row" style="margin-top: 15px;">
-        <div class="form-group">
-            <label>Budget YTD</label>
-            <input type="text" id="fin-budget-ytd" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="background-color: #f8f9fa;">
-        </div>
-        <div class="form-group">
-            <label>2M Buffer Pool</label>
-            <input type="text" id="fin-buffer-pool" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="background-color: #f8f9fa;">
-        </div>
-    </div>
-
-    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
-        <label>Variance</label>
-        <input type="text" id="fin-variance" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="background-color: #f8f9fa;">
-    </div>
-</fieldset>
-
-
-<!-- Approvals Fieldset -->
-<fieldset class="approvals-fieldset">
-    <legend>Approvals & Attachments</legend>
-
-    <!-- Document Upload & List Section -->
-    <div class="form-group full-width">
-        <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
-        <input 
-            type="file" 
-            id="attach_quotes" 
-            name="attach_quotes" 
-            accept=".pdf, image/*" 
-            multiple 
-            onchange="updateQuotesCount(this)"
-            class="hidden-file-input"
-        >
-        
-        <label for="attach_quotes" class="custom-file-upload-btn">
-            📁 Choose Files
-        </label>
-        <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
-        </div>
-
-        <div id="quotes_count_display" class="upload-feedback"></div>
-
-        <!-- Document Grid -->
-        <div class="attachments-card-container">
-            <span class="attachments-label">Attached Documents</span>
-            <div id="attachments_list" class="doc-grid">
-                {% if selected_po and selected_po.quote_urls %}
-                    {% for url in selected_po.quote_urls %}
-                        {% set ext = url.split('.')[-1].split('?')[0]|lower %}
-                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
-                            <span class="doc-icon">
-                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
-                            </span>
-                            <span class="doc-name">Quote {{ loop.index }}</span>
-                        </a>
-                    {% endfor %}
-                {% elif selected_po and selected_po.quote_filepath %}
-                    {% for url in selected_po.quote_filepath.split(',') %}
-                        {% set ext = url.strip().split('.')[-1].split('?')[0]|lower %}
-                        <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
-                            <span class="doc-icon">
-                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
-                            </span>
-                            <span class="doc-name">Quote {{ loop.index }}</span>
-                        </a>
-                    {% endfor %}
-                {% else %}
-                    <span id="no_attachments_text" class="no-docs-text">No documents attached yet.</span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-
-    <!-- Structured Form Grid -->
-    <div class="form-row three-col">
-        <div class="form-group">
-            <label>Quotes Provided</label>
-            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly class="readonly-input">
-        </div>
-        <div class="form-group">
-            <label>Actioned Date</label>
-            <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
-        </div>
-        <div class="form-group">
-            <label>Actioned By</label>
-            <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
-        </div>
-    </div>
-
-    <div class="form-group full-width" style="margin-top: 15px;">
-        <label>System Compliance Status</label>
-        <input 
-            type="text" 
-            id="system_status" 
-            name="system_status" 
-            value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
-            readonly 
-            class="readonly-input status-banner"
-        >
-    </div>
-
-    <div class="form-group full-width" style="margin-top: 15px;">
-        <label>Approval Notes</label>
-        <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
-    </div>
-
-    <div class="form-group full-width" style="margin-top: 15px;">
-        <label>AI Recommendation Summary</label>
-        <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
-    </div>
-</fieldset>
-
-</form>
-
-<button type="submit" class="submit-btn">Save</button>
-
-
+</div>
 
 <script>
     // 1. Live filter JS for GL code dropdown search input
@@ -314,60 +308,57 @@
 
     // 3. Single consolidated function for handling file uploads & quote count
     function updateQuotesCount(input) {
-    const display = document.getElementById('quotes_count_display');
-    const quotesField = document.getElementById('quotes_provided');
-    const attachmentsList = document.getElementById('attachments_list');
-    const statusText = document.getElementById('file_chosen_status')
-    const files = input.files ? Array.from(input.files) : [];
-    const count = files.length;
+        const display = document.getElementById('quotes_count_display');
+        const quotesField = document.getElementById('quotes_provided');
+        const attachmentsList = document.getElementById('attachments_list');
+        const statusText = document.getElementById('file_chosen_status');
+        const files = input.files ? Array.from(input.files) : [];
+        const count = files.length;
 
-    // Update status text next to the button
-    if (statusText) {
-        if (count === 1) {
-            statusText.textContent = files[0].name;
-            statusText.style.fontStyle = 'normal';
-        } else if (count > 1) {
-            statusText.textContent = `${count} files selected`;
-            statusText.style.fontStyle = 'normal';
-        } else {
-            statusText.textContent = 'No file chosen';
-            statusText.style.fontStyle = 'italic';
+        if (statusText) {
+            if (count === 1) {
+                statusText.textContent = files[0].name;
+                statusText.style.fontStyle = 'normal';
+            } else if (count > 1) {
+                statusText.textContent = `${count} files selected`;
+                statusText.style.fontStyle = 'normal';
+            } else {
+                statusText.textContent = 'No file chosen';
+                statusText.style.fontStyle = 'italic';
+            }
+        }
+
+        if (quotesField && count > 0) {
+            quotesField.value = count;
+        }
+
+        if (display) {
+            display.style.display = count > 0 ? 'block' : 'none';
+            display.textContent = count > 0 ? `${count} file(s) selected for upload.` : '';
+        }
+
+        if (attachmentsList && count > 0) {
+            attachmentsList.innerHTML = '';
+            files.forEach((file) => {
+                const objectUrl = URL.createObjectURL(file);
+                const ext = file.name.split('.').pop().toLowerCase();
+                const icon = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? '🖼️' : '📄';
+
+                const badge = document.createElement('a');
+                badge.href = objectUrl;
+                badge.target = '_blank';
+                badge.rel = 'noopener noreferrer';
+                badge.className = 'doc-badge';
+                badge.innerHTML = `<span class="doc-icon">${icon}</span> <span class="doc-name">${file.name}</span>`;
+
+                attachmentsList.appendChild(badge);
+            });
+        }
+
+        if (typeof calculateSystemStatus === 'function') {
+            calculateSystemStatus();
         }
     }
-
-    // Update Quotes Provided count dynamically
-    if (quotesField && count > 0) {
-        quotesField.value = count;
-    }
-
-    // Display helper message
-    if (display) {
-        display.style.display = count > 0 ? 'block' : 'none';
-        display.textContent = count > 0 ? `${count} file(s) selected for upload.` : '';
-    }
-
-    if (attachmentsList && count > 0) {
-        attachmentsList.innerHTML = '';
-        files.forEach((file, index) => {
-            const objectUrl = URL.createObjectURL(file);
-            const ext = file.name.split('.').pop().toLowerCase();
-            const icon = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? '🖼️' : '📄';
-
-            const badge = document.createElement('a');
-            badge.href = objectUrl;
-            badge.target = '_blank';
-            badge.rel = 'noopener noreferrer';
-            badge.className = 'doc-badge';
-            badge.innerHTML = `<span class="doc-icon">${icon}</span> <span class="doc-name">${file.name}</span>`;
-
-            attachmentsList.appendChild(badge);
-        });
-    }
-
-    if (typeof calculateSystemStatus === 'function') {
-        calculateSystemStatus();
-    }
-}
 
     // 4. Dynamic calculation engine for SYSTEM STATUS
     function calculateSystemStatus() {
@@ -431,7 +422,7 @@
         }
     }
 
-    // 5. Attach live listeners to form elements so system status updates on every field change
+    // 5. Attach live listeners to form elements
     document.addEventListener('DOMContentLoaded', function() {
         const formInputs = [
             'submission_status', 
@@ -449,10 +440,6 @@
             }
         });
 
-        // Run initial evaluation on load
         calculateSystemStatus();
     });
-</script>   
-
-</body>
-</html>
+</script>
