@@ -106,6 +106,7 @@ def budget_details():
 @app.route("/", methods=["GET", "POST"])
 @app.route("/po_form", methods=["GET", "POST"])
 @app.route("/simple", methods=["GET", "POST"])
+
 def po_form():
     conn = get_connection()
     message = None
@@ -318,6 +319,63 @@ def po_form():
         financial_summary=financial_summary,
         message=message
     )
+
+
+def get_db_connection():
+    """Establishes and returns a connection to the Neon PostgreSQL database."""
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is missing.")
+    
+    conn = psycopg2.connect(
+        db_url,
+        cursor_factory=RealDictCursor
+    )
+    return conn
+
+@app.route('/prompts')
+def render_prompts_page():
+    return render_template('prompts.html')
+
+@app.route('/api/prompts', methods=['GET', 'POST'])
+def handle_prompts_api():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            if request.method == 'GET':
+                process_name = request.args.get('process')
+                cursor.execute(
+                    "SELECT process, prompt_template, description FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
+                    (process_name,)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return jsonify(dict(row)), 200
+                return jsonify({'error': 'Prompt process not found.'}), 404
+
+            elif request.method == 'POST':
+                data = request.json or {}
+                process_name = data.get('process')
+                prompt_template = data.get('prompt_template')
+
+                if not process_name or not prompt_template:
+                    return jsonify({'error': 'Missing required fields.'}), 400
+
+                cursor.execute("""
+                    UPDATE system_prompts 
+                    SET prompt_template = %s, 
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE LOWER(process) = LOWER(%s);
+                """, (prompt_template, process_name))
+                conn.commit()
+
+                return jsonify({'status': 'success', 'message': 'Prompt updated successfully.'}), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+    
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
