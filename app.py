@@ -426,6 +426,41 @@ def projects_page(project_id=None):
     
     return render_template("projects.html", project=project, vendors=vendors)
 
+@app.route('/projects/<int:project_id>')
+def view_project(project_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        # Fetch project and vendors
+        cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+        project = cursor.fetchone()
+
+        cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
+        vendors = cursor.fetchall()
+
+        # Fetch Line Items per Vendor
+        for vendor in vendors:
+            v_id = vendor['id']
+            
+            # Pricing line items
+            cursor.execute("""
+                SELECT * FROM options_line_items_pricing 
+                WHERE procurement_option_id = %s 
+                ORDER BY id ASC;
+            """, (v_id,))
+            vendor['pricing_items'] = cursor.fetchall()
+
+            # Non-pricing line items
+            cursor.execute("""
+                SELECT n.*, w.criteria_name, w.weighting_percent 
+                FROM options_line_items_non_pricing n
+                JOIN project_weightings w ON n.weighting_id = w.id
+                WHERE n.procurement_option_id = %s;
+            """, (v_id,))
+            vendor['non_pricing_items'] = cursor.fetchall()
+
+    conn.close()
+    return render_template('projects.html', project=project, vendors=vendors)
+
 # --- 2. QUOTE UPLOAD ROUTE ---
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
@@ -534,38 +569,80 @@ def update_project(project_id):
     gl_code = request.form.get("gl_code", "")
     gl_title = request.form.get("gl_title", "")
     gl_sub = request.form.get("gl_sub", "")
-    price_weighting = request.form.get("price_weighting", 30.00)
     executive_sourcing_recommendation = request.form.get("executive_sourcing_recommendation", "")
+    
     raw_weight = float(request.form.get("price_weighting", 30))
     price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("""
-        UPDATE projects 
-        SET project_reference = %s,
-            name = %s,
-            project_description = %s,
-            project_objective = %s,
-            ai_prompt_adjustments = %s,
-            gl_code = %s,
-            gl_title = %s,
-            gl_sub = %s,
-            price_weighting = %s,
-            executive_sourcing_recommendation = %s
-        WHERE id = %s;
-    """, (
-        project_reference, name, project_description, project_objective, 
-        ai_prompt_adjustments, gl_code, gl_title, gl_sub, 
-        price_weighting, executive_sourcing_recommendation, project_id
-    ))
+    try:
+        # 1. Update Project Definitions
+        cursor.execute("""
+            UPDATE projects 
+            SET project_reference = %s,
+                name = %s,
+                project_description = %s,
+                project_objective = %s,
+                ai_prompt_adjustments = %s,
+                gl_code = %s,
+                gl_title = %s,
+                gl_sub = %s,
+                price_weighting = %s,
+                executive_sourcing_recommendation = %s
+            WHERE id = %s;
+        """, (
+            project_reference, name, project_description, project_objective, 
+            ai_prompt_adjustments, gl_code, gl_title, gl_sub, 
+            price_weighting, executive_sourcing_recommendation, project_id
+        ))
 
-    conn.commit()
-    cursor.close()
-    conn.close()
+        # 2. Dynamic Update of Pricing and Non-Pricing Line Items
+        for key, value in request.form.items():
+            if key.startswith("pricing_name_"):
+                item_id = key.replace("pricing_name_", "")
+                cursor.execute("""
+                    UPDATE options_line_items_pricing 
+                    SET cost_component_name = %s 
+                    WHERE id = %s;
+                """, (value, item_id))
 
-    flash("Project definitions updated successfully.")
+            elif key.startswith("pricing_amount_"):
+                item_id = key.replace("pricing_amount_", "")
+                amount_val = float(value) if value else 0.0
+                cursor.execute("""
+                    UPDATE options_line_items_pricing 
+                    SET amount = %s 
+                    WHERE id = %s;
+                """, (amount_val, item_id))
+
+            elif key.startswith("pricing_category_"):
+                item_id = key.replace("pricing_category_", "")
+                cursor.execute("""
+                    UPDATE options_line_items_pricing 
+                    SET cost_type_category = %s 
+                    WHERE id = %s;
+                """, (value, item_id))
+
+            elif key.startswith("non_pricing_score_"):
+                item_id = key.replace("non_pricing_score_", "")
+                score_val = float(value) if value else 0.0
+                cursor.execute("""
+                    UPDATE options_line_items_non_pricing 
+                    SET score = %s 
+                    WHERE id = %s;
+                """, (score_val, item_id))
+
+        conn.commit()
+        flash("Project definitions and matrix line items updated successfully.")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error updating project: {str(e)}")
+    finally:
+        cursor.close()
+        conn.close()
+
     return redirect(url_for("projects_page", project_id=project_id))     
 
 if __name__ == "__main__":
