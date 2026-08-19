@@ -89,8 +89,23 @@ def fetch_file_bytes_and_mime(location):
     
     return None, None
 
-def get_gemini_analysis(record):
-    """Executes multi-phase AI audit using exact PostgreSQL schema mapping."""
+
+def get_prompt_by_process(cursor, process_name):
+    """Fetches a prompt template directly from PostgreSQL system_prompts using the process name."""
+    if not cursor:
+        raise ValueError(f"Database cursor is required to fetch prompt for process '{process_name}'.")
+    
+    cursor.execute("SELECT prompt_template FROM system_prompts WHERE LOWER(process) = LOWER(%s);", (process_name,))
+    row = cursor.fetchone()
+    
+    if row and row.get("prompt_template"):
+        log(f"Successfully loaded prompt from DB for process: '{process_name}'")
+        return row["prompt_template"]
+    else:
+        raise ValueError(f"No prompt template found in 'system_prompts' table for process: '{process_name}'")
+
+def get_gemini_analysis(record, cursor):
+    """Executes multi-phase AI audit using exact PostgreSQL schema mapping and database system_prompts."""
     api_key = os.getenv("GEMINI_API_KEY")
     po_num = str(record.get('po_number', '')).strip()
     
@@ -111,31 +126,15 @@ def get_gemini_analysis(record):
 
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
-        quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
-
-        if quote_urls:
-            formatted_links = "\n".join([f"  • Document {i+1}: {url}" for i, url in enumerate(quote_urls)])
-            attachments_section = f"\nAttached Quote Documents:\n{formatted_links}\n"
-        else:
-            attachments_section = "\nAttached Quote Documents:\n  No documents attached.\n"
 
         # ----------------------------------------------------
         # PHASE 1: ENRICHED DOCUMENT PARSING & METADATA EXTRACTION
         # ----------------------------------------------------
-        parse_contents = [
-            f"""Examine the attached quote documentation for Purchase Order {po_num}.
-Extract key vendor and financial details into a valid JSON object without markdown formatting.
+        # Fetch Phase 1 template strictly from DB
+        quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
+        parse_prompt_text = quote_eval_template.format(po_num=po_num)
 
-Required Fields:
-{{
-    "legal_name": "Full Legal / Vendor Name",
-    "cipc_number": "Company Registration Number if found else N/A",
-    "vat_number": "VAT Number if found else N/A",
-    "quoted_amount": "Total numerical amount stated in quote or N/A",
-    "currency": "ZAR/USD/etc or ZAR",
-    "includes_vat": "Yes/No/Unspecified"
-}}"""
-        ]
+        parse_contents = [parse_prompt_text]
 
         for file_loc in quote_attachments:
             file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
@@ -181,44 +180,25 @@ Required Fields:
         # ----------------------------------------------------
         # PHASE 3: ENRICHED AUDIT SYNTHESIS
         # ----------------------------------------------------
-        synthesis_prompt = f"""You are a corporate procurement officer conducting an automated intelligence audit for Purchase Order {po_num}.
-
-Context:
-- Item Description: {desc_val}
-- Estimated Cost (System): R{cost:,.2f}
-- General Ledger Code: {gl_code_val}
-- Recommended Vendor: {user_recommended_vendor}
-- User Justification: "{user_justification}"
-- Conflict of Interest Declared: {coi_status}
-- Conflict Details: "{coi_details}"
-
-Extracted Document Metadata:
-- Legal Name: {extracted_vendor_name}
-- CIPC Reg: {cipc_num}
-- VAT Reg: {vat_num}
-- Document Quoted Amount: R{quoted_amount} (VAT Included: {includes_vat})
-
-Public OSINT Web Findings (DuckDuckGo):
-{search_context}
-
-TASKS:
-1. FINANCIAL AUDIT & CROSS-VERIFICATION
-   - Compare the document quoted amount (R{quoted_amount}) against the system estimated cost (R{cost:,.2f}) and report any variance.
-   - Evaluate whether the user justification adequately supports the vendor selection.
-   - Flag any governance or financial risk regarding GL code alignment or conflicts of interest.
-
-2. PUBLIC VENDOR DUE DILIGENCE (PUBLIC OSINT):
-   - Assess the operational footprint and legitimacy of '{extracted_vendor_name}' within the South African market.
-   - Identify mandatory statutory / industry accreditations required for this category (e.g., PSIRA for security, ECA/ECB/Wireman's for electrical, CIDB/NHBRC for construction, COIDA compliance).
-   - Flag public risk indicators (adverse litigation, regulatory notices, CIPC status, or red-flag search results).
-   - Determine overall Due Diligence Status: Passed, Caution, or High Risk.
-
-CRITICAL STRUCTURAL REQUIREMENTS:
-Include a dedicated markdown section labeled '### PUBLIC VENDOR DUE DILIGENCE REPORT' in your main text.
-
-At the absolute end of your response, output exactly these two lines:
-VENDOR_DD_STATUS: [Passed / Caution / High Risk]
-AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
+        # Fetch Phase 3 template strictly from DB
+        company_assess_template = get_prompt_by_process(cursor, 'Company assessment')
+        
+        synthesis_prompt = company_assess_template.format(
+            po_num=po_num,
+            desc_val=desc_val,
+            cost=cost,
+            gl_code_val=gl_code_val,
+            user_recommended_vendor=user_recommended_vendor,
+            user_justification=user_justification,
+            coi_status=coi_status,
+            coi_details=coi_details,
+            extracted_vendor_name=extracted_vendor_name,
+            cipc_num=cipc_num,
+            vat_num=vat_num,
+            quoted_amount=quoted_amount,
+            includes_vat=includes_vat,
+            search_context=search_context
+        )
 
         log(f"PO {po_num}: Generating Gemini audit synthesis...")
         synthesis_response = client.models.generate_content(
@@ -231,6 +211,7 @@ AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
     except Exception as e:
         log(f"PO {po_num}: Gemini API Exception: {e}", "ERROR")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
+
 
 def send_approval_email(to_emails, cc_emails, subject, body, attachment_paths=None):
     sender_email = os.getenv("SENDER_EMAIL")
