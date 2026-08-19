@@ -6,7 +6,7 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from google import genai
 from google.genai import types
-from ddgs import DDGS
+from duckduckgo_search import DDGS
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
