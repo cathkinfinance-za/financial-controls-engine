@@ -116,35 +116,43 @@ def get_gemini_analysis(record, cursor):
         log(f"PO {po_num}: Skipping Gemini API call (GEMINI_API_KEY not found).", "WARNING")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
 
+    # 1. Initialize ALL variables with default fallbacks at the top
+    desc_val = str(record.get('description') or 'Operational Procurement').strip()
+    cost = float(record.get('estimated_cost') or 0.0)
+    gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
+    user_recommended_vendor = str(record.get('recommended_vendor') or 'N/A').strip()
+    user_justification = str(record.get('justification_notes') or 'N/A').strip()
+    coi_status = str(record.get('conflict_of_interest') or 'No').strip()
+    coi_details = str(record.get('conflict_details') or 'None').strip()
+
+    extracted_vendor_name = user_recommended_vendor
+    cipc_num = "N/A"
+    vat_num = "N/A"
+    quoted_amount = "N/A"
+    includes_vat = "Unspecified"
+    search_context = "No direct public OSINT web results returned."
+
     try:
         client = genai.Client(api_key=api_key)
         
-        user_recommended_vendor = str(record.get('recommended_vendor') or 'N/A').strip()
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
-
-        extracted_vendor_name = user_recommended_vendor
-        cipc_num = "N/A"
-        vat_num = "N/A"
-        quoted_amount = "N/A"
-        includes_vat = "Unspecified"
 
         # ----------------------------------------------------
         # PHASE 1: QUOTE EVALUATION (If Active)
         # ----------------------------------------------------
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
-
+        
         if quote_eval_template:
-            # Pass all system variables into Phase 1 formatting
             parse_prompt_text = quote_eval_template.format(
                 po_num=po_num,
-                desc_val=str(record.get('description') or 'Operational Procurement').strip(),
-                cost=float(record.get('estimated_cost') or 0.0),
-                gl_code_val=str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip(),
+                desc_val=desc_val,
+                cost=cost,
+                gl_code_val=gl_code_val,
                 user_recommended_vendor=user_recommended_vendor,
-                user_justification=str(record.get('justification_notes') or 'N/A').strip(),
-                coi_status=str(record.get('conflict_of_interest') or 'No').strip(),
-                coi_details=str(record.get('conflict_details') or 'None').strip(),
+                user_justification=user_justification,
+                coi_status=coi_status,
+                coi_details=coi_details,
                 extracted_vendor_name=extracted_vendor_name,
                 cipc_num=cipc_num,
                 vat_num=vat_num,
@@ -153,7 +161,12 @@ def get_gemini_analysis(record, cursor):
                 search_context=search_context
             )
             parse_contents = [parse_prompt_text]
-            
+
+            for file_loc in quote_attachments:
+                file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
+                if file_data and mime_type:
+                    parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
+
             log(f"PO {po_num}: 📑 Parsing quote metadata...")
             parse_response = client.models.generate_content(
                 model='gemini-3.5-flash-lite',
@@ -168,24 +181,23 @@ def get_gemini_analysis(record, cursor):
                 vat_num = vendor_meta.get("vat_number") or "N/A"
                 quoted_amount = vendor_meta.get("quoted_amount") or "N/A"
                 includes_vat = vendor_meta.get("includes_vat") or "Unspecified"
-            except Exception:
-                pass
+            except Exception as meta_err:
+                log(f"PO {po_num}: Failed to parse JSON metadata response: {meta_err}", "WARNING")
 
         # ----------------------------------------------------
-        # PHASE 2: OSINT WEB SEARCH
+        # PHASE 2: OSINT WEB SEARCH (DuckDuckGo)
         # ----------------------------------------------------
-        search_context = ""
+        log(f"PO {po_num}: 🌐 Fetching public OSINT records for '{extracted_vendor_name}' via DuckDuckGo...")
         try:
             with DDGS() as ddgs:
                 query = f"{extracted_vendor_name} {cipc_num} South Africa compliance risk"
                 results = list(ddgs.text(query, max_results=5))
-                for r in results:
-                    search_context += f"- Title: {r.get('title')}\n  Snippet: {r.get('body')}\n"
-        except Exception:
-            search_context = "No direct public OSINT web results returned."
-
-        if not search_context.strip():
-            search_context = "No direct public OSINT web results returned."
+                if results:
+                    search_context = ""
+                    for r in results:
+                        search_context += f"- Title: {r.get('title')}\n  Snippet: {r.get('body')}\n"
+        except Exception as search_err:
+            log(f"PO {po_num}: DuckDuckGo search lookup failed for '{extracted_vendor_name}': {search_err}", "WARNING")
 
         # ----------------------------------------------------
         # PHASE 3: COMPANY ASSESSMENT / AUDIT SYNTHESIS (If Active)
@@ -198,13 +210,13 @@ def get_gemini_analysis(record, cursor):
 
         synthesis_prompt = company_assess_template.format(
             po_num=po_num,
-            desc_val=str(record.get('description') or 'Operational Procurement').strip(),
-            cost=float(record.get('estimated_cost') or 0.0),
-            gl_code_val=str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip(),
+            desc_val=desc_val,
+            cost=cost,
+            gl_code_val=gl_code_val,
             user_recommended_vendor=user_recommended_vendor,
-            user_justification=str(record.get('justification_notes') or 'N/A').strip(),
-            coi_status=str(record.get('conflict_of_interest') or 'No').strip(),
-            coi_details=str(record.get('conflict_details') or 'None').strip(),
+            user_justification=user_justification,
+            coi_status=coi_status,
+            coi_details=coi_details,
             extracted_vendor_name=extracted_vendor_name,
             cipc_num=cipc_num,
             vat_num=vat_num,
