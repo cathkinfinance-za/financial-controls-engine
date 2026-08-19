@@ -12,35 +12,20 @@
             --card-bg: #ffffff;
             --text: #1e293b;
             --border: #e2e8f0;
-            --success: #16a34a;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background-color: var(--bg);
             color: var(--text);
             margin: 0;
             padding: 2rem;
         }
 
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        header {
-            margin-bottom: 2rem;
-        }
-
-        h1 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.875rem;
-        }
-
-        p.subtitle {
-            color: #64748b;
-            margin: 0;
-        }
+        .container { max-width: 900px; margin: 0 auto; }
+        header { margin-bottom: 2rem; }
+        h1 { margin: 0 0 0.5rem 0; font-size: 1.875rem; }
+        .subtitle { color: #64748b; margin: 0; }
 
         .card {
             background: var(--card-bg);
@@ -51,17 +36,9 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        .form-group {
-            margin-bottom: 1.25rem;
-        }
-
-        label {
-            display: block;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
+        .form-group { margin-bottom: 1.25rem; }
+        label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.9rem; }
+        
         select, input, textarea {
             width: 100%;
             padding: 0.75rem;
@@ -72,12 +49,58 @@
             background: #fff;
         }
 
-        textarea {
-            font-family: "Courier New", Courier, monospace;
-            min-height: 250px;
-            resize: vertical;
-            line-height: 1.4;
+        textarea { font-family: "Courier New", Courier, monospace; min-height: 250px; resize: vertical; line-height: 1.4; }
+
+        /* Toggle Switch Styling */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f1f5f9;
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            margin-bottom: 1.25rem;
         }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #cbd5e1;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px; width: 18px;
+            left: 3px; bottom: 3px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider { background-color: #16a34a; }
+        input:checked + .slider:before { transform: translateX(24px); }
+
+        .badge {
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-active { background: #dcfce7; color: #15803d; }
+        .badge-inactive { background: #fee2e2; color: #b91c1c; }
 
         button {
             background-color: var(--primary);
@@ -88,31 +111,11 @@
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s;
         }
 
-        button:hover {
-            background-color: var(--primary-hover);
-        }
-
-        .alert {
-            padding: 1rem;
-            border-radius: 6px;
-            margin-bottom: 1rem;
-            display: none;
-        }
-
-        .alert-success {
-            background-color: #dcfce7;
-            color: #15803d;
-            border: 1px solid #bbf7d0;
-        }
-
-        .alert-error {
-            background-color: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
-        }
+        .alert { padding: 1rem; border-radius: 6px; margin-bottom: 1rem; display: none; }
+        .alert-success { background-color: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .alert-error { background-color: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
 
         .variable-tag {
             display: inline-block;
@@ -122,8 +125,7 @@
             border-radius: 4px;
             font-family: monospace;
             font-size: 0.85rem;
-            margin-right: 0.3rem;
-            margin-bottom: 0.3rem;
+            margin: 0 0.3rem 0.3rem 0;
         }
     </style>
 </head>
@@ -132,7 +134,7 @@
 <div class="container">
     <header>
         <h1>System Prompt Management</h1>
-        <p class="subtitle">Select a process to view or update its dynamic AI prompt stored in Neon.</p>
+        <p class="subtitle">Enable, disable, or modify AI prompt execution rules in Neon.</p>
     </header>
 
     <div id="alertBox" class="alert"></div>
@@ -145,6 +147,17 @@
                     <option value="Quote evaluation">Quote evaluation</option>
                     <option value="Company assessment">Company assessment</option>
                 </select>
+            </div>
+
+            <div class="toggle-container">
+                <div>
+                    <strong>Execution Status:</strong> 
+                    <span id="statusBadge" class="badge">Checking...</span>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="isActiveToggle" onchange="updateBadgeState()">
+                    <span class="slider"></span>
+                </label>
             </div>
 
             <div class="form-group">
@@ -162,7 +175,7 @@
                 <div id="placeholders"></div>
             </div>
 
-            <button type="submit">Save Prompt to Database</button>
+            <button type="submit">Save Changes</button>
         </form>
     </div>
 </div>
@@ -179,14 +192,23 @@
         ]
     };
 
+    function updateBadgeState() {
+        const isActive = document.getElementById("isActiveToggle").checked;
+        const badge = document.getElementById("statusBadge");
+        if (isActive) {
+            badge.innerText = "Active";
+            badge.className = "badge badge-active";
+        } else {
+            badge.innerText = "Disabled";
+            badge.className = "badge badge-inactive";
+        }
+    }
+
     async function loadPrompt() {
         const process = document.getElementById("processSelect").value;
-        const alertBox = document.getElementById("alertBox");
-        alertBox.style.display = "none";
+        document.getElementById("alertBox").style.display = "none";
 
-        // Render tags
-        const tagsContainer = document.getElementById("placeholders");
-        tagsContainer.innerHTML = (placeholdersMap[process] || [])
+        document.getElementById("placeholders").innerHTML = (placeholdersMap[process] || [])
             .map(p => `<span class="variable-tag">${p}</span>`)
             .join("");
 
@@ -197,11 +219,13 @@
             if (response.ok) {
                 document.getElementById("promptTemplate").value = data.prompt_template || "";
                 document.getElementById("promptDescription").value = data.description || "";
+                document.getElementById("isActiveToggle").checked = data.is_active ?? true;
+                updateBadgeState();
             } else {
                 showAlert(data.error || "Failed to load prompt.", "error");
             }
         } catch (err) {
-            showAlert("Network error fetching prompt template.", "error");
+            showAlert("Network error fetching prompt.", "error");
         }
     }
 
@@ -210,6 +234,7 @@
         
         const process = document.getElementById("processSelect").value;
         const promptTemplate = document.getElementById("promptTemplate").value;
+        const isActive = document.getElementById("isActiveToggle").checked;
 
         try {
             const response = await fetch("/api/prompts", {
@@ -217,19 +242,20 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     process: process,
-                    prompt_template: promptTemplate
+                    prompt_template: promptTemplate,
+                    is_active: isActive
                 })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                showAlert("Prompt saved successfully to Neon!", "success");
+                showAlert("Prompt settings saved successfully!", "success");
             } else {
-                showAlert(data.error || "Failed to save prompt.", "error");
+                showAlert(data.error || "Failed to save settings.", "error");
             }
         } catch (err) {
-            showAlert("Network error saving prompt template.", "error");
+            showAlert("Network error saving settings.", "error");
         }
     });
 
@@ -240,7 +266,6 @@
         alertBox.style.display = "block";
     }
 
-    // Initial load
     window.onload = loadPrompt;
 </script>
 

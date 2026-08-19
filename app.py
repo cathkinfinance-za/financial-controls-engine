@@ -345,7 +345,7 @@ def handle_prompts_api():
             if request.method == 'GET':
                 process_name = request.args.get('process')
                 cursor.execute(
-                    "SELECT process, prompt_template, description FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
+                    "SELECT process, prompt_template, description, is_active FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
                     (process_name,)
                 )
                 row = cursor.fetchone()
@@ -357,16 +357,18 @@ def handle_prompts_api():
                 data = request.json or {}
                 process_name = data.get('process')
                 prompt_template = data.get('prompt_template')
+                is_active = data.get('is_active', True)
 
-                if not process_name or not prompt_template:
+                if not process_name or prompt_template is None:
                     return jsonify({'error': 'Missing required fields.'}), 400
 
                 cursor.execute("""
                     UPDATE system_prompts 
                     SET prompt_template = %s, 
+                        is_active = %s,
                         updated_at = CURRENT_TIMESTAMP 
                     WHERE LOWER(process) = LOWER(%s);
-                """, (prompt_template, process_name))
+                """, (prompt_template, is_active, process_name))
                 conn.commit()
 
                 return jsonify({'status': 'success', 'message': 'Prompt updated successfully.'}), 200

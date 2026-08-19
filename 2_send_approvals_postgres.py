@@ -91,21 +91,24 @@ def fetch_file_bytes_and_mime(location):
 
 
 def get_prompt_by_process(cursor, process_name):
-    """Fetches a prompt template directly from PostgreSQL system_prompts using the process name."""
+    """Fetches prompt template only if is_active is True."""
     if not cursor:
-        raise ValueError(f"Database cursor is required to fetch prompt for process '{process_name}'.")
+        raise ValueError(f"Database cursor required for '{process_name}'.")
     
-    cursor.execute("SELECT prompt_template FROM system_prompts WHERE LOWER(process) = LOWER(%s);", (process_name,))
+    cursor.execute("SELECT prompt_template, is_active FROM system_prompts WHERE LOWER(process) = LOWER(%s);", (process_name,))
     row = cursor.fetchone()
     
-    if row and row.get("prompt_template"):
-        log(f"Successfully loaded prompt from DB for process: '{process_name}'")
-        return row["prompt_template"]
+    if row:
+        if not row.get("is_active"):
+            log(f"Prompt for '{process_name}' is currently DISABLED. Skipping execution.")
+            return None
+        return row.get("prompt_template")
     else:
-        raise ValueError(f"No prompt template found in 'system_prompts' table for process: '{process_name}'")
+        raise ValueError(f"No prompt template found in DB for process: '{process_name}'")
+
 
 def get_gemini_analysis(record, cursor):
-    """Executes multi-phase AI audit using exact PostgreSQL schema mapping and database system_prompts."""
+    """Executes AI analysis phases conditionally based on prompt active status."""
     api_key = os.getenv("GEMINI_API_KEY")
     po_num = str(record.get('po_number', '')).strip()
     
@@ -116,53 +119,50 @@ def get_gemini_analysis(record, cursor):
     try:
         client = genai.Client(api_key=api_key)
         
-        desc_val = str(record.get('description') or 'Operational Procurement').strip()
-        cost = float(record.get('estimated_cost') or 0.0)
-        gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
         user_recommended_vendor = str(record.get('recommended_vendor') or 'N/A').strip()
-        user_justification = str(record.get('justification_notes') or 'N/A').strip()
-        coi_status = str(record.get('conflict_of_interest') or 'No').strip()
-        coi_details = str(record.get('conflict_details') or 'None').strip()
-
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
+        extracted_vendor_name = user_recommended_vendor
+        cipc_num = "N/A"
+        vat_num = "N/A"
+        quoted_amount = "N/A"
+        includes_vat = "Unspecified"
+
         # ----------------------------------------------------
-        # PHASE 1: ENRICHED DOCUMENT PARSING & METADATA EXTRACTION
+        # PHASE 1: QUOTE EVALUATION (If Active)
         # ----------------------------------------------------
-        # Fetch Phase 1 template strictly from DB
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
-        parse_prompt_text = quote_eval_template.format(po_num=po_num)
+        
+        if quote_eval_template:
+            parse_prompt_text = quote_eval_template.format(po_num=po_num)
+            parse_contents = [parse_prompt_text]
 
-        parse_contents = [parse_prompt_text]
+            for file_loc in quote_attachments:
+                file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
+                if file_data and mime_type:
+                    parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
 
-        for file_loc in quote_attachments:
-            file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
-            if file_data and mime_type:
-                parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
+            log(f"PO {po_num}: 📑 Parsing quote metadata...")
+            parse_response = client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=parse_contents,
+                config=types.GenerateContentConfig(response_mime_type="application/json")
+            )
 
-        log(f"PO {po_num}: 📑 Parsing vendor metadata and financial details from quote documents...")
-        parse_response = client.models.generate_content(
-            model='gemini-3.5-flash-lite',
-            contents=parse_contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json")
-        )
-
-        try:
-            vendor_meta = json.loads(parse_response.text or "{}")
-        except Exception:
-            vendor_meta = {}
-
-        extracted_vendor_name = vendor_meta.get("legal_name") or user_recommended_vendor
-        cipc_num = vendor_meta.get("cipc_number") or "N/A"
-        vat_num = vendor_meta.get("vat_number") or "N/A"
-        quoted_amount = vendor_meta.get("quoted_amount") or "N/A"
-        includes_vat = vendor_meta.get("includes_vat") or "Unspecified"
+            try:
+                vendor_meta = json.loads(parse_response.text or "{}")
+                extracted_vendor_name = vendor_meta.get("legal_name") or user_recommended_vendor
+                cipc_num = vendor_meta.get("cipc_number") or "N/A"
+                vat_num = vendor_meta.get("vat_number") or "N/A"
+                quoted_amount = vendor_meta.get("quoted_amount") or "N/A"
+                includes_vat = vendor_meta.get("includes_vat") or "Unspecified"
+            except Exception:
+                pass
 
         # ----------------------------------------------------
-        # PHASE 2: DUCKDUCKGO WEB SEARCH (OSINT)
+        # PHASE 2: OSINT WEB SEARCH
         # ----------------------------------------------------
-        log(f"PO {po_num}: 🌐 Fetching public OSINT records for '{extracted_vendor_name}' via DuckDuckGo...")
         search_context = ""
         try:
             with DDGS() as ddgs:
@@ -170,28 +170,30 @@ def get_gemini_analysis(record, cursor):
                 results = list(ddgs.text(query, max_results=5))
                 for r in results:
                     search_context += f"- Title: {r.get('title')}\n  Snippet: {r.get('body')}\n"
-        except Exception as search_err:
-            log(f"PO {po_num}: DuckDuckGo search lookup failed for '{extracted_vendor_name}': {search_err}", "WARNING")
+        except Exception:
             search_context = "No direct public OSINT web results returned."
 
         if not search_context.strip():
             search_context = "No direct public OSINT web results returned."
 
         # ----------------------------------------------------
-        # PHASE 3: ENRICHED AUDIT SYNTHESIS
+        # PHASE 3: COMPANY ASSESSMENT / AUDIT SYNTHESIS (If Active)
         # ----------------------------------------------------
-        # Fetch Phase 3 template strictly from DB
         company_assess_template = get_prompt_by_process(cursor, 'Company assessment')
         
+        if not company_assess_template:
+            log(f"PO {po_num}: 'Company assessment' is toggled OFF. Skipping final synthesis.")
+            return "AI Company Assessment step disabled by administrative toggle."
+
         synthesis_prompt = company_assess_template.format(
             po_num=po_num,
-            desc_val=desc_val,
-            cost=cost,
-            gl_code_val=gl_code_val,
+            desc_val=str(record.get('description') or 'Operational Procurement').strip(),
+            cost=float(record.get('estimated_cost') or 0.0),
+            gl_code_val=str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip(),
             user_recommended_vendor=user_recommended_vendor,
-            user_justification=user_justification,
-            coi_status=coi_status,
-            coi_details=coi_details,
+            user_justification=str(record.get('justification_notes') or 'N/A').strip(),
+            coi_status=str(record.get('conflict_of_interest') or 'No').strip(),
+            coi_details=str(record.get('conflict_details') or 'None').strip(),
             extracted_vendor_name=extracted_vendor_name,
             cipc_num=cipc_num,
             vat_num=vat_num,
@@ -211,7 +213,7 @@ def get_gemini_analysis(record, cursor):
     except Exception as e:
         log(f"PO {po_num}: Gemini API Exception: {e}", "ERROR")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
-
+    
 
 def send_approval_email(to_emails, cc_emails, subject, body, attachment_paths=None):
     sender_email = os.getenv("SENDER_EMAIL")
