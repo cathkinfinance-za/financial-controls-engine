@@ -4,8 +4,11 @@ import json
 import psycopg2
 import vercel_blob
 from psycopg2.extras import RealDictCursor
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from werkzeug.utils import secure_filename
+from ai_matrix_drafter_postgres import execute_phase1
+from vendor_comparison_engine_postgres import execute_phase2
+
 
 try:
     import google.generativeai as genai
@@ -16,6 +19,8 @@ except ModuleNotFoundError:
     GEMINI_AVAILABLE = False
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
@@ -387,7 +392,72 @@ def view_audit_log():
         logs = cursor.fetchall()
     conn.close()
     return render_template('audit_log.html', logs=logs)
+
+# 1. Route: Render Project Dashboard & Form
+@app.route("/project/<int:project_id>")
+def project_dashboard(project_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
+    # Fetch project details
+    cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+    project = cursor.fetchone()
+    
+    # Fetch linked vendor options
+    cursor.execute("SELECT id, vendor_name, quote_filename, public_dd_status, final_weighted_score_output FROM procurement_options WHERE project_id = %s;", (project_id,))
+    vendors = cursor.fetchall()
+    
+    cursor.close()
+    conn.close()
+    return render_template("project_dashboard.html", project=project, vendors=vendors)
+# 2. Route: Handle PDF Upload and Store Bytes in PostgreSQL
+@app.route("/upload-quote", methods=["POST"])
+def upload_quote():
+    project_id = request.form.get("project_id")
+    vendor_name = request.form.get("vendor_name")
+    file = request.files.get("quote_file")
+
+    if not file or file.filename == '':
+        flash("Error: Please select a valid PDF file.")
+        return redirect(url_for("project_dashboard", project_id=project_id))
+
+    file_bytes = file.read()
+    filename = file.filename
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        INSERT INTO procurement_options (project_id, vendor_name, quote_filename, quote_file_bytes)
+        VALUES (%s, %s, %s, %s);
+    """, (project_id, vendor_name, filename, psycopg2.Binary(file_bytes)))
+    
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash(f"Quote for '{vendor_name}' uploaded successfully.")
+    return redirect(url_for("project_dashboard", project_id=project_id))
+
+# 3. Route: Trigger Phase 1 (AI Matrix Drafting & Line Item Extraction)
+@app.route("/run-phase1/<int:project_id>", methods=["POST"])
+def run_phase1_route(project_id):
+    try:
+        execute_phase1(project_id)
+        flash("Phase 1 complete: Qualitative criteria and line items generated for review.")
+    except Exception as e:
+        flash(f"Phase 1 Error: {str(e)}")
+    return redirect(url_for("project_dashboard", project_id=project_id))
+
+# 4. Route: Trigger Phase 2 (Math Scoring, Due Diligence & Recommendation)
+@app.route("/run-phase2/<int:project_id>", methods=["POST"])
+def run_phase2_route(project_id):
+    try:
+        execute_phase2(project_id)
+        flash("Phase 2 complete: Vendor scores, OSINT due diligence, and executive summary updated.")
+    except Exception as e:
+        flash(f"Phase 2 Error: {str(e)}")
+    return redirect(url_for("project_dashboard", project_id=project_id))    
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

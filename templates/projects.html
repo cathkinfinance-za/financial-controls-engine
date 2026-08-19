@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Project Evaluation Management</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f6f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; }
+        .card { background: #fff; border-radius: 8px; padding: 25px; margin-bottom: 25px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        h1, h2 { color: #1e293b; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .btn { display: inline-block; background: #2563eb; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; font-weight: bold; border: none; cursor: pointer; }
+        .btn-secondary { background: #475569; }
+        .status-badge { padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: bold; background: #e2e8f0; color: #334155; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border-bottom: 1px solid #e2e8f0; padding: 12px; text-align: left; }
+        th { background: #f8fafc; font-size: 0.85rem; text-transform: uppercase; color: #64748b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Project Management: {{ project.project_reference }}</h1>
+    
+    <!-- SECTION 1: Quote Upload & Ingestion -->
+    <div class="card">
+        <h2>1. Vendor Quote Ingestion</h2>
+        <form action="/upload-quote" method="POST" enctype="multipart/form-data" class="grid">
+            <input type="hidden" name="project_id" value="{{ project.id }}">
+            <div>
+                <label>Vendor / Option Name</label>
+                <input type="text" name="vendor_name" placeholder="e.g. Acme Security" required style="width: 100%; padding: 8px; margin-top: 5px;">
+            </div>
+            <div>
+                <label>Quote PDF File</label>
+                <input type="file" name="quote_file" accept="application/pdf" required style="width: 100%; padding: 8px; margin-top: 5px;">
+            </div>
+            <div style="grid-column: span 2;">
+                <button type="submit" class="btn">Upload Quote PDF to Database</button>
+            </div>
+        </form>
+
+        <!-- Uploaded Options List -->
+        <h3>Uploaded Procurement Options</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Vendor Name</th>
+                    <th>PDF File Name</th>
+                    <th>5-Yr Projected Total</th>
+                    <th>DD Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for vendor in vendors %}
+                <tr>
+                    <td><strong>{{ vendor.vendor_name }}</strong></td>
+                    <td>{{ vendor.quote_filename }}</td>
+                    <td>R {{ "{:,.2f}".format(vendor.projected_5yr_total or 0) }}</td>
+                    <td><span class="status-badge">{{ vendor.public_dd_status or 'Pending' }}</span></td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4">No vendor quotes uploaded yet.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- SECTION 2: Workflow Controls & Execution -->
+    <div class="card">
+        <h2>2. AI Evaluation Pipeline</h2>
+        <p>Current Workflow Status: <strong>{{ project.draft_matrix_via_ai or 'Not Started' }}</strong></p>
+        
+        <div style="display: flex; gap: 15px;">
+            <!-- Trigger Phase 1 -->
+            <form action="/run-phase1/{{ project.id }}" method="POST">
+                <button type="submit" class="btn">Run Phase 1: AI Matrix Drafter</button>
+            </form>
+
+            <!-- Trigger Phase 2 -->
+            <form action="/run-phase2/{{ project.id }}" method="POST">
+                <button type="submit" class="btn btn-secondary">Run Phase 2: Calculate & Due Diligence</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SECTION 3: Executive Summary Output (Populated after Phase 2) -->
+    {% if project.executive_sourcing_recommendation %}
+    <div class="card">
+        <h2>3. Executive Board Recommendation</h2>
+        <div style="white-space: pre-line; background: #f8fafc; padding: 15px; border-left: 4px solid #2563eb;">
+            {{ project.executive_sourcing_recommendation }}
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>
