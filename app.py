@@ -166,7 +166,7 @@ def po_form():
                     blob_response = vercel_blob.put(
                         f"quotes/{safe_filename}", 
                         file_bytes, 
-                        options={"access": "public"}
+                        options={"access": "private"}
                     )
                     url = blob_response.get('url')
                     if url:
