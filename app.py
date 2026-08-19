@@ -428,41 +428,42 @@ def projects_page():
 # 2. Route: Handle PDF Upload and Store Bytes in PostgreSQL
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
-    raw_project_id = request.form.get("project_id", "").strip()
+    raw_project_id = request.form.get("project_id", "1").strip()
     vendor_name = request.form.get("vendor_name", "").strip()
     file = request.files.get("quote_file")
 
-    # Validate Project ID presence
-    if not raw_project_id:
-        flash("Error: No Project ID selected. Please select or create a project first.")
-        return redirect(url_for("projects_page"))
-
     try:
-        project_id = int(raw_project_id)
+        project_id = int(raw_project_id) if raw_project_id else 1
     except ValueError:
-        flash("Error: Invalid Project ID format.")
-        return redirect(url_for("projects_page"))
-
-    if not file or file.filename == '':
-        flash("Error: Please select a valid PDF file.")
-        return redirect(url_for("projects_page", project_id=project_id))
-
-    file_bytes = file.read()
-    filename = file.filename
+        project_id = 1
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    
-    cursor.execute("""
-        INSERT INTO procurement_options (project_id, vendor_name, quote_filename, quote_file_bytes)
-        VALUES (%s, %s, %s, %s);
-    """, (project_id, vendor_name, filename, psycopg2.Binary(file_bytes)))
-    
-    conn.commit()
+
+    # Ensure the parent project exists
+    cursor.execute("SELECT id FROM projects WHERE id = %s;", (project_id,))
+    if not cursor.fetchone():
+        cursor.execute("""
+            INSERT INTO projects (id, project_reference, description) 
+            VALUES (%s, %s, %s);
+        """, (project_id, f"PROJ-{project_id:03d}", "Initial Procurement Evaluation"))
+        conn.commit()
+
+    if file and file.filename != '':
+        file_bytes = file.read()
+        filename = file.filename
+
+        cursor.execute("""
+            INSERT INTO procurement_options (project_id, vendor_name, quote_filename, quote_file_bytes)
+            VALUES (%s, %s, %s, %s);
+        """, (project_id, vendor_name, filename, psycopg2.Binary(file_bytes)))
+        
+        conn.commit()
+        flash(f"Quote for '{vendor_name}' uploaded successfully.")
+
     cursor.close()
     conn.close()
 
-    flash(f"Quote for '{vendor_name}' uploaded successfully.")
     return redirect(url_for("projects_page", project_id=project_id))
 
 # 3. Route: Trigger Phase 1 (AI Matrix Drafting & Line Item Extraction)
