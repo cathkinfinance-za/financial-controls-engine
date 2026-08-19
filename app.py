@@ -395,36 +395,117 @@ def view_audit_log():
     conn.close()
     return render_template('audit_log.html', logs=logs)
 
-# Route to list or access projects dashboard
-@app.route("/projects")
-@app.route("/projects/<int:project_id>")
-def projects_page(project_id=None):
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
-    p_id = project_id or request.args.get("id", type=int)
-    
-    if p_id:
-        cursor.execute("SELECT * FROM projects WHERE id = %s;", (p_id,))
-    else:
-        cursor.execute("SELECT * FROM projects ORDER BY id DESC LIMIT 1;")
-        
-    project = cursor.fetchone()
-    
-    vendors = []
-    if project:
-        cursor.execute("""
-            SELECT id, vendor_name, quote_filename, projected_5yr_total, price_score, 
-                   final_weighted_score_output, public_dd_status 
-            FROM procurement_options 
-            WHERE project_id = %s;
-        """, (project['id'],))
-        vendors = cursor.fetchall()
+# Helper to fetch all projects for the sidebar
+def get_all_projects_summary(cursor):
+    cursor.execute("SELECT id, project_reference, name FROM projects ORDER BY id DESC;")
+    return cursor.fetchall()
 
+
+# 1. Base route: Opens blank project form
+@app.route("/projects/", methods=["GET"])
+@app.route("/projects", methods=["GET"])
+def new_project_page():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    all_projects = get_all_projects_summary(cursor)
+    
     cursor.close()
     conn.close()
     
-    return render_template("projects.html", project=project, vendors=vendors)
+    # Renders template with project=None (blank form)
+    return render_template("projects.html", project=None, vendors=[], criteria_list=[], scores_map={}, all_projects=all_projects)
+
+# Route to list or access projects dashboard
+@app.route("/projects")
+@app.route("/projects/<int:project_id>", methods=["GET"])
+def projects_page(project_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Sidebar data
+    all_projects = get_all_projects_summary(cursor)
+
+    # Active Project
+    cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+    project = cursor.fetchone()
+
+    # Active Vendors
+    cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
+    vendors = cursor.fetchall()
+
+    # Criteria list
+    cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s ORDER BY id ASC;", (project_id,))
+    criteria_list = cursor.fetchall()
+
+    # Pricing items per vendor
+    for vendor in vendors:
+        cursor.execute("SELECT * FROM options_line_items_pricing WHERE procurement_option_id = %s ORDER BY id ASC;", (vendor["id"],))
+        vendor["pricing_items"] = cursor.fetchall()
+
+    # Qualitative scores map
+    cursor.execute("""
+        SELECT line_item_id, procurement_option_id, weighting_id, score 
+        FROM options_line_items_non_pricing 
+        WHERE procurement_option_id IN (SELECT id FROM procurement_options WHERE project_id = %s);
+    """, (project_id,))
+    scores_raw = cursor.fetchall()
+    
+    scores_map = {}
+    for row in scores_raw:
+        w_id = row["weighting_id"]
+        v_id = row["procurement_option_id"]
+        if w_id not in scores_map:
+            scores_map[w_id] = {}
+        scores_map[w_id][v_id] = row
+
+    cursor.close()
+    conn.close()
+
+    return render_template(
+        "projects.html", 
+        project=project, 
+        vendors=vendors, 
+        criteria_list=criteria_list, 
+        scores_map=scores_map,
+        all_projects=all_projects
+    )
+
+@app.route("/create-project", methods=["POST"])
+def create_project():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    raw_weight = float(request.form.get("price_weighting", 30))
+    price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
+
+    cursor.execute("""
+        INSERT INTO projects (
+            project_reference, name, project_description, project_objective, 
+            ai_prompt_adjustments, gl_code, gl_title, gl_sub, price_weighting, 
+            executive_sourcing_recommendation
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id;
+    """, (
+        request.form.get("project_reference", ""),
+        request.form.get("name", ""),
+        request.form.get("project_description", ""),
+        request.form.get("project_objective", ""),
+        request.form.get("ai_prompt_adjustments", ""),
+        request.form.get("gl_code", ""),
+        request.form.get("gl_title", ""),
+        request.form.get("gl_sub", ""),
+        price_weighting,
+        request.form.get("executive_sourcing_recommendation", "")
+    ))
+    
+    new_id = cursor.fetchone()["id"]
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+    flash("New project created successfully.")
+    return redirect(url_for("projects_page", project_id=new_id))
 
 @app.route('/projects/<int:project_id>')
 def view_project(project_id):
