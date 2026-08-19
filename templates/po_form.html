@@ -171,88 +171,88 @@
 
 
 <!-- Approvals Fieldset -->
-<fieldset style="margin-top: 20px;">
-    <legend>Approvals</legend>
+<fieldset class="approvals-fieldset">
+    <legend>Approvals & Attachments</legend>
 
-    <div class="form-row">
-        <div class="form-group">
-    <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
-    
-    <input 
-        type="file" 
-        id="attach_quotes" 
-        name="attach_quotes" 
-        accept=".pdf, image/*" 
-        multiple 
-        onchange="updateQuotesCount(this)"
-    >
+    <!-- Document Upload & List Section -->
+    <div class="form-group full-width">
+        <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
+        <input 
+            type="file" 
+            id="attach_quotes" 
+            name="attach_quotes" 
+            accept=".pdf, image/*" 
+            multiple 
+            onchange="updateQuotesCount(this)"
+            class="file-input-custom"
+        >
+        <div id="quotes_count_display" class="upload-feedback"></div>
 
-    <!-- UI FEEDBACK FOR NEWLY SELECTED FILES -->
-    <div id="quotes_count_display" style="margin-top: 6px; font-size: 0.9em; color: #6c757d; display: none;"></div>
-
-        <!-- DISPLAY ATTACHED QUOTES -->
-        <div id="attachments_list_container" style="margin-top: 10px; padding: 10px 12px; background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 4px;">
-            <span style="font-size: 0.85em; color: #6c757d; display: block; margin-bottom: 6px; font-weight: 600;">
-                Attached Documents:
-            </span>
-            
-            <div id="attachments_list">
+        <!-- Document Grid -->
+        <div class="attachments-card-container">
+            <span class="attachments-label">Attached Documents</span>
+            <div id="attachments_list" class="doc-grid">
                 {% if selected_po and selected_po.quote_urls %}
                     {% for url in selected_po.quote_urls %}
-                        <div style="margin-bottom: 6px; font-size: 0.9em;">
-                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
-                                📄 View Uploaded Document {{ loop.index }}
-                            </a>
-                        </div>
+                        {% set ext = url.split('.')[-1].split('?')[0]|lower %}
+                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                            <span class="doc-icon">
+                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                            </span>
+                            <span class="doc-name">Quote {{ loop.index }}</span>
+                        </a>
                     {% endfor %}
                 {% elif selected_po and selected_po.quote_filepath %}
                     {% for url in selected_po.quote_filepath.split(',') %}
-                        <div style="margin-bottom: 6px; font-size: 0.9em;">
-                            <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
-                                📄 View Uploaded Document {{ loop.index }}
-                            </a>
-                        </div>
+                        {% set ext = url.strip().split('.')[-1].split('?')[0]|lower %}
+                        <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                            <span class="doc-icon">
+                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                            </span>
+                            <span class="doc-name">Quote {{ loop.index }}</span>
+                        </a>
                     {% endfor %}
                 {% else %}
-                    <span id="no_attachments_text" style="font-size: 0.85em; color: #a0aec0;">No documents attached yet.</span>
+                    <span id="no_attachments_text" class="no-docs-text">No documents attached yet.</span>
                 {% endif %}
             </div>
         </div>
-        
+    </div>
+
+    <!-- Structured Form Grid -->
+    <div class="form-row three-col">
         <div class="form-group">
             <label>Quotes Provided</label>
-            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly style="background-color: #f8f9fa;">
+            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly class="readonly-input">
         </div>
         <div class="form-group">
             <label>Actioned Date</label>
             <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
         </div>
-    </div>
-
-    <div class="form-group" style="margin-top: 15px;">
-    <label>SYSTEM STATUS</label>
-    <input 
-        type="text" 
-        id="system_status" 
-        name="system_status" 
-        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
-        readonly 
-        style="background-color: #f8f9fa;"
-    >
-    </div>
-
-    <div class="form-row" style="margin-top: 15px;">
         <div class="form-group">
             <label>Actioned By</label>
             <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
         </div>
-        <div class="form-group">
-            <label>Approval Notes</label>
-            <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
-        </div>
     </div>
 
-    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
+    <div class="form-group full-width" style="margin-top: 15px;">
+        <label>System Compliance Status</label>
+        <input 
+            type="text" 
+            id="system_status" 
+            name="system_status" 
+            value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+            readonly 
+            class="readonly-input status-banner"
+        >
+    </div>
+
+    <div class="form-group full-width" style="margin-top: 15px;">
+        <label>Approval Notes</label>
+        <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
+    </div>
+
+    <div class="form-group full-width" style="margin-top: 15px;">
         <label>AI Recommendation Summary</label>
         <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
     </div>
@@ -318,36 +318,31 @@
 
     // Display helper message
     if (display) {
-        if (count > 0) {
-            display.style.display = 'block';
-            display.textContent = `${count} file${count > 1 ? 's' : ''} selected for upload.`;
-        } else {
-            display.style.display = 'none';
-            display.textContent = '';
-        }
+        display.style.display = count > 0 ? 'block' : 'none';
+        display.textContent = count > 0 ? `${count} file(s) selected for upload.` : '';
     }
 
-    // Render client-side file links for selected files
     if (attachmentsList && count > 0) {
-        attachmentsList.innerHTML = ''; // Clear previous/placeholder entries
-
+        attachmentsList.innerHTML = '';
         files.forEach((file, index) => {
             const objectUrl = URL.createObjectURL(file);
-            const item = document.createElement('div');
-            item.style.marginBottom = '6px';
-            item.style.fontSize = '0.9em';
+            const ext = file.name.split('.').pop().toLowerCase();
+            const icon = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? '🖼️' : '📄';
 
-            item.innerHTML = `
-                <a href="${objectUrl}" target="_blank" rel="noopener noreferrer" style="color: #0d6efd; text-decoration: underline; font-weight: 500;">
-                    📄 Preview ${file.name} (Ready to upload)
-                </a>
-            `;
-            attachmentsList.appendChild(item);
+            const badge = document.createElement('a');
+            badge.href = objectUrl;
+            badge.target = '_blank';
+            badge.rel = 'noopener noreferrer';
+            badge.className = 'doc-badge';
+            badge.innerHTML = `<span class="doc-icon">${icon}</span> <span class="doc-name">${file.name}</span>`;
+
+            attachmentsList.appendChild(badge);
         });
     }
 
-    // Recalculate system compliance status
-    calculateSystemStatus();
+    if (typeof calculateSystemStatus === 'function') {
+        calculateSystemStatus();
+    }
 }
 
     // 4. Dynamic calculation engine for SYSTEM STATUS
