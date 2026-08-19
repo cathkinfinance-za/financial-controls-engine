@@ -377,6 +377,16 @@ def handle_prompts_api():
         return jsonify({'error': str(e)}), 500
     finally:
         conn.close()
+
+
+@app.route('/audit-log')
+def view_audit_log():
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT * FROM workflow_control_log ORDER BY timestamp DESC LIMIT 100;")
+        logs = cursor.fetchall()
+    conn.close()
+    return render_template('audit_log.html', logs=logs)
     
 
 if __name__ == "__main__":

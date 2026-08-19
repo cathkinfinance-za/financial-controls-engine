@@ -42,43 +42,38 @@ def fetch_and_sync_weconnectu_budget():
     soup = BeautifulSoup(html_content, 'html.parser')
     financial_data = []
     
-    containers = soup.find_all(['tr', 'div', 'p'])
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
-    
-    # Improved regex to capture digits with optional spaces, commas, decimals, or negative brackets
-    currency_pattern = re.compile(r'\(?\d{1,3}(?:[,\s]?\d{3})*(?:\.\d+)?\)?')
 
-    for element in containers:
-        text_line = element.text.strip()
-        if not text_line:
+    for tr in soup.find_all('tr'):
+        cells = [td.text.strip() for td in tr.find_all(['td', 'th'])]
+        if not cells:
             continue
-            
-        gl_match = gl_pattern.search(text_line)
+        
+        full_row_text = " ".join(cells)
+        gl_match = gl_pattern.search(full_row_text)
+        
         if gl_match:
             gl_code = gl_match.group(1)
-            remainder = text_line.replace(gl_code, '', 1).strip()
             
-            all_numbers = currency_pattern.findall(remainder)
+            clean_metrics = []
+            description_parts = []
             
-            # Keep all valid captured numbers (removed the strict '.' requirement that dropped whole numbers)
-            clean_metrics = [num.strip() for num in all_numbers if num.strip() != '']
+            for cell in cells:
+                cleaned_cell = re.sub(r'[\s\xa0R]', '', cell)
+                if re.match(r'^\(?\-?\d+(?:[\.,]\d+)?\)?$', cleaned_cell):
+                    clean_metrics.append(cell)
+                elif cell != gl_code and not gl_pattern.search(cell):
+                    if cell.strip():
+                        description_parts.append(cell.strip())
             
-            description = remainder
-            for num in clean_metrics:
-                description = description.replace(num, '', 1)
-            description = re.sub(r'\s+', ' ', description).strip()
-            
-            if not description:
-                description = "Operational Portfolio Allocation"
+            description = " ".join(description_parts) if description_parts else "Operational Portfolio Allocation"
 
-            # Safely parse mapping the last 4 fixed summary columns from the back
             if len(clean_metrics) >= 4:
                 total_budget = clean_and_convert_number(clean_metrics[-1])
                 variance = clean_and_convert_number(clean_metrics[-2])
                 budget_ytd = clean_and_convert_number(clean_metrics[-3])
                 ytd = clean_and_convert_number(clean_metrics[-4])
                 
-                # Months are everything before the last 4 metrics
                 months = clean_metrics[:-4]
                 mar_2026 = clean_and_convert_number(months[0]) if len(months) > 0 else 0.0
                 apr_2026 = clean_and_convert_number(months[1]) if len(months) > 1 else 0.0
