@@ -4,45 +4,303 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Order Details</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+            --danger-red: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+        }
+
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Styles matching project.html */
+        .sidebar {
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid var(--border-color);
+            padding: 24px 16px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .sidebar-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            color: var(--text-muted);
+        }
+
+        .btn-new-po {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background-color: #212529;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .btn-new-po:hover { background-color: #000000; }
+
+        .po-list { list-style: none; padding: 0; margin: 0; }
+
+        .po-item a {
+            display: block;
+            padding: 10px 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+        }
+
+        .po-item a:hover { background-color: #f1f3f5; }
+
+        .po-item.active a {
+            background-color: #e7f5ff;
+            color: var(--primary-blue);
+            font-weight: 600;
+            border-color: #74c0fc;
+        }
+
+        /* Main Content Workspace */
+        .main-content {
+            flex-grow: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .dashboard-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .control-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary { background-color: #212529; color: white; }
+        .btn-secondary { background-color: #e9ecef; color: var(--text-main); border-color: #ced4da; }
+        .btn-blue { background-color: var(--primary-blue); color: white; }
+
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            margin-top: 36px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+
+        .form-row.two-col {
+            grid-template-columns: 240px 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-row.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-main);
+            padding-top: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+
+        .form-control[readonly] {
+            background-color: #f8f9fa;
+        }
+
+        textarea.form-control { min-height: 80px; resize: vertical; }
+
+        .flash-message {
+            padding: 12px 18px;
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        /* File Upload & Document Grid Styling */
+        .file-upload-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .hidden-file-input { display: none; }
+
+        .custom-file-upload-btn {
+            background-color: #e9ecef;
+            color: var(--text-main);
+            border: 1px solid #ced4da;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .custom-file-upload-btn:hover { background-color: #dde0e3; }
+
+        .file-chosen-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .upload-feedback {
+            font-size: 13px;
+            color: #0f5132;
+            margin-bottom: 12px;
+            display: none;
+        }
+
+        .attachments-card-container {
+            background-color: #fdfdfd;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-top: 10px;
+        }
+
+        .attachments-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .doc-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .doc-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1f3f5;
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 4px;
+            text-decoration: none;
+            color: var(--text-main);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .doc-badge:hover { background: #e7f5ff; border-color: #74c0fc; color: var(--primary-blue); }
+
+        .status-banner {
+            font-weight: 600;
+            color: #0d6efd;
+        }
+    </style>
 </head>
 <body>
 
 <div class="app-layout">
     <!-- Sidebar List -->
     <div class="sidebar">
-        <div class="sidebar-header">
-            <span>Saved POs</span>
-            <a href="/simple" class="new-po-btn">+ New PO</a>
-        </div>
-        <ul class="sidebar-list">
+        <a href="/simple" class="btn-new-po">+ New PO</a>
+        <div class="sidebar-title">Saved POs Directory</div>
+        <ul class="po-list">
             {% if saved_pos %}
                 {% for po in saved_pos %}
-                <li>
-                    <a href="/simple?po_number={{ po.po_number }}" class="{% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
+                <li class="po-item {% if selected_po and selected_po.po_number == po.po_number %}active{% endif %}">
+                    <a href="/simple?po_number={{ po.po_number }}">
                         <strong>{{ po.po_number }}</strong><br>
-                        <span style="font-size: 0.8em; color: #bdc3c7;">
+                        <span style="font-size: 12px; color: var(--text-muted);">
                             {{ po.description[:25] if po.description else 'No description' }}{% if po.description and po.description|length > 25 %}...{% endif %}
                         </span>                    
                     </a>
                 </li>
                 {% endfor %}
             {% else %}
-                <li style="padding: 20px; color: #95a5a6; text-align: center; font-size: 0.9em;">No saved purchase orders</li>
+                <li style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 12px 0;">No saved purchase orders</li>
             {% endif %}
         </ul>
     </div>
 
     <!-- Main Container -->
     <div class="main-content">
-        <div class="container">
-            <div class="header-bar">
-                <h1>Purchase Order</h1>
-                <a href="#" class="back-btn">Back to Dashboard &gt;</a>
+        <div class="dashboard-container">
+            <div class="control-bar">
+                <h2 style="margin: 0; font-size: 20px;">Purchase Order Controls</h2>
+                <a href="#" class="btn btn-secondary">Back to Dashboard &gt;</a>
             </div>
 
             {% if message %}
-                <div style="padding: 10px; margin-bottom: 15px; background-color: #d4edda; color: #155724; border-radius: 4px;">
+                <div class="flash-message">
                     {{ message }}
                 </div>
             {% endif %}
@@ -52,38 +310,37 @@
                 <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
 
                 <!-- Purchase Order Details -->
-                <fieldset>
-                    <legend>Purchase Order Details</legend>
+                <div class="section-header" style="margin-top: 0;">Purchase Order Details</div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>PO Number</label>
-                        <input type="text" name="po_number" value="{{ selected_po.po_number if selected_po else '' }}" required>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">PO Number</label>
+                    <input type="text" name="po_number" class="form-control" value="{{ selected_po.po_number if selected_po else '' }}" required style="width: 200px;">
+                </div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>Description</label>
-                        <textarea name="description" rows="3">{{ selected_po.description if selected_po else '' }}</textarea>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Description</label>
+                    <textarea name="description" class="form-control">{{ selected_po.description if selected_po else '' }}</textarea>
+                </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Date</label>
-                            <input type="date" name="po_date" value="{{ selected_po.po_date if selected_po else '' }}">
-                        </div>
-                        <div class="form-group">
-                            <label>Has this been budgeted for?</label>
-                            <select name="is_budgeted">
-                                <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
-                                <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
-                                <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
-                            </select>
-                        </div>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Date</label>
+                    <input type="date" name="po_date" class="form-control" value="{{ selected_po.po_date if selected_po else '' }}" style="width: 200px;">
+                </div>
 
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>Select GL Code</label>
-                        <input type="text" id="gl-search-input" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
-                        <select name="gl_code" id="gl-code-select">
+                <div class="form-row">
+                    <label class="form-label">Has this been budgeted for?</label>
+                    <select name="is_budgeted" class="form-control" style="width: 200px;">
+                        <option value="" disabled {% if not selected_po or not selected_po.is_budgeted %}selected{% endif %}>Select option</option>
+                        <option value="Yes" {% if selected_po and selected_po.is_budgeted == "Yes" %}selected{% endif %}>Yes</option>
+                        <option value="No" {% if selected_po and selected_po.is_budgeted == "No" %}selected{% endif %}>No</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Select GL Code</label>
+                    <div>
+                        <input type="text" id="gl-search-input" class="form-control" placeholder="Type to filter GL codes..." style="margin-bottom: 8px;">
+                        <select name="gl_code" id="gl-code-select" class="form-control">
                             <option value="" disabled {% if not selected_po or not selected_po.gl_code %}selected{% endif %}>Select GL Code</option>
                             {% for gl in gl_records %}
                                 <option value="{{ gl.gl_code }}" {% if selected_po and selected_po.gl_code == gl.gl_code %}selected{% endif %}>
@@ -92,95 +349,88 @@
                             {% endfor %}
                         </select>
                     </div>
+                </div>
 
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>Expense Type</label>
-                        <select name="expense_type">
-                            <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
-                            <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
-                            <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
-                            <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
-                            <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
-                        </select>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Expense Type</label>
+                    <select name="expense_type" class="form-control" style="width: 200px;">
+                        <option value="" disabled {% if not selected_po or not selected_po.expense_type %}selected{% endif %}>Select expense type</option>
+                        <option value="Operational" {% if selected_po and selected_po.expense_type == "Operational" %}selected{% endif %}>Operational</option>
+                        <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
+                        <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
+                        <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
+                    </select>
+                </div>
 
-                    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
-                        <label>Estimated Cost</label>
-                        <input type="number" step="0.01" name="estimated_cost" value="{{ selected_po.estimated_cost if selected_po else '' }}">
-                    </div>
-                </fieldset>
+                <div class="form-row">
+                    <label class="form-label">Estimated Cost</label>
+                    <input type="number" step="0.01" name="estimated_cost" class="form-control" value="{{ selected_po.estimated_cost if selected_po else '' }}" style="width: 200px;">
+                </div>
 
                 <!-- Vendor Selection & Rationale -->
-                <fieldset style="margin-top: 20px;">
-                    <legend>Vendor Selection & Rationale</legend>
+                <div class="section-header">Vendor Selection & Rationale</div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>Suggested Vendor</label>
-                        <input type="text" name="recommended_vendor" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Suggested Vendor</label>
+                    <input type="text" name="recommended_vendor" class="form-control" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
+                </div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>Justification Notes</label>
-                        <textarea name="justification_notes" rows="4">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Justification Notes</label>
+                    <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
+                </div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>Submission Status</label>
-                        <select name="submission_status">
-                            <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
-                            <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
-                            <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
-                            <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
-                            <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
-                            <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
-                        </select>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Submission Status</label>
+                    <select name="submission_status" class="form-control" style="width: 240px;">
+                        <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
+                        <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                        <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                        <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
+                        <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+                        <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+                    </select>
+                </div>
 
-                    <div class="form-group" style="margin-bottom: 15px;">
-                        <label>Latest AI Status</label>
-                        <input type="text" name="latest_ai_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly style="background-color: #f8f9fa;">
-                    </div>
-                </fieldset>
+                <div class="form-row">
+                    <label class="form-label">Latest AI Status</label>
+                    <input type="text" name="latest_ai_status" class="form-control" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly>
+                </div>
 
                 <!-- Financial Summary (Read Only) -->
-                <fieldset style="margin-top: 20px;">
-                    <legend>Financial Summary</legend>
+                <div class="section-header">Financial Summary</div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>YTD Actual</label>
-                            <input type="text" id="fin-ytd-actual" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="background-color: #f8f9fa;">
-                        </div>
-                        <div class="form-group">
-                            <label>Total Annual Budget</label>
-                            <input type="text" id="fin-total-budget" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="background-color: #f8f9fa;">
-                        </div>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">YTD Actual</label>
+                    <input type="text" id="fin-ytd-actual" class="form-control" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="width: 240px;">
+                </div>
 
-                    <div class="form-row" style="margin-top: 15px;">
-                        <div class="form-group">
-                            <label>Budget YTD</label>
-                            <input type="text" id="fin-budget-ytd" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="background-color: #f8f9fa;">
-                        </div>
-                        <div class="form-group">
-                            <label>2M Buffer Pool</label>
-                            <input type="text" id="fin-buffer-pool" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="background-color: #f8f9fa;">
-                        </div>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Total Annual Budget</label>
+                    <input type="text" id="fin-total-budget" class="form-control" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="width: 240px;">
+                </div>
 
-                    <div class="form-group" style="margin-top: 15px; margin-bottom: 15px;">
-                        <label>Variance</label>
-                        <input type="text" id="fin-variance" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="background-color: #f8f9fa;">
-                    </div>
-                </fieldset>
+                <div class="form-row">
+                    <label class="form-label">Budget YTD</label>
+                    <input type="text" id="fin-budget-ytd" class="form-control" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">2M Buffer Pool</label>
+                    <input type="text" id="fin-buffer-pool" class="form-control" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Variance</label>
+                    <input type="text" id="fin-variance" class="form-control" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="width: 240px;">
+                </div>
 
                 <!-- Approvals Fieldset -->
-                <fieldset class="approvals-fieldset">
-                    <legend>Approvals & Attachments</legend>
+                <div class="section-header">Approvals & Attachments</div>
 
-                    <!-- Document Upload & List Section -->
-                    <div class="form-group full-width">
-                        <label for="attach_quotes">Attach Quotes (PDF / Images)</label>
+                <div class="form-row">
+                    <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
+                    <div>
                         <div class="file-upload-wrapper">
                             <input 
                                 type="file" 
@@ -225,52 +475,53 @@
                                         </a>
                                     {% endfor %}
                                 {% else %}
-                                    <span id="no_attachments_text" class="no-docs-text">No documents attached yet.</span>
+                                    <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No documents attached yet.</span>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Structured Form Grid -->
-                    <div class="form-row three-col">
-                        <div class="form-group">
-                            <label>Quotes Provided</label>
-                            <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly class="readonly-input">
-                        </div>
-                        <div class="form-group">
-                            <label>Actioned Date</label>
-                            <input type="date" id="actioned_date" name="actioned_date" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}">
-                        </div>
-                        <div class="form-group">
-                            <label>Actioned By</label>
-                            <input type="text" name="actioned_by" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}">
-                        </div>
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Quotes Provided</label>
+                    <input type="number" id="quotes_provided" name="quotes_provided" value="{{ selected_po.quotes_provided if selected_po and selected_po.quotes_provided is not none else 0 }}" readonly class="form-control" style="width: 140px;">
+                </div>
 
-                    <div class="form-group full-width" style="margin-top: 15px;">
-                        <label>System Compliance Status</label>
-                        <input 
-                            type="text" 
-                            id="system_status" 
-                            name="system_status" 
-                            value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
-                            readonly 
-                            class="readonly-input status-banner"
-                        >
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Actioned Date</label>
+                    <input type="date" id="actioned_date" name="actioned_date" class="form-control" value="{{ selected_po.actioned_date if selected_po and selected_po.actioned_date else '' }}" style="width: 200px;">
+                </div>
 
-                    <div class="form-group full-width" style="margin-top: 15px;">
-                        <label>Approval Notes</label>
-                        <input type="text" name="approval_notes" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
-                    </div>
+                <div class="form-row">
+                    <label class="form-label">Actioned By</label>
+                    <input type="text" name="actioned_by" class="form-control" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}" style="width: 240px;">
+                </div>
 
-                    <div class="form-group full-width" style="margin-top: 15px;">
-                        <label>AI Recommendation Summary</label>
-                        <textarea name="ai_recommendation_summary" rows="3">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
-                    </div>
-                </fieldset>
+                <div class="form-row">
+                    <label class="form-label">System Compliance Status</label>
+                    <input 
+                        type="text" 
+                        id="system_status" 
+                        name="system_status" 
+                        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+                        readonly 
+                        class="form-control status-banner"
+                    >
+                </div>
 
-                <button type="submit" class="submit-btn" style="margin-top: 20px;">Save</button>
+                <div class="form-row">
+                    <label class="form-label">Approval Notes</label>
+                    <input type="text" name="approval_notes" class="form-control" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">AI Recommendation Summary</label>
+                    <textarea name="ai_recommendation_summary" class="form-control">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                </div>
+
+                <div style="margin-top: 30px; text-align: right;">
+                    <button type="submit" class="btn btn-blue">Save Purchase Order</button>
+                </div>
             </form>
         </div>
     </div>
