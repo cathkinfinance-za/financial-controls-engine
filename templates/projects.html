@@ -481,6 +481,7 @@
                         </tr>
                     </thead>
                     <tbody>
+                        <!-- Collect unique cost component names -->
                         {% set component_names = [] %}
                         {% for vendor in vendors %}
                             {% for item in vendor.pricing_items %}
@@ -491,22 +492,23 @@
                         {% endfor %}
 
                         {% for comp_name in component_names %}
+                        <!-- Find the category for this component across vendor items -->
+                        {% set ns = namespace(category='One-Off Cost') %}
+                        {% for vendor in vendors %}
+                            {% for item in vendor.pricing_items %}
+                                {% if item.cost_component_name == comp_name and item.cost_type_category %}
+                                    {% set ns.category = item.cost_type_category %}
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
                         <tr>
                             <td>
                                 <strong>{{ comp_name }}</strong>
                             </td>
                             <td>
-                                {% set sample_cat = 'One-Off Cost' %}
-                                {% for vendor in vendors %}
-                                    {% for item in vendor.pricing_items %}
-                                        {% if item.cost_component_name == comp_name %}
-                                            {% set sample_cat = item.cost_type_category %}
-                                        {% endif %}
-                                    {% endfor %}
-                                {% endfor %}
                                 <select name="category_{{ loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                                    <option value="One-Off Cost" {% if sample_cat == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                    <option value="Annual Cost" {% if sample_cat == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                    <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                    <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
                                 </select>
                             </td>
                             {% for vendor in vendors %}
@@ -519,16 +521,16 @@
                                 <td>
                                     {% if match_item %}
                                         <input type="number" step="0.01" name="pricing_amount_{{ match_item[0].id }}" 
-                                               class="form-control item-amount" 
-                                               data-vendor-id="{{ vendor.id }}" 
-                                               data-comp-name="{{ comp_name }}"
-                                               value="{{ match_item[0].amount }}">
+                                            class="form-control item-amount" 
+                                            data-vendor-id="{{ vendor.id }}" 
+                                            data-comp-name="{{ comp_name }}"
+                                            value="{{ match_item[0].amount }}">
                                     {% else %}
                                         <input type="number" step="0.01" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" 
-                                               class="form-control item-amount" 
-                                               data-vendor-id="{{ vendor.id }}" 
-                                               data-comp-name="{{ comp_name }}"
-                                               value="0.00">
+                                            class="form-control item-amount" 
+                                            data-vendor-id="{{ vendor.id }}" 
+                                            data-comp-name="{{ comp_name }}"
+                                            value="0.00">
                                     {% endif %}
                                 </td>
                             {% endfor %}
@@ -552,7 +554,6 @@
                         </tr>
                     </tfoot>
                 </table>
-                {% endif %}
 
                 <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
 
@@ -566,6 +567,8 @@
                         {% if project %}Save Project Definitions{% else %}Create Project{% endif %}
                     </button>
                 </div>
+
+                {% endif %}
 
             </form>
         </div>
