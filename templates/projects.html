@@ -21,12 +21,22 @@
 
 <div class="container">
     <h1>Project Management: {{ project.project_reference }}</h1>
+
+    {% with messages = get_flashed_messages() %}
+    {% if messages %}
+        {% for message in messages %}
+        <div style="padding: 12px 18px; background-color: #d1e7dd; color: #0f5132; border: 1px solid #badbcc; border-radius: 6px; margin-bottom: 20px;">
+            {{ message }}
+        </div>
+        {% endfor %}
+    {% endif %}
+    {% endwith %}
     
     <!-- SECTION 1: Quote Upload & Ingestion -->
     <div class="card">
         <h2>1. Vendor Quote Ingestion</h2>
         <form action="/upload-quote" method="POST" enctype="multipart/form-data" class="grid">
-            <!-- Ensure project.id is passed, or default to 1 for testing -->
+            <!-- Hidden input with fallback project_id -->
             <input type="hidden" name="project_id" value="{{ project.id if project else 1 }}">
             
             <div>
@@ -38,7 +48,8 @@
                 <input type="file" name="quote_file" accept="application/pdf" required style="width: 100%; padding: 8px; margin-top: 5px;">
             </div>
             <div style="grid-column: span 2;">
-                <button type="submit" class="btn" {% if not project %}disabled{% endif %}>
+                <!-- Removed 'disabled' attribute -->
+                <button type="submit" class="btn">
                     Upload Quote PDF to Database
                 </button>
             </div>
