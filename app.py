@@ -167,7 +167,10 @@ def po_form():
                     blob_response = vercel_blob.put(
                         f"quotes/{safe_filename}", 
                         file_bytes, 
-                        options={"access": "private"}  # FIXED: Changed from "public" to "private"
+                        options={
+                            "access": "public",
+                            "token": os.getenv("PUBLIC_BLOB_READ_WRITE_TOKEN")
+                        }
                     )
                     
                     # Extract URL from response (handles dict or object response)
