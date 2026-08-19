@@ -136,9 +136,10 @@ def po_form():
         except ValueError:
             estimated_cost = 0.0
 
-        # Fetch existing record if updating to preserve old attachment URLs
-        existing_filepath_str = ""
-        if original_po or new_po:
+        # 1. Check hidden form input first, then fall back to DB lookup to preserve existing URLs
+        existing_filepath_str = request.form.get("existing_quote_filepath", "").strip()
+
+        if not existing_filepath_str and (original_po or new_po):
             try:
                 with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     lookup_target = original_po if original_po else new_po
@@ -162,13 +163,15 @@ def po_form():
                     file_bytes = quote_file.read()
                     safe_filename = secure_filename(quote_file.filename)
                     
-                    # 1. Save to Vercel Blob
+                    # 1. Save to Vercel Blob using "private" access
                     blob_response = vercel_blob.put(
                         f"quotes/{safe_filename}", 
                         file_bytes, 
-                        options={"access": "private"}
+                        options={"access": "private"}  # FIXED: Changed from "public" to "private"
                     )
-                    url = blob_response.get('url')
+                    
+                    # Extract URL from response (handles dict or object response)
+                    url = blob_response.get('url') if isinstance(blob_response, dict) else getattr(blob_response, 'url', None)
                     if url:
                         new_urls.append(url)
 

@@ -48,6 +48,7 @@
 
         <form action="/po_form" method="POST" enctype="multipart/form-data">
     <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
+    <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
 
     <fieldset>
         <legend>Purchase Order Details</legend>
