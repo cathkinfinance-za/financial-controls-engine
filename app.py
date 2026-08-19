@@ -352,6 +352,15 @@ def handle_prompts_api():
         with conn.cursor() as cursor:
             if request.method == 'GET':
                 process_name = request.args.get('process')
+                
+                # If no process parameter passed, return a list of all process names
+                if not process_name:
+                    cursor.execute("SELECT DISTINCT process FROM system_prompts ORDER BY process ASC;")
+                    rows = cursor.fetchall()
+                    processes = [row['process'] for row in rows]
+                    return jsonify(processes), 200
+
+                # Fetch specific prompt details
                 cursor.execute(
                     "SELECT process, prompt_template, description, is_active FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
                     (process_name,)

@@ -186,7 +186,8 @@
         "{user_recommended_vendor}", "{user_justification}", 
         "{coi_status}", "{coi_details}", "{extracted_vendor_name}", 
         "{cipc_num}", "{vat_num}", "{quoted_amount}", 
-        "{includes_vat}", "{search_context}"
+        "{includes_vat}", "{search_context}",
+        "{winner_name}", "{winning_score}", "{cheapest_vendor}", "{min_cost}"
     ];
 
     function updateBadgeState() {
@@ -201,8 +202,28 @@
         }
     }
 
+    async function populateProcessDropdown() {
+        try {
+            const response = await fetch('/api/prompts');
+            const processes = await response.json();
+            
+            if (response.ok && Array.isArray(processes)) {
+                const select = document.getElementById("processSelect");
+                select.innerHTML = processes.map(p => `<option value="${p}">${p}</option>`).join("");
+                await loadPrompt();
+            } else {
+                showAlert("Failed to load process list.", "error");
+            }
+        } catch (err) {
+            console.error("Error loading dropdown options:", err);
+            showAlert("Network error populating dropdown.", "error");
+        }
+    }
+
     async function loadPrompt() {
         const process = document.getElementById("processSelect").value;
+        if (!process) return;
+
         document.getElementById("alertBox").style.display = "none";
 
         document.getElementById("placeholders").innerHTML = allPlaceholders
@@ -263,7 +284,7 @@
         alertBox.style.display = "block";
     }
 
-    window.onload = loadPrompt;
+    window.onload = populateProcessDropdown;
 </script>
 
 </body>
