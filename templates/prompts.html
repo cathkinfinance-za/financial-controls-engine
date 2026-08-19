@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Management Console</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            margin: 0 0 0.5rem 0;
+            font-size: 1.875rem;
+        }
+
+        p.subtitle {
+            color: #64748b;
+            margin: 0;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        select, input, textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            background: #fff;
+        }
+
+        textarea {
+            font-family: "Courier New", Courier, monospace;
+            min-height: 250px;
+            resize: vertical;
+            line-height: 1.4;
+        }
+
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert-success {
+            background-color: #dcfce7;
+            color: #15803d;
+            border: 1px solid #bbf7d0;
+        }
+
+        .alert-error {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
+        }
+
+        .variable-tag {
+            display: inline-block;
+            background: #f1f5f9;
+            color: #475569;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            margin-right: 0.3rem;
+            margin-bottom: 0.3rem;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>System Prompt Management</h1>
+        <p class="subtitle">Select a process to view or update its dynamic AI prompt stored in Neon.</p>
+    </header>
+
+    <div id="alertBox" class="alert"></div>
+
+    <div class="card">
+        <form id="promptForm">
+            <div class="form-group">
+                <label for="processSelect">Target Process</label>
+                <select id="processSelect" onchange="loadPrompt()">
+                    <option value="Quote evaluation">Quote evaluation</option>
+                    <option value="Company assessment">Company assessment</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="promptDescription">Description</label>
+                <input type="text" id="promptDescription" readonly style="background-color: #f8fafc;">
+            </div>
+
+            <div class="form-group">
+                <label for="promptTemplate">Prompt Template</label>
+                <textarea id="promptTemplate" placeholder="Loading prompt template..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Available Format Placeholders</label>
+                <div id="placeholders"></div>
+            </div>
+
+            <button type="submit">Save Prompt to Database</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const placeholdersMap = {
+        "Quote evaluation": ["{po_num}"],
+        "Company assessment": [
+            "{po_num}", "{desc_val}", "{cost}", "{gl_code_val}", 
+            "{user_recommended_vendor}", "{user_justification}", 
+            "{coi_status}", "{coi_details}", "{extracted_vendor_name}", 
+            "{cipc_num}", "{vat_num}", "{quoted_amount}", 
+            "{includes_vat}", "{search_context}"
+        ]
+    };
+
+    async function loadPrompt() {
+        const process = document.getElementById("processSelect").value;
+        const alertBox = document.getElementById("alertBox");
+        alertBox.style.display = "none";
+
+        // Render tags
+        const tagsContainer = document.getElementById("placeholders");
+        tagsContainer.innerHTML = (placeholdersMap[process] || [])
+            .map(p => `<span class="variable-tag">${p}</span>`)
+            .join("");
+
+        try {
+            const response = await fetch(`/api/prompts?process=${encodeURIComponent(process)}`);
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById("promptTemplate").value = data.prompt_template || "";
+                document.getElementById("promptDescription").value = data.description || "";
+            } else {
+                showAlert(data.error || "Failed to load prompt.", "error");
+            }
+        } catch (err) {
+            showAlert("Network error fetching prompt template.", "error");
+        }
+    }
+
+    document.getElementById("promptForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const process = document.getElementById("processSelect").value;
+        const promptTemplate = document.getElementById("promptTemplate").value;
+
+        try {
+            const response = await fetch("/api/prompts", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    process: process,
+                    prompt_template: promptTemplate
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                showAlert("Prompt saved successfully to Neon!", "success");
+            } else {
+                showAlert(data.error || "Failed to save prompt.", "error");
+            }
+        } catch (err) {
+            showAlert("Network error saving prompt template.", "error");
+        }
+    });
+
+    function showAlert(message, type) {
+        const alertBox = document.getElementById("alertBox");
+        alertBox.className = `alert alert-${type}`;
+        alertBox.innerText = message;
+        alertBox.style.display = "block";
+    }
+
+    // Initial load
+    window.onload = loadPrompt;
+</script>
+
+</body>
+</html>

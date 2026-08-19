@@ -308,7 +308,7 @@ def process_postgres_approvals():
                 log(f"PO {po_num} Summary: Cost=R{cost:,.2f}, Type='{expense_type}', GL='{gl_code_val}'")
 
                 # Run multi-phase Gemini analysis
-                ai_analysis_text = get_gemini_analysis(record)
+                ai_analysis_text = get_gemini_analysis(record, cursor)
                 
                 # Routing
                 to_list = [approver_emails.get("Estate Manager")]
