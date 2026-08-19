@@ -299,8 +299,10 @@
                         <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
                     </form>
                     
-                    <form action="/recalculate-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>Recalculate Matrix</button>
+                    <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
+                            Generate Recommendation
+                        </button>
                     </form>
                     
                     <span class="status-badge">

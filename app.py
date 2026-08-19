@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
 
+
 try:
     import google.generativeai as genai
     genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -761,6 +762,82 @@ def delete_vendor(vendor_id):
 
     flash(f'Option "{vendor.vendor_name}" was successfully removed.')
     return redirect(url_for('view_project', project_id=project_id))  
+
+
+@app.route('/generate-recommendation/<int:project_id>', methods=['POST'])
+def generate_recommendation(project_id):
+    if not GEMINI_AVAILABLE:
+        flash('Gemini API library is not installed or configured.')
+        return redirect(url_for('view_project', project_id=project_id))
+
+    project = Project.query.get_or_404(project_id)
+    vendors = VendorOption.query.filter_by(project_id=project_id).all()
+
+    if not vendors:
+        flash('Cannot generate recommendation without vendor options.')
+        return redirect(url_for('view_project', project_id=project_id))
+
+    # 1. Fetch system prompts from database
+    rec_prompt_row = SystemPrompt.query.filter_by(process='executive_recommendation', is_active=True).first()
+    company_prompt_row = SystemPrompt.query.filter_by(process='Company assessment', is_active=True).first()
+
+    prompt_template = rec_prompt_row.prompt_template if rec_prompt_row else ""
+    company_assessment_context = company_prompt_row.prompt_template if company_prompt_row else ""
+
+    # 2. Identify winner and lowest cost options
+    sorted_by_score = sorted(vendors, key=lambda v: v.final_weighted_score_output or 0, reverse=True)
+    sorted_by_cost = sorted(vendors, key=lambda v: v.projected_5yr_total or float('inf'))
+
+    winner = sorted_by_score[0] if sorted_by_score else None
+    cheapest = sorted_by_cost[0] if sorted_by_cost else None
+
+    winner_name = winner.vendor_name if winner else "N/A"
+    winning_score = f"{winner.final_weighted_score_output:.1f}" if winner and winner.final_weighted_score_output else "0.0"
+    cheapest_vendor = cheapest.vendor_name if cheapest else "N/A"
+    min_cost = f"{int(round(cheapest.projected_5yr_total)):,}" if cheapest and cheapest.projected_5yr_total else "0"
+
+    # 3. Inject variables into prompt template
+    formatted_task_prompt = prompt_template.format(
+        winner_name=winner_name,
+        winning_score=winning_score,
+        cheapest_vendor=cheapest_vendor,
+        min_cost=min_cost
+    )
+
+    # 4. Construct payload context
+    full_prompt = f"""
+=== COMPANY & SYSTEM DIRECTIVES ===
+{company_assessment_context}
+
+=== PROJECT DETAILS ===
+Project Name: {project.name}
+Project Reference: {project.project_reference}
+Project Description: {project.project_description}
+Project Objectives: {project.project_objective}
+
+=== USER SPECIFIC INSTRUCTIONS ===
+{project.ai_prompt_adjustments or 'None provided.'}
+
+=== EVALUATION DATA & INSTRUCTIONS ===
+{formatted_task_prompt}
+"""
+
+    # 5. Call Gemini API
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(full_prompt)
+        
+        # 6. Save result to database
+        project.executive_sourcing_recommendation = response.text
+        project.latest_ai_status = 'Recommendation Generated'
+        db.session.commit()
+        
+        flash('Executive sourcing recommendation successfully generated!')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error generating recommendation: {str(e)}')
+
+    return redirect(url_for('view_project', project_id=project_id))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
