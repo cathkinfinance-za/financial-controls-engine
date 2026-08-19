@@ -68,15 +68,16 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        status, messages = mail.search(None, 'UNSEEN SUBJECT "Approval Required"')
+        # Use broader UNSEEN search to ensure Gmail doesn't drop partial subject matches
+        status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
-            log("No unseen approval workflow emails found.")
+            log("No unseen emails found in inbox.")
             mail.logout()
             return {}, {}
 
         raw_data = messages[0]
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
-        log(f"Found {len(email_ids)} unread workflow email(s) to process.")
+        log(f"Found {len(email_ids)} unread email(s). Filtering for workflow replies...")
 
         approvals = {}
         rejections = {}
@@ -100,9 +101,14 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    # Extract PO number from [PO-XXX] subject format
+                    # Filter: Subject must contain 'Approval Required'
+                    if "approval required" not in decoded_subject.lower():
+                        continue
+
+                    # Flexible Regex: Captures bracketed POs like [PO-101], [101], or [Test]
                     po_match = re.search(r'\[([A-Za-z0-9_-]+)\]', decoded_subject)
                     if not po_match:
+                        log(f"Skipping email '{decoded_subject}': No bracketed identifier found.", "WARNING")
                         continue
 
                     po_number = po_match.group(1).strip()
@@ -121,22 +127,23 @@ def fetch_approval_replies():
                         if isinstance(payload, bytes):
                             body = payload.decode(errors='ignore')
 
-                    # Parse top message reply only
+                    # Parse top message reply or subject
                     top_reply = body.strip()
                     reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
                     for splitter in reply_splitters:
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    body_upper = top_reply.upper()
+                    # Combine top reply and subject line to detect decision keywords
+                    combined_text = f"{decoded_subject} {top_reply}".upper()
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    if "REJECTED" in body_upper or "REJECT" in body_upper:
+                    if "REJECTED" in combined_text or "REJECT" in combined_text:
                         rejections[po_number] = {"sender": sender_clean}
                         mail.store(e_id, '+FLAGS', '\\Seen')
-                    elif "APPROVED" in body_upper or "APPROVE" in body_upper:
+                    elif "APPROVED" in combined_text or "APPROVE" in combined_text:
                         approvals[po_number] = {"sender": sender_clean}
                         mail.store(e_id, '+FLAGS', '\\Seen')
 

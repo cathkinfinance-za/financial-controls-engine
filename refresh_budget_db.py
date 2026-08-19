@@ -55,44 +55,34 @@ def fetch_and_sync_weconnectu_budget():
         if gl_match:
             gl_code = gl_match.group(1)
             
-            clean_metrics = []
+            # Extract description by stripping GL code out of text cells
             description_parts = []
-            
             for cell in cells:
                 cleaned_cell = re.sub(r'[\s\xa0R]', '', cell)
-                if re.match(r'^\(?\-?\d+(?:[\.,]\d+)?\)?$', cleaned_cell):
-                    clean_metrics.append(cell)
-                elif cell != gl_code and not gl_pattern.search(cell):
-                    if cell.strip():
-                        description_parts.append(cell.strip())
+                if not re.match(r'^\(?\-?\d+(?:[\.,]\d+)?\)?$', cleaned_cell):
+                    text_only = gl_pattern.sub('', cell).strip()
+                    if text_only:
+                        description_parts.append(text_only)
             
             description = " ".join(description_parts) if description_parts else "Operational Portfolio Allocation"
 
-            if len(clean_metrics) >= 4:
-                total_budget = clean_and_convert_number(clean_metrics[-1])
-                variance = clean_and_convert_number(clean_metrics[-2])
-                budget_ytd = clean_and_convert_number(clean_metrics[-3])
-                ytd = clean_and_convert_number(clean_metrics[-4])
-                
-                months = clean_metrics[:-4]
-                mar_2026 = clean_and_convert_number(months[0]) if len(months) > 0 else 0.0
-                apr_2026 = clean_and_convert_number(months[1]) if len(months) > 1 else 0.0
-                may_2026 = clean_and_convert_number(months[2]) if len(months) > 2 else 0.0
-                jun_2026 = clean_and_convert_number(months[3]) if len(months) > 3 else 0.0
-                jul_2026 = clean_and_convert_number(months[4]) if len(months) > 4 else 0.0
+            # Parse all cells to floats based on their exact column positions
+            vals = [clean_and_convert_number(c) for c in cells]
 
+            # Map directly to exact column indices
+            if len(vals) >= 10:
                 financial_data.append({
                     "gl_code": gl_code,
                     "description": description,
-                    "mar_2026": mar_2026,
-                    "apr_2026": apr_2026,
-                    "may_2026": may_2026,
-                    "jun_2026": jun_2026,
-                    "jul_2026": jul_2026,
-                    "ytd": ytd,
-                    "budget_ytd": budget_ytd,
-                    "variance": variance,
-                    "total_budget": total_budget
+                    "mar_2026": vals[1] if len(vals) > 1 else 0.0,
+                    "apr_2026": vals[2] if len(vals) > 2 else 0.0,
+                    "may_2026": vals[3] if len(vals) > 3 else 0.0,
+                    "jun_2026": vals[4] if len(vals) > 4 else 0.0,
+                    "jul_2026": vals[5] if len(vals) > 5 else 0.0,
+                    "ytd": vals[6] if len(vals) > 6 else 0.0,
+                    "budget_ytd": vals[7] if len(vals) > 7 else 0.0,
+                    "variance": vals[8] if len(vals) > 8 else 0.0,
+                    "total_budget": vals[9] if len(vals) > 9 else 0.0
                 })
 
     df = pd.DataFrame(financial_data)
