@@ -395,6 +395,7 @@ def view_audit_log():
 
 # Route to list or access projects dashboard
 @app.route("/projects")
+@app.route("/projects/<int:project_id>")
 def projects_page():
     conn = get_db_connection()
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -427,13 +428,24 @@ def projects_page():
 # 2. Route: Handle PDF Upload and Store Bytes in PostgreSQL
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
-    project_id = request.form.get("project_id")
-    vendor_name = request.form.get("vendor_name")
+    raw_project_id = request.form.get("project_id", "").strip()
+    vendor_name = request.form.get("vendor_name", "").strip()
     file = request.files.get("quote_file")
+
+    # Validate Project ID presence
+    if not raw_project_id:
+        flash("Error: No Project ID selected. Please select or create a project first.")
+        return redirect(url_for("projects_page"))
+
+    try:
+        project_id = int(raw_project_id)
+    except ValueError:
+        flash("Error: Invalid Project ID format.")
+        return redirect(url_for("projects_page"))
 
     if not file or file.filename == '':
         flash("Error: Please select a valid PDF file.")
-        return redirect(url_for("project_dashboard", project_id=project_id))
+        return redirect(url_for("projects_page", project_id=project_id))
 
     file_bytes = file.read()
     filename = file.filename
@@ -451,7 +463,7 @@ def upload_quote():
     conn.close()
 
     flash(f"Quote for '{vendor_name}' uploaded successfully.")
-    return redirect(url_for("project_dashboard", project_id=project_id))
+    return redirect(url_for("projects_page", project_id=project_id))
 
 # 3. Route: Trigger Phase 1 (AI Matrix Drafting & Line Item Extraction)
 @app.route("/run-phase1/<int:project_id>", methods=["POST"])

@@ -26,7 +26,9 @@
     <div class="card">
         <h2>1. Vendor Quote Ingestion</h2>
         <form action="/upload-quote" method="POST" enctype="multipart/form-data" class="grid">
-            <input type="hidden" name="project_id" value="{{ project.id }}">
+            <!-- Ensure project.id is passed, or default to 1 for testing -->
+            <input type="hidden" name="project_id" value="{{ project.id if project else 1 }}">
+            
             <div>
                 <label>Vendor / Option Name</label>
                 <input type="text" name="vendor_name" placeholder="e.g. Acme Security" required style="width: 100%; padding: 8px; margin-top: 5px;">
@@ -36,7 +38,9 @@
                 <input type="file" name="quote_file" accept="application/pdf" required style="width: 100%; padding: 8px; margin-top: 5px;">
             </div>
             <div style="grid-column: span 2;">
-                <button type="submit" class="btn">Upload Quote PDF to Database</button>
+                <button type="submit" class="btn" {% if not project %}disabled{% endif %}>
+                    Upload Quote PDF to Database
+                </button>
             </div>
         </form>
 
