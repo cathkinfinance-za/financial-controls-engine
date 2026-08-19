@@ -22,7 +22,6 @@
             padding: 0;
         }
 
-        /* App Layout & Sidebar Styling */
         .app-layout {
             display: flex;
             min-height: 100vh;
@@ -61,15 +60,9 @@
             font-size: 14px;
         }
 
-        .btn-new-project:hover {
-            background-color: #000000;
-        }
+        .btn-new-project:hover { background-color: #000000; }
 
-        .project-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
+        .project-list { list-style: none; padding: 0; margin: 0; }
 
         .project-item a {
             display: block;
@@ -82,9 +75,7 @@
             border: 1px solid transparent;
         }
 
-        .project-item a:hover {
-            background-color: #f1f3f5;
-        }
+        .project-item a:hover { background-color: #f1f3f5; }
 
         .project-item.active a {
             background-color: #e7f5ff;
@@ -109,7 +100,6 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        /* Top Action / Control Bar */
         .control-bar {
             display: flex;
             align-items: center;
@@ -119,11 +109,7 @@
             margin-bottom: 30px;
         }
 
-        .control-buttons {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-        }
+        .control-buttons { display: flex; gap: 12px; align-items: center; }
 
         .btn {
             padding: 8px 16px;
@@ -146,7 +132,6 @@
             border-radius: 4px;
         }
 
-        /* Form Layout Rules */
         .section-header {
             font-size: 18px;
             font-weight: 700;
@@ -179,12 +164,8 @@
             background-color: #fff;
         }
 
-        textarea.form-control {
-            min-height: 70px;
-            resize: vertical;
-        }
+        textarea.form-control { min-height: 70px; resize: vertical; }
 
-        /* GL Code Inputs */
         .gl-inline-group {
             display: grid;
             grid-template-columns: 140px 1fr;
@@ -192,7 +173,6 @@
             align-items: center;
         }
 
-        /* Procurement Cards */
         .vendor-card {
             background-color: #fdfdfd;
             border: 1px solid var(--border-color);
@@ -223,7 +203,6 @@
             font-weight: bold;
         }
 
-        /* Matrix Tables */
         table.matrix-table {
             width: 100%;
             border-collapse: collapse;
@@ -243,7 +222,17 @@
             font-weight: 600;
         }
 
-        /* Flash Message Styling */
+        tr.pricing-row { background-color: #f0f7ff; }
+        tr.total-row { background-color: #f8f9fa; font-weight: 700; border-top: 2px solid var(--border-color); }
+
+        .score-display {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #f1f3f5;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
         .flash-message {
             padding: 12px 18px;
             background-color: #d1e7dd;
@@ -258,7 +247,6 @@
 
 <div class="app-layout">
 
-    <!-- Sidebar Navigation -->
     <div class="sidebar">
         <a href="/projects/" class="btn-new-project">+ New Project</a>
         <div class="sidebar-title">Projects Directory</div>
@@ -276,11 +264,9 @@
         </ul>
     </div>
 
-    <!-- Main Content Workspace -->
     <div class="main-content">
         <div class="dashboard-container">
 
-            <!-- Flash Feedback Banner -->
             {% with messages = get_flashed_messages() %}
               {% if messages %}
                 {% for message in messages %}
@@ -289,7 +275,6 @@
               {% endif %}
             {% endwith %}
 
-            <!-- Top Action / Control Bar -->
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
@@ -307,7 +292,6 @@
                 </div>
             </div>
 
-            <!-- Main Project Input Form -->
             <form action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
                 
                 <div class="section-header">
@@ -350,7 +334,6 @@
                     </div>
                 </div>
 
-                <!-- Procurement Options Cards -->
                 <div class="form-row">
                     <label class="form-label">Procurement Options</label>
                     <div style="width: 100%;">
@@ -380,70 +363,86 @@
                     </div>
                 </div>
 
-                <!-- Calculations & Weightings Table -->
-                <div class="section-header" style="margin-top: 40px;">Project Output: Calculations</div>
-
-                <div class="form-row">
-                    <label class="form-label">Price Weighting</label>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <input 
-                            type="number" 
-                            name="price_weighting" 
-                            class="form-control" 
-                            value="{{ (project.price_weighting * 100)|int if project and project.price_weighting <= 1 else (project.price_weighting if project else 30) }}" 
-                            min="0" 
-                            max="100" 
-                            step="1"
-                            style="width: 100px;"
-                        >
-                        <span>%</span>
-                    </div>
-                </div>
-
-                <!-- Consolidated Qualitative Criteria Matrix -->
                 {% if project %}
-                <div class="section-header" style="margin-top: 40px;">Qualitative Criteria Matrix</div>
-                <table class="matrix-table">
+                <div class="section-header" style="margin-top: 40px;">Qualitative & Pricing Criteria Matrix</div>
+                <table class="matrix-table" id="criteriaMatrix">
                     <thead>
                         <tr>
                             <th>Evaluation Criteria</th>
-                            <th style="width: 100px;">Weight (%)</th>
+                            <th style="width: 120px;">Weight (%)</th>
                             {% for vendor in vendors %}
                                 <th>{{ vendor.vendor_name }} (Score /10)</th>
                             {% endfor %}
                         </tr>
                     </thead>
                     <tbody>
+                        <!-- Integrated Commercial/Pricing Evaluation Row -->
+                        <tr class="pricing-row">
+                            <td>
+                                <strong>Commercial / Price Evaluation</strong><br>
+                                <span style="font-size: 12px; color: var(--text-muted);">Calculated via relative inverse quote pricing</span>
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <input type="number" step="0.1" min="0" max="100" name="price_weighting" class="form-control weight-input" 
+                                           value="{{ (project.price_weighting * 100)|round(2) if project.price_weighting <= 1 else project.price_weighting }}">
+                                    <span>%</span>
+                                </div>
+                            </td>
+                            {% for vendor in vendors %}
+                                <td>
+                                    <span class="score-display vendor-score-{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0 }}">
+                                        {{ vendor.price_score or '0.00' }}
+                                    </span>
+                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
+                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
+                                    </div>
+                                </td>
+                            {% endfor %}
+                        </tr>
+
+                        <!-- Non-Pricing Qualitative Criteria -->
                         {% for criteria in criteria_list %}
-                        <tr>
+                        <tr class="criteria-row">
                             <td><strong>{{ criteria.criteria_name }}</strong></td>
-                            <td>{{ criteria.weighting_percent }}%</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <input type="number" step="0.1" min="0" max="100" name="weighting_{{ criteria.id }}" class="form-control weight-input" 
+                                           value="{{ criteria.weighting_percent }}">
+                                    <span>%</span>
+                                </div>
+                            </td>
                             {% for vendor in vendors %}
                                 {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id) %}
+                                {% set current_score = score_entry.score if score_entry else 0 %}
                                 <td>
-                                    {% if score_entry %}
-                                        <input type="number" 
-                                               step="0.1" 
-                                               min="0" 
-                                               max="10" 
-                                               name="non_pricing_score_{{ score_entry.line_item_id if score_entry.line_item_id else score_entry.id }}" 
-                                               class="form-control" 
-                                               value="{{ score_entry.score }}">
-                                    {% else %}
-                                        <span style="color: var(--text-muted);">-</span>
-                                    {% endif %}
+                                    <span class="score-display vendor-score-{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ current_score }}">
+                                        {{ "%.2f"|format(current_score) }}
+                                    </span>
                                 </td>
                             {% endfor %}
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No criteria generated yet. Click "Draft Matrix via AI" above.</td>
+                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No non-pricing criteria available. Click "Draft Matrix via AI" above.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot>
+                        <tr class="total-row">
+                            <td>Total Composite Score</td>
+                            <td><span id="totalWeightDisplay">0.00%</span></td>
+                            {% for vendor in vendors %}
+                                <td>
+                                    <strong style="font-size: 16px; color: var(--primary-blue);" id="vendorTotal_{{ vendor.id }}">
+                                        {{ vendor.final_weighted_score_output or '0.00' }}
+                                    </strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
                 </table>
 
-                <!-- Pricing Line Items Breakdown per Vendor -->
                 <div class="section-header" style="margin-top: 40px;">Detailed Option Line Items</div>
                 {% for vendor in vendors %}
                 <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
@@ -481,50 +480,12 @@
                 {% endfor %}
                 {% endif %}
 
-                <!-- Executive Summary Section -->
                 <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
 
                 <div class="form-row">
                     <label class="form-label">Executive Sourcing Recommendation</label>
                     <textarea name="executive_sourcing_recommendation" class="form-control" style="min-height: 140px;">{{ project.executive_sourcing_recommendation if project else '' }}</textarea>
                 </div>
-
-                <!-- Matrix Results Table -->
-                {% if project %}
-                <div style="margin-top: 24px;">
-                    <h4 style="margin-bottom: 12px;">Procurement Matrix Summary Chart</h4>
-                    <table class="matrix-table">
-                        <thead>
-                            <tr>
-                                <th>Evaluation Criteria & Metrics</th>
-                                {% for vendor in vendors %}
-                                    <th>{{ vendor.vendor_name }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td><strong>Lifespan Projected Cost</strong></td>
-                                {% for vendor in vendors %}
-                                    <td>ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '-' }}</td>
-                                {% endfor %}
-                            </tr>
-                            <tr>
-                                <td><strong>Price Score (Inverse Rank)</strong></td>
-                                {% for vendor in vendors %}
-                                    <td>{{ vendor.price_score if vendor.price_score else '-' }}</td>
-                                {% endfor %}
-                            </tr>
-                            <tr>
-                                <td><strong>Final Weighted Score</strong></td>
-                                {% for vendor in vendors %}
-                                    <td><strong>{{ vendor.final_weighted_score_output if vendor.final_weighted_score_output else '-' }}</strong></td>
-                                {% endfor %}
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-                {% endif %}
 
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">
@@ -537,7 +498,6 @@
     </div>
 </div>
 
-<!-- Modal for PDF Upload -->
 <div id="uploadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
     <div style="background:white; max-width:500px; margin:100px auto; padding:24px; border-radius:6px;">
         <h3 style="margin-top:0;">Upload Vendor Quote</h3>
@@ -561,6 +521,61 @@
         </form>
     </div>
 </div>
+
+<!-- Dynamic Matrix Live Recalculation -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function calculateTotals() {
+        const matrix = document.getElementById('criteriaMatrix');
+        if (!matrix) return;
+
+        let totalWeight = 0;
+        const vendorTotals = {};
+
+        const weightInputs = matrix.querySelectorAll('.weight-input');
+        weightInputs.forEach(input => {
+            totalWeight += parseFloat(input.value) || 0;
+        });
+
+        const totalWeightSpan = document.getElementById('totalWeightDisplay');
+        if (totalWeightSpan) {
+            totalWeightSpan.innerText = totalWeight.toFixed(2) + '%';
+            totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
+        }
+
+        const rows = matrix.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const weightInput = row.querySelector('.weight-input');
+            const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
+
+            const scores = row.querySelectorAll('.score-display');
+            scores.forEach(scoreSpan => {
+                const vendorId = scoreSpan.getAttribute('data-vendor-id');
+                const score = parseFloat(scoreSpan.getAttribute('data-score')) || 0;
+
+                if (!vendorTotals[vendorId]) {
+                    vendorTotals[vendorId] = 0;
+                }
+                vendorTotals[vendorId] += score * (weight / 100);
+            });
+        });
+
+        for (const [vendorId, totalScore] of Object.entries(vendorTotals)) {
+            const displayElem = document.getElementById('vendorTotal_' + vendorId);
+            if (displayElem) {
+                displayElem.innerText = totalScore.toFixed(2);
+            }
+        }
+    }
+
+    const inputs = document.querySelectorAll('.weight-input');
+    inputs.forEach(input => {
+        input.addEventListener('input', calculateTotals);
+    });
+
+    calculateTotals();
+});
+</script>
 
 </body>
 </html>
