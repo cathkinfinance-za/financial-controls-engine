@@ -22,7 +22,7 @@
             padding: 0;
         }
 
-        /* App Sidebar Layout */
+        /* App Layout & Sidebar Styling */
         .app-layout {
             display: flex;
             min-height: 100vh;
@@ -38,7 +38,7 @@
         }
 
         .sidebar-title {
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
@@ -109,7 +109,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        /* Top Control Bar */
+        /* Top Action / Control Bar */
         .control-bar {
             display: flex;
             align-items: center;
@@ -184,7 +184,7 @@
             resize: vertical;
         }
 
-        /* GL Grouping */
+        /* GL Code Inputs */
         .gl-inline-group {
             display: grid;
             grid-template-columns: 140px 1fr;
@@ -192,7 +192,7 @@
             align-items: center;
         }
 
-        /* Vendors & Procurement Cards */
+        /* Procurement Cards */
         .vendor-card {
             background-color: #fdfdfd;
             border: 1px solid var(--border-color);
@@ -223,7 +223,7 @@
             font-weight: bold;
         }
 
-        /* Tables */
+        /* Matrix Tables */
         table.matrix-table {
             width: 100%;
             border-collapse: collapse;
@@ -243,7 +243,7 @@
             font-weight: 600;
         }
 
-        /* Banner Messages */
+        /* Flash Message Styling */
         .flash-message {
             padding: 12px 18px;
             background-color: #d1e7dd;
@@ -271,12 +271,12 @@
                     </a>
                 </li>
             {% else %}
-                <li style="color: var(--text-muted); font-size: 13px;">No projects found.</li>
+                <li style="color: var(--text-muted); font-size: 13px;">No projects created yet.</li>
             {% endfor %}
         </ul>
     </div>
 
-    <!-- Main Workspace -->
+    <!-- Main Content Workspace -->
     <div class="main-content">
         <div class="dashboard-container">
 
@@ -289,41 +289,39 @@
               {% endif %}
             {% endwith %}
 
-            {% if project %}
-            <!-- Top Controls (Only shown for saved projects) -->
+            <!-- Top Action / Control Bar -->
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
-                    <form action="/draft-matrix/{{ project.id }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-primary">Draft Matrix via AI</button>
+                    <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
                     </form>
                     
-                    <form action="/recalculate-matrix/{{ project.id }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-secondary">Recalculate Matrix</button>
+                    <form action="/recalculate-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>Recalculate Matrix</button>
                     </form>
                     
                     <span class="status-badge">
-                        Latest AI Status: <strong>{{ project.latest_ai_status if project.latest_ai_status else 'Ready' }}</strong>
+                        Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
                     </span>
                 </div>
             </div>
-            {% endif %}
 
-            <!-- Project Form -->
+            <!-- Main Project Input Form -->
             <form action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
                 
                 <div class="section-header">
-                    {% if project %}Project Definitions{% else %}New Project Creation{% endif %}
+                    {% if project %}Project Definitions{% else %}Create New Project{% endif %}
                 </div>
 
                 <div class="form-row">
                     <label class="form-label">Project Reference</label>
-                    <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '' }}" placeholder="e.g. 2026_02" style="width: 200px;">
+                    <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '2026_02' }}" style="width: 200px;">
                 </div>
 
                 <div class="form-row">
                     <label class="form-label">Name</label>
-                    <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Security System Replacement">
+                    <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Security System Replacement - 2">
                 </div>
 
                 <div class="form-row">
@@ -344,15 +342,14 @@
                 <div class="form-row">
                     <label class="form-label">GL Code</label>
                     <div class="gl-inline-group">
-                        <input type="text" name="gl_code" class="form-control" value="{{ project.gl_code if project else '' }}" placeholder="2400/040">
+                        <input type="text" name="gl_code" class="form-control" value="{{ project.gl_code if project else '2400/040' }}">
                         <div>
-                            <input type="text" name="gl_title" class="form-control" value="{{ project.gl_title if project else '' }}" placeholder="Title" style="margin-bottom: 4px;">
-                            <input type="text" name="gl_sub" class="form-control" value="{{ project.gl_sub if project else '' }}" placeholder="Sub Description">
+                            <input type="text" name="gl_title" class="form-control" value="{{ project.gl_title if project else 'Operations' }}" placeholder="Title" style="margin-bottom: 4px;">
+                            <input type="text" name="gl_sub" class="form-control" value="{{ project.gl_sub if project else 'Security Bit 20/12 subscription' }}" placeholder="Sub Description">
                         </div>
                     </div>
                 </div>
 
-                {% if project %}
                 <!-- Procurement Options Cards -->
                 <div class="form-row">
                     <label class="form-label">Procurement Options</label>
@@ -377,13 +374,13 @@
                             <p style="color: var(--text-muted); font-size: 14px;">No procurement quotes uploaded yet.</p>
                         {% endif %}
 
-                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('uploadModal').style.display='block'" style="margin-top: 8px;">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('uploadModal').style.display='block'" style="margin-top: 8px;" {% if not project %}disabled{% endif %}>
                             + Add Option
                         </button>
                     </div>
                 </div>
 
-                <!-- Weighting Configurations -->
+                <!-- Calculations & Weightings Table -->
                 <div class="section-header" style="margin-top: 40px;">Project Output: Calculations</div>
 
                 <div class="form-row">
@@ -403,7 +400,8 @@
                     </div>
                 </div>
 
-                <!-- Unified Qualitative Criteria Matrix -->
+                <!-- Consolidated Qualitative Criteria Matrix -->
+                {% if project %}
                 <div class="section-header" style="margin-top: 40px;">Qualitative Criteria Matrix</div>
                 <table class="matrix-table">
                     <thead>
@@ -439,17 +437,17 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No non-pricing criteria available. Click "Draft Matrix via AI" above.</td>
+                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No criteria generated yet. Click "Draft Matrix via AI" above.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
 
-                <!-- Detailed Pricing Line Items (Extracted from Quotes) -->
+                <!-- Pricing Line Items Breakdown per Vendor -->
                 <div class="section-header" style="margin-top: 40px;">Detailed Option Line Items</div>
                 {% for vendor in vendors %}
                 <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
-                    <h4 style="margin-top: 0; margin-bottom: 12px; color: #333;">{{ vendor.vendor_name }} Pricing Breakdown</h4>
+                    <h4 style="margin-top: 0; margin-bottom: 12px; color: #333;">{{ vendor.vendor_name }} Quote Items</h4>
                     <table class="matrix-table" style="margin-bottom: 0;">
                         <thead>
                             <tr>
@@ -475,12 +473,13 @@
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="3" style="color: var(--text-muted);">No quote line items found for this option.</td></tr>
+                            <tr><td colspan="3" style="color: var(--text-muted);">No pricing line items recorded.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 {% endfor %}
+                {% endif %}
 
                 <!-- Executive Summary Section -->
                 <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
@@ -490,7 +489,8 @@
                     <textarea name="executive_sourcing_recommendation" class="form-control" style="min-height: 140px;">{{ project.executive_sourcing_recommendation if project else '' }}</textarea>
                 </div>
 
-                <!-- Final Computed Matrix Summary -->
+                <!-- Matrix Results Table -->
+                {% if project %}
                 <div style="margin-top: 24px;">
                     <h4 style="margin-bottom: 12px;">Procurement Matrix Summary Chart</h4>
                     <table class="matrix-table">
@@ -526,7 +526,6 @@
                 </div>
                 {% endif %}
 
-                <!-- Save Action -->
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">
                         {% if project %}Save Project Definitions{% else %}Create Project{% endif %}
@@ -538,13 +537,12 @@
     </div>
 </div>
 
-{% if project %}
-<!-- PDF Upload Modal -->
+<!-- Modal for PDF Upload -->
 <div id="uploadModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000;">
     <div style="background:white; max-width:500px; margin:100px auto; padding:24px; border-radius:6px;">
         <h3 style="margin-top:0;">Upload Vendor Quote</h3>
         <form action="/upload-quote" method="POST" enctype="multipart/form-data">
-            <input type="hidden" name="project_id" value="{{ project.id }}">
+            <input type="hidden" name="project_id" value="{{ project.id if project else 1 }}">
             
             <div style="margin-bottom: 16px;">
                 <label style="display:block; margin-bottom: 6px; font-weight:600;">Vendor Name</label>
@@ -563,7 +561,6 @@
         </form>
     </div>
 </div>
-{% endif %}
 
 </body>
 </html>
