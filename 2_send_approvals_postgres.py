@@ -111,6 +111,13 @@ def get_gemini_analysis(record):
 
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
+        quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
+
+        if quote_urls:
+            formatted_links = "\n".join([f"  • Document {i+1}: {url}" for i, url in enumerate(quote_urls)])
+            attachments_section = f"\nAttached Quote Documents:\n{formatted_links}\n"
+        else:
+            attachments_section = "\nAttached Quote Documents:\n  No documents attached.\n"
 
         # ----------------------------------------------------
         # PHASE 1: ENRICHED DOCUMENT PARSING & METADATA EXTRACTION
@@ -328,6 +335,17 @@ def process_postgres_approvals():
                 
                 log(f"Routing PO {po_num} -> To: {to_list}, CC: {cc_list}")
 
+                # Format attachment links section for the email
+                raw_filepaths = record.get('quote_filepath') or ''
+                quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
+
+                if quote_urls:
+                    formatted_links = "\n".join([f"  • Document {i+1}: {url}" for i, url in enumerate(quote_urls)])
+                    attachments_section = f"\nAttached Quote Documents:\n{formatted_links}\n"
+                else:
+                    attachments_section = "\nAttached Quote Documents:\n  No documents attached.\n"
+
+
                 email_subject = f"[{po_num}] Approval Required: {desc_val}"
                 email_body = f"""Hello,
 
@@ -342,6 +360,7 @@ Item Details:
 - Total Annual Budget: R{total_budget:,.2f}
 - YTD Actual Spend: R{ytd_actual:,.2f}
 - Remaining YTD Budget: R{remaining_budget:,.2f}
+{attachments_section}
 
 ====================================================
 🤖 AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
