@@ -41,7 +41,7 @@ def render_guide_page():
         # Pass RealDictCursor here so rows match dictionary keys expected by guide.html
         with conn.cursor(cursor_factory=RealDictCursor) as cursor:
             cursor.execute("""
-                SELECT id, matrix_category, min_value, max_value, 
+                SELECT id, matrix_category, description, min_value, max_value, 
                        reviewer_roles, quotes_required, approver_roles, 
                        applicable_controls, compliance_audit_requirement 
                 FROM approval_matrix 

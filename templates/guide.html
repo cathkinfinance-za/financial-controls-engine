@@ -65,6 +65,7 @@
             <thead>
                 <tr>
                     <th>Matrix Category</th>
+                    <th>Description</th>
                     <th>Min Value (ZAR)</th>
                     <th>Max Value (ZAR)</th>
                     <th>Reviewer Roles</th>
@@ -78,6 +79,7 @@
                 {% for row in matrix_rows %}
                 <tr>
                     <td>{{ row.matrix_category }}</td>
+                    <td>{{ row.description }}</td>
                     <td>R{{ "{:,.2f}".format(row.min_value) if row.min_value is not none else '0.00' }}</td>
                     <td>{{ "R{:,.2f}".format(row.max_value) if row.max_value is not none else 'Unlimited' }}</td>
                     <td>{{ row.reviewer_roles or 'N/A' }}</td>
@@ -102,7 +104,7 @@
         <ul>
             <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor.</li>
             <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated.</li>
-            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee.</li>
+            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a <a href="/projects">detailed comparison (system-generated)</a> must be submitted to the Finance Committee.</li>
         </ul>
 
         <h2>4. Compliance Status Engine: Evaluation Phases</h2>
