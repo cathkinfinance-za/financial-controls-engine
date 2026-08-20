@@ -2,8 +2,8 @@ name: Process Approval Replies Engine
 
 on:
   schedule:
-    # Runs daily at 00:00 UTC (Midnight)
-    - cron: '0 0 * * *'
+    # Runs every 15 minutes between 4 AM and 4 PM UTC
+    - cron: '*/15 4-16 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub UI for testing
 
 jobs:
