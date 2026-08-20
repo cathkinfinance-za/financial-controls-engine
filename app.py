@@ -38,23 +38,29 @@ def compliance_guide_page():
     return render_template('guide.html')
 
 
-@app.route('/guide')
+@app.route("/guide")
 def render_guide_page():
+  conn = None
+  try:
     conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
+    with conn.cursor() as cursor:
+      cursor.execute("""
                 SELECT id, matrix_category, min_value, max_value, 
                        reviewer_roles, quotes_required, approver_roles, 
                        applicable_controls, compliance_audit_requirement 
                 FROM approval_matrix 
                 ORDER BY id ASC;
             """)
-            matrix_rows = cursor.fetchall()
-    finally:
-        conn.close()
-        
-    return render_template('guide.html', matrix_rows=matrix_rows)
+      matrix_rows = cursor.fetchall()
+  except Exception as e:
+    # Log the error appropriately in your production app
+    print(f"Database error on /guide: {e}")
+    matrix_rows = []
+  finally:
+    if conn:
+      conn.close()
+
+  return render_template("guide.html", matrix_rows=matrix_rows)
 
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""

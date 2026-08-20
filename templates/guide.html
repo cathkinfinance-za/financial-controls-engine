@@ -64,7 +64,6 @@
         <table>
             <thead>
                 <tr>
-                    <th>ID</th>
                     <th>Matrix Category</th>
                     <th>Min Value (ZAR)</th>
                     <th>Max Value (ZAR)</th>
@@ -78,7 +77,6 @@
             <tbody>
                 {% for row in matrix_rows %}
                 <tr>
-                    <td>{{ row.id }}</td>
                     <td>{{ row.matrix_category }}</td>
                     <td>R{{ "{:,.2f}".format(row.min_value) if row.min_value is not none else '0.00' }}</td>
                     <td>{{ "R{:,.2f}".format(row.max_value) if row.max_value is not none else 'Unlimited' }}</td>
