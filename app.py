@@ -32,6 +32,11 @@ def dashboard_home():
     """Renders the central management dashboard as the home page."""
     return render_template("dashboard.html")
 
+@app.route('/guide')
+def compliance_guide_page():
+    # Fetch any required data here if needed
+    return render_template('guide.html')
+
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))
