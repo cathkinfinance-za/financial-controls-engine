@@ -47,6 +47,21 @@ def fetch_approval_replies():
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
     email_password = os.getenv("SENDER_PASSWORD")
+    recommendations_approval = {}
+    recommendations_rejection = {}
+    final_approvals = {}
+    final_rejections = {}
+
+
+    # Match keywords in extracted email payload
+    if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
+        recommendations_rejection[po_number] = {"sender": sender_clean}
+    elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
+        recommendations_approval[po_number] = {"sender": sender_clean}
+    elif "REJECTED" in full_payload or "REJECT" in full_payload:
+        final_rejections[po_number] = {"sender": sender_clean}
+    elif "APPROVED" in full_payload or "APPROVE" in full_payload:
+        final_approvals[po_number] = {"sender": sender_clean}
 
     if not email_account or not email_password:
         log("SENDER_EMAIL or SENDER_PASSWORD missing.", "ERROR")
@@ -164,44 +179,59 @@ def process_replies():
 
             current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
-            # 1. PROCESS REJECTIONS
-            for po_num, meta in rejections.items():
+            # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
+            for po_num, meta in recommendations_approval.items():
                 record = po_map.get(po_num.lower())
-                if not record:
-                    log(f"PO '{po_num}' not found in database records.", "WARNING")
-                    continue
+                if record and record.get('submission_status') == 'Finance Review':
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Finance Recommended',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), "Finance Committee recommended for approval.")
 
-                rejector_email = meta.get("sender", "Approver (Via Email)")
-                
-                cursor.execute("""
-                    UPDATE po_log 
-                    SET submission_status = 'Rejected',
-                        actioned_by = %s,
-                        actioned_date = %s
-                    WHERE id = %s;
-                """, (rejector_email, current_timestamp, record['id']))
-                conn.commit()
-
-                write_control_log(conn, record['po_number'], "Inbound Rejection", rejector_email, "Marked as rejected via email reply.")
-                log(f"❌ PO '{record['po_number']}' successfully updated to REJECTED in database!")
-
-            # 2. PROCESS APPROVALS
-            for po_num, meta in approvals.items():
+            for po_num, meta in recommendations_rejection.items():
                 record = po_map.get(po_num.lower())
-                if not record:
-                    log(f"PO '{po_num}' not found in database records.", "WARNING")
-                    continue
+                if record and record.get('submission_status') == 'Finance Review':
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Finance Rejected',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), "Finance Committee recommended for rejection.")
 
-                approver_email = meta.get("sender", "Approver (Via Email)")
-                
-                cursor.execute("""
-                    UPDATE po_log 
-                    SET submission_status = 'Approved',
-                        actioned_by = %s,
-                        actioned_date = %s
-                    WHERE id = %s;
-                """, (approver_email, current_timestamp, record['id']))
-                conn.commit()
+            # 2. PROCESS FINAL APPROVALS & REJECTIONS
+            for po_num, meta in final_approvals.items():
+                record = po_map.get(po_num.lower())
+                if record:
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Approved',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
+
+            for po_num, meta in final_rejections.items():
+                record = po_map.get(po_num.lower())
+                if record:
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Rejected',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), "Marked as rejected via email reply.")
 
                 write_control_log(conn, record['po_number'], "Inbound Approval", approver_email, "Marked as approved via email reply.")
                 log(f"✅ PO '{record['po_number']}' successfully updated to APPROVED in database!")

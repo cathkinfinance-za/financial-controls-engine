@@ -385,6 +385,7 @@
                     <select name="submission_status" class="form-control" style="width: 240px;">
                         <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
                         <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                        <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
                         <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
                         <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
@@ -639,6 +640,8 @@
 
         if (submissionStatus === 'Approved') {
             status = '✅ APPROVED: Compliance Process Complete';
+        } else if (submissionStatus === 'Finance Review') {
+            status = '🔍 FINANCE REVIEW: Awaiting Committee Sign-off';    
         } else if (submissionStatus === 'Sent') {
             status = '📬 SENT: Approval Request Dispatched via Email'; 
         }    else if (submissionStatus === 'Rejected') {
@@ -685,6 +688,9 @@
             systemStatusInput.value = status;
         }
     }
+
+
+    
 
     // 5. Attach live listeners to form elements
     document.addEventListener('DOMContentLoaded', function() {

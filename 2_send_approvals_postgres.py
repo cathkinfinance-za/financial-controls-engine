@@ -10,6 +10,7 @@ import csv
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from streamlit import status
 from duckduckgo_search import DDGS
 from google import genai
 from google.genai import types
@@ -281,12 +282,12 @@ def process_postgres_approvals():
 
     try:
         with conn.cursor() as cursor:
-            log("Querying 'po_log' table for records with status 'Submit for Approval'...")
+            log("Querying 'po_log' table for records pending approval or finance review...")
             cursor.execute("""
                 SELECT p.*, m.gl_code as master_gl_code, m.total_budget as total_annual_budget, m.ytd as ytd_actual, m.variance 
                 FROM po_log p
                 LEFT JOIN master_budget m ON p.gl_code_id = m.id
-                WHERE LOWER(p.submission_status) LIKE 'submit%';
+                WHERE LOWER(p.submission_status) IN ('submit for approval', 'submit for finance review');
             """)
             records = cursor.fetchall()
             log(f"Query executed. Found {len(records)} pending record(s) to process.")
@@ -296,10 +297,23 @@ def process_postgres_approvals():
                 return
 
             log("Fetching approver matrix mapping...")
-            cursor.execute("SELECT role, email FROM approvers;")
+            cursor.execute("SELECT email, approval_permission FROM approvers;")
             approver_records = cursor.fetchall()
-            approver_emails = {row['role'].strip(): row['email'].strip() for row in approver_records}
-            log(f"Loaded approver roles: {list(approver_emails.keys())}")
+
+            # Categorize recipient lists based on approval_permission
+            approval_authorities = [
+                row['email'].strip() for row in approver_records 
+                if row.get('approval_permission') == 'Approval Authority' and row.get('email')
+            ]
+            finance_reviewers = [
+                row['email'].strip() for row in approver_rows 
+                if row.get('approval_permission') == 'Finance Review' and row.get('email')
+            ]
+            estate_managers = [
+                row['email'].strip() for row in approver_rows 
+                if row.get('approval_permission') == 'Estate Manager' and row.get('email')
+            ]
+
 
             for idx, record in enumerate(records, start=1):
                 po_num = str(record.get('po_number', '')).strip()
@@ -325,16 +339,37 @@ def process_postgres_approvals():
                 
                 log(f"PO {po_num} Summary: Cost=R{cost:,.2f}, Type='{expense_type}', GL='{gl_code_val}'")
 
-                # Run multi-phase Gemini analysis
-                ai_analysis_text = get_gemini_analysis(record, cursor)
+                # REUSE EXISTING AI SUMMARY IF PRESENT
+                existing_summary = record.get('ai_recommendation_summary')
+                if existing_summary and str(existing_summary).strip():
+                    log(f"PO {po_num}: Reusing existing AI recommendation summary from database.")
+                    ai_analysis_text = str(existing_summary).strip()
+                else:
+                    log(f"PO {po_num}: No existing AI summary found. Invoking Gemini engine...")
+                    ai_analysis_text = get_gemini_analysis(record, cursor)
                 
-                # Routing
-                to_list = [approver_emails.get("Estate Manager")]
-                cc_list = [approver_emails.get("Managing Agent (GEMS)")]
-                
+                # Routing & Call-to-Action Text
+                submission_status = record.get('submission_status', '').strip()
+
+                if submission_status.lower() == 'submit for finance review':
+                    to_list = finance_reviewers
+                    cc_list = estate_managers
+                    
+                    call_to_action = 'Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
+                    next_status = "Finance Review"
+
+                else:
+                    # "Submit for Approval" logic
+                    to_list = approval_authorities
+                    # Copy in Finance Reviewers + Estate Managers
+                    cc_list = list(set(finance_reviewers + estate_managers))
+                    
+                    call_to_action = 'Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".'
+                    next_status = "Sent"
+
                 log(f"Routing PO {po_num} -> To: {to_list}, CC: {cc_list}")
 
-                # Format attachment links section for the email
+                # Format attachments
                 raw_filepaths = record.get('quote_filepath') or ''
                 quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
@@ -343,7 +378,6 @@ def process_postgres_approvals():
                     attachments_section = f"\nAttached Quote Documents:\n{formatted_links}\n"
                 else:
                     attachments_section = "\nAttached Quote Documents:\n  No documents attached.\n"
-
 
                 email_subject = f"[{po_num}] Approval Required: {desc_val}"
                 email_body = f"""Hello,
@@ -362,18 +396,18 @@ Item Details:
 {attachments_section}
 
 ====================================================
-🤖 AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
+AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 ====================================================
 {ai_analysis_text}
 ====================================================
 
-Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".
+{call_to_action}
 
 Regards,
 Automated Compliance Engine"""
 
                 if send_approval_email(to_list, cc_list, email_subject, email_body):
-                    log(f"Updating database status for PO {po_num} to 'Sent'...")
+                    log(f"Updating database status for PO {po_num} to '{next_status}'...")
                     with conn.cursor() as update_cursor:
                         update_cursor.execute(
                             """
@@ -382,11 +416,11 @@ Automated Compliance Engine"""
                                 ai_recommendation_summary = %s 
                             WHERE id = %s;
                             """,
-                            ("Sent", ai_analysis_text, record['id'])
+                            (next_status, ai_analysis_text, record['id'])
                         )
                         conn.commit()
                     log(f"Database successfully updated for PO {po_num}.")
-                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), "Emailed approvers.")
+                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), f"Emailed approvers ({next_status}).")
                 else:
                     log(f"Failed to dispatch approval email for PO {po_num}. Skipping database update.", "ERROR")
 
