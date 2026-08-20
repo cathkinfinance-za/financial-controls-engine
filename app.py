@@ -37,6 +37,25 @@ def compliance_guide_page():
     # Fetch any required data here if needed
     return render_template('guide.html')
 
+
+@app.route('/guide')
+def render_guide_page():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, matrix_category, min_value, max_value, 
+                       reviewer_roles, quotes_required, approver_roles, 
+                       applicable_controls, compliance_audit_requirement 
+                FROM approval_matrix 
+                ORDER BY id ASC;
+            """)
+            matrix_rows = cursor.fetchall()
+    finally:
+        conn.close()
+        
+    return render_template('guide.html', matrix_rows=matrix_rows)
+
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))

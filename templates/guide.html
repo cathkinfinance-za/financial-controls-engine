@@ -59,7 +59,42 @@
         <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association. It applies to all elected Directors, Portfolio Committee Members, the Estate Manager, and the appointed Managing Agent (GEMS).</p>
         
         <h2>2. Schedule of Financial Authorities</h2>
-        <p><em>[Approval Matrix Table Placeholder]</em></p>
+        <p>The authorization parameters, review structures, and compliance requirements governing operational and capital outlays are structured via the system's <code>approval_matrix</code> table:</p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Matrix Category</th>
+                    <th>Min Value (ZAR)</th>
+                    <th>Max Value (ZAR)</th>
+                    <th>Reviewer Roles</th>
+                    <th>Quotes Required</th>
+                    <th>Approver Roles</th>
+                    <th>Applicable Controls</th>
+                    <th>Compliance Audit Requirement</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in matrix_rows %}
+                <tr>
+                    <td>{{ row.id }}</td>
+                    <td>{{ row.matrix_category }}</td>
+                    <td>R{{ "{:,.2f}".format(row.min_value) if row.min_value is not none else '0.00' }}</td>
+                    <td>{{ "R{:,.2f}".format(row.max_value) if row.max_value is not none else 'Unlimited' }}</td>
+                    <td>{{ row.reviewer_roles or 'N/A' }}</td>
+                    <td>{{ row.quotes_required or 'N/A' }}</td>
+                    <td>{{ row.approver_roles or 'N/A' }}</td>
+                    <td>{{ row.applicable_controls or 'N/A' }}</td>
+                    <td>{{ row.compliance_audit_requirement or 'N/A' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: #6c757d;">No approval matrix records found in database.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         
         <h2>3. Core Operational Regulations</h2>
         <h3>3.1 The Anti-Splitting Directive</h3>
