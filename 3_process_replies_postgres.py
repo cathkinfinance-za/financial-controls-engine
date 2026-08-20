@@ -147,7 +147,8 @@ def process_replies():
     log("Starting Inbox Reply Processor...")
     recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
     
-    if not approvals and not rejections:
+    # 1. Guard against empty responses across all 4 categories
+    if not any([recommendations_approval, recommendations_rejection, final_approvals, final_rejections]):
         log("No actionable email replies detected. Processing complete.")
         return
 
@@ -155,7 +156,13 @@ def process_replies():
         conn = get_db_connection()
         ensure_audit_log_table(conn)
         
-        all_po_numbers = list(set(list(rejections.keys()) + list(approvals.keys())))
+        # 2. Combine all unique PO numbers across all categories
+        all_po_numbers = list(set(
+            list(recommendations_approval.keys()) + 
+            list(recommendations_rejection.keys()) + 
+            list(final_approvals.keys()) + 
+            list(final_rejections.keys())
+        ))
         log(f"Found replies for PO numbers: {all_po_numbers}")
 
         with conn.cursor() as cursor:
@@ -168,7 +175,7 @@ def process_replies():
 
             current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
-            # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
+            # 3. PROCESS FINANCE REVIEW RECOMMENDATIONS
             for po_num, meta in recommendations_approval.items():
                 record = po_map.get(po_num.lower())
                 if record and record.get('submission_status') == 'Finance Review':
@@ -181,6 +188,7 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), "Finance Committee recommended for approval.")
+                    log(f"✅ PO '{record['po_number']}' updated to FINANCE RECOMMENDED.")
 
             for po_num, meta in recommendations_rejection.items():
                 record = po_map.get(po_num.lower())
@@ -194,8 +202,9 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), "Finance Committee recommended for rejection.")
+                    log(f"❌ PO '{record['po_number']}' updated to FINANCE REJECTED.")
 
-            # 2. PROCESS FINAL APPROVALS & REJECTIONS
+            # 4. PROCESS FINAL APPROVALS & REJECTIONS
             for po_num, meta in final_approvals.items():
                 record = po_map.get(po_num.lower())
                 if record:
@@ -208,6 +217,7 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
+                    log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
 
             for po_num, meta in final_rejections.items():
                 record = po_map.get(po_num.lower())
@@ -221,9 +231,7 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), "Marked as rejected via email reply.")
-
-                write_control_log(conn, record['po_number'], "Inbound Approval", approver_email, "Marked as approved via email reply.")
-                log(f"✅ PO '{record['po_number']}' successfully updated to APPROVED in database!")
+                    log(f"❌ PO '{record['po_number']}' updated to REJECTED.")
 
     except Exception as db_err:
         log(f"Database sync error: {db_err}", "CRITICAL")
