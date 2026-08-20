@@ -47,25 +47,10 @@ def fetch_approval_replies():
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
     email_password = os.getenv("SENDER_PASSWORD")
-    recommendations_approval = {}
-    recommendations_rejection = {}
-    final_approvals = {}
-    final_rejections = {}
-
-
-    # Match keywords in extracted email payload
-    if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
-        recommendations_rejection[po_number] = {"sender": sender_clean}
-    elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
-        recommendations_approval[po_number] = {"sender": sender_clean}
-    elif "REJECTED" in full_payload or "REJECT" in full_payload:
-        final_rejections[po_number] = {"sender": sender_clean}
-    elif "APPROVED" in full_payload or "APPROVE" in full_payload:
-        final_approvals[po_number] = {"sender": sender_clean}
 
     if not email_account or not email_password:
         log("SENDER_EMAIL or SENDER_PASSWORD missing.", "ERROR")
-        return {}, {}
+        return {}, {}, {}, {}
 
     log(f"Connecting to IMAP inbox at {imap_server}...")
     try:
@@ -73,22 +58,23 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        # Search for ALL recent messages with "Approval Required" in subject (handles read/unread/self-sent)
         status, messages = mail.search(None, 'SUBJECT "Approval Required"')
         if status != "OK" or not messages or messages == [b'']:
             log("No matching approval emails found in inbox.")
             mail.logout()
-            return {}, {}
+            return {}, {}, {}, {}
 
         raw_data = messages[0]
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
         
-        # Take the most recent 20 emails to keep runs fast
         latest_email_ids = email_ids[-20:]
         log(f"Scanning latest {len(latest_email_ids)} workflow email(s)...")
 
-        approvals = {}
-        rejections = {}
+        # 1. Initialize all 4 response categories
+        recommendations_approval = {}
+        recommendations_rejection = {}
+        final_approvals = {}
+        final_rejections = {}
 
         for e_id in latest_email_ids:
             res, msg_data = mail.fetch(e_id, '(RFC822)')
@@ -109,14 +95,12 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    # Extract PO number from brackets [PO_NUM]
                     po_match = re.search(r'\[([A-Za-z0-9_-]+)\]', decoded_subject)
                     if not po_match:
                         continue
 
                     po_number = po_match.group(1).strip()
 
-                    # Extract body payload
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
@@ -136,27 +120,32 @@ def fetch_approval_replies():
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    # Combine subject + body for keyword check
+                    # 2. Define full_payload BEFORE performing keyword checks
                     full_payload = f"{decoded_subject} {top_reply}".upper()
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    if "REJECTED" in full_payload or "REJECT" in full_payload:
-                        rejections[po_number] = {"sender": sender_clean}
+                    # 3. Categorize reply
+                    if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
+                        recommendations_rejection[po_number] = {"sender": sender_clean}
+                    elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
+                        recommendations_approval[po_number] = {"sender": sender_clean}
+                    elif "REJECTED" in full_payload or "REJECT" in full_payload:
+                        final_rejections[po_number] = {"sender": sender_clean}
                     elif "APPROVED" in full_payload or "APPROVE" in full_payload:
-                        approvals[po_number] = {"sender": sender_clean}
+                        final_approvals[po_number] = {"sender": sender_clean}
 
         mail.logout()
-        return approvals, rejections
+        return recommendations_approval, recommendations_rejection, final_approvals, final_rejections
 
     except Exception as e:
         log(f"IMAP Processing Error: {e}", "ERROR")
-        return {}, {}
+        return {}, {}, {}, {}
 
 def process_replies():
     log("Starting Inbox Reply Processor...")
-    approvals, rejections = fetch_approval_replies()
+    recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
     
     if not approvals and not rejections:
         log("No actionable email replies detected. Processing complete.")
