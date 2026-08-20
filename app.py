@@ -25,6 +25,13 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+
+# --- 1. NEW DASHBOARD HOME PAGE ROUTE ---
+@app.route("/")
+def dashboard_home():
+    """Renders the central management dashboard as the home page."""
+    return render_template("dashboard.html")
+
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
     return psycopg2.connect(os.getenv("DATABASE_URL"))

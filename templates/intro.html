@@ -1,0 +1,152 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delegation of Financial Authority & Compliance Engine Guide - Cathkin Estates</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+            --danger-red: #dc3545;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        .dashboard-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        h1 { font-size: 24px; color: var(--text-main); margin-bottom: 20px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; }
+        h2 { font-size: 18px; margin-top: 30px; margin-bottom: 15px; color: var(--primary-blue); }
+        h3 { font-size: 16px; margin-top: 20px; }
+        p { margin-bottom: 15px; }
+        ul { margin-bottom: 15px; padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; font-size: 14px; }
+        th { background-color: #f8f9fa; font-weight: 600; }
+        .highlight { background-color: #f1f3f5; padding: 15px; border-radius: 4px; border-left: 4px solid var(--primary-blue); margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <h1>DELEGATION OF FINANCIAL AUTHORITY & APPROVAL MATRIX -- DRAFT</h1>
+        
+        <div class="highlight">
+            <strong>Compliance Status Engine Guide</strong><br>
+            <em>Function: Programmatic Evaluation of Financial Authority Limits & Compliance Constraints</em><br>
+            This document translates the nested Airtable conditional formulas of the Compliance Status Engine into sequential, plain-English business rules. The engine evaluates rows in strict descending order through five distinct phases: Verification, Validation, Compliance Hard-Stops, Special Routing, and Standard Authority Routing.
+        </div>
+        
+        <h2>1. Purpose and Scope</h2>
+        <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association. It applies to all elected Directors, Portfolio Committee Members, the Estate Manager, and the appointed Managing Agent (GEMS).</p>
+        
+        <h2>2. Schedule of Financial Authorities</h2>
+        <p><em>[Approval Matrix Table Placeholder]</em></p>
+        
+        <h2>3. Core Operational Regulations</h2>
+        <h3>3.1 The Anti-Splitting Directive</h3>
+        <p>Large projects, single procurement orders, or related service invoices may not be split into multiple smaller purchase orders or partial payments to circumvent the threshold limits defined in Section 2. Threshold compliance is determined by the total cumulative cost of the required work or asset procurement.</p>
+        
+        <h3>3.2 Procurement Sourcing Thresholds</h3>
+        <ul>
+            <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor.</li>
+            <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated.</li>
+            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee.</li>
+        </ul>
+
+        <h2>4. Compliance Status Engine: Evaluation Phases</h2>
+        
+        <h3>Phase 1: Terminal States (Overriding Blocks)</h3>
+        <p>Before running any validation rules or calculating threshold limits, the system checks whether a transaction has already been concluded. If a transaction has a final resolution, further system analysis is bypassed:</p>
+        <ul>
+            <li><strong>Approved State:</strong> If the Submission Status is marked as "Approved", the engine immediately locks the status as: <strong>✅ APPROVED: Compliance Process Complete</strong></li>
+            <li><strong>Rejected State:</strong> If the Submission Status is marked as "Rejected", the engine immediately locks the status as: <strong>🛑 REJECTED: Final Authorisation Declined</strong></li>
+        </ul>
+
+        <h3>Phase 2: Mandatory Metadata Validation (Quality Gates)</h3>
+        <p>If the transaction is active (not resolved), the system forces the operator to provide accurate general ledger and category mapping. The status is flagged with a Warning (⚠️) if any crucial parameters are missing:</p>
+        <ul>
+            <li><strong>General Ledger Check:</strong> If the purchase is budgeted (Has this been budgeted for? = "Yes") but the General Ledger field Select GL Code is blank or returns a calculation error: <strong>⚠️ ACTION REQUIRED: Select a valid GL description</strong></li>
+            <li><strong>Expense Classification Check:</strong> If the Expense Type field is left blank: <strong>⚠️ ACTION REQUIRED: Select Expense Type If Not Approved</strong></li>
+            <li><strong>Quote Quantification Check:</strong> If the Quotes Provided count field is left blank: <strong>⚠️ ACTION REQUIRED: Enter number of quotes provided</strong></li>
+        </ul>
+
+        <h3>Phase 3: Procurement Compliance Hard-Stops</h3>
+        <p>To enforce fair value and prevent direct single-vendor bias, the engine verifies the quantity of quotes provided against the transaction’s value. If the quotes do not match the required thresholds, the transaction is Blocked (❌):</p>
+        <ul>
+            <li><strong>Under R10,000:</strong> Requires a minimum of 1 quote. If 0 quotes are entered, the transaction is blocked.</li>
+            <li><strong>R10,001 to R50,000:</strong> Requires a minimum of 2 independent quotes. If fewer than 2 are entered, the transaction is blocked.</li>
+            <li><strong>Over R50,000:</strong> Requires a minimum of 3 independent quotes. If fewer than 3 are entered, the transaction is blocked.</li>
+            <li><strong>Capital Expenditure & Infrastructure (Any Amount):</strong> Always requires a minimum of 3 independent quotes. If fewer than 3 are entered, the transaction is blocked.</li>
+            <li><strong>Status Output if Sourcing Rules are Violated:</strong> <strong>❌ BLOCKED: Insufficient Quotes Provided for this Threshold</strong></li>
+        </ul>
+
+        <h3>Phase 4: AI Sourcing Matrix Verification</h3>
+        <p>For high-value or long-term structural decisions, human assessment alone is insufficient. The engine enforces the generation of an objective AI-powered comparative matrix:</p>
+        <ul>
+            <li><strong>AI Matrix Gate:</strong> If the Estimated Cost exceeds R50,000, or if the Expense Type is categorized as "Capital Expenditure & Infrastructure", and the Procurement Matrix Summary Chart remains blank (indicating Python script 4_AI_Matrix_Drafter.py has not run yet): <strong>📋 ACTION REQUIRED: Run Python AI Sourcing Matrix via Projects</strong></li>
+        </ul>
+
+        <h3>Phase 5: Routing Pathways & Approval Thresholds</h3>
+        <p>Once a transaction has passed all metadata, sourcing, and AI verification gates, the system assigns the appropriate routing pathway based on the budget status and expenditure category:</p>
+        
+        <h4>A. Special Non-Standard Classifications</h4>
+        <ul>
+            <li><strong>Capital Reserve Outlays:</strong> If the Expense Type is "Capital Expenditure & Infrastructure": <strong>🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)</strong></li>
+            <li><strong>SLA Service Provider Appointments:</strong> If the Expense Type is "Service Provider Contracts": <strong>📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)</strong></li>
+        </ul>
+
+        <h4>B. Standard Budgeted Expenditure (Has this been budgeted for? = "Yes")</h4>
+        <ul>
+            <li><strong>Up to R10,000:</strong> <strong>🟢 Routine Operational: Within Budget (No Approval Required)</strong> (Auto-authorized for reconciliation log).</li>
+            <li><strong>R10,001 to R50,000:</strong> <strong>🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)</strong></li>
+            <li><strong>Over R50,000:</strong> <strong>🟠 High-Value Operational: Within Budget (Requires 2 Board Members)</strong></li>
+        </ul>
+
+        <h4>C. Unbudgeted Emergency Expenditure (Has this been budgeted for? = "No" AND Expense Type = "Emergency")</h4>
+        <ul>
+            <li><strong>Up to R30,000:</strong> <strong>⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)</strong></li>
+            <li><strong>Over R30,000:</strong> <strong>❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)</strong> (Hard-locked to prevent unauthorized emergency spending).</li>
+        </ul>
+
+        <h4>D. Unbudgeted Extraordinary Expenditure (Has this been budgeted for? = "No" AND Expense Type = "Extraordinary")</h4>
+        <ul>
+            <li><strong>Up to R30,000:</strong> <strong>🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)</strong></li>
+            <li><strong>Over R30,000:</strong> <strong>❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)</strong> (Hard-locked to enforce AGM statutory limits).</li>
+        </ul>
+
+        <h2>5. Special Safeguard: The 2-Month Run-rate Buffer Pool (2M Pool)</h2>
+        <p>The system incorporates an independent, macro-liquidity evaluation variable: the {2M Buffer Pool}. This represents a baseline cash reserve equivalent to two months of standard operational estate expenditures.</p>
+        <ul>
+            <li><strong>Programmatic Application:</strong> While the Airtable logical formula governs sequential routing thresholds, the automation script <code>2_send_approvals_airtable.py</code> leverages this field to prevent structural deficits.</li>
+            <li><strong>Dynamic Health Audit:</strong> During step 2 (Inbound Dispatch & AI Audit), the Python logic compares the post-purchase remaining balance of the target GL code against the {2M Buffer Pool} reserve.</li>
+            <li><strong>Deficit Risk Warnings:</strong> If the post-purchase balance falls below the 2-Month Run-rate threshold, the AI automatically overrides a standard "Approved" narrative to attach a highly visible Fiscal Vulnerability Alert to the Board’s routing email. This ensures that even "within-budget" expenses are scrutinized if they threaten the estate's overall operational runway.</li>
+        </ul>
+
+        <h2>6. Executive Objectives</h2>
+        <ul>
+            <li><strong>Absolute Ledger Transparency:</strong> Automatic enforcement of precise GL codes, preventing arbitrary cost allocations.</li>
+            <li><strong>Unalterable Audit Trails:</strong> Chronological logging of all approvals, partial votes, and rejections to an independent ledger (`workflow control log.csv`).</li>
+            <li><strong>Operational Optimization:</strong> Elimination of administrative bottlenecks for routine, pre-planned tasks while protecting the Board of Directors with absolute control over high-value capital, unbudgeted, or risk-prone outlays.</li>
+        </ul>
+    </div>
+</body>
+</html>
