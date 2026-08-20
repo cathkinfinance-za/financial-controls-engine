@@ -305,11 +305,11 @@ def process_postgres_approvals():
                 if row.get('approval_permission') == 'Approval Authority' and row.get('email')
             ]
             finance_reviewers = [
-                row['email'].strip() for row in approver_rows 
+                row['email'].strip() for row in approver_records
                 if row.get('approval_permission') == 'Finance Review' and row.get('email')
             ]
             estate_managers = [
-                row['email'].strip() for row in approver_rows 
+                row['email'].strip() for row in approver_records 
                 if row.get('approval_permission') == 'Estate Manager' and row.get('email')
             ]
 
