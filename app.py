@@ -33,34 +33,28 @@ def dashboard_home():
     return render_template("dashboard.html")
 
 @app.route('/guide')
-def compliance_guide_page():
-    # Fetch any required data here if needed
-    return render_template('guide.html')
-
-
-@app.route("/guide")
 def render_guide_page():
-  conn = None
-  try:
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-      cursor.execute("""
+    conn = None
+    matrix_rows = []
+    try:
+        conn = get_db_connection()
+        # Pass RealDictCursor here so rows match dictionary keys expected by guide.html
+        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+            cursor.execute("""
                 SELECT id, matrix_category, min_value, max_value, 
                        reviewer_roles, quotes_required, approver_roles, 
                        applicable_controls, compliance_audit_requirement 
                 FROM approval_matrix 
                 ORDER BY id ASC;
             """)
-      matrix_rows = cursor.fetchall()
-  except Exception as e:
-    # Log the error appropriately in your production app
-    print(f"Database error on /guide: {e}")
-    matrix_rows = []
-  finally:
-    if conn:
-      conn.close()
-
-  return render_template("guide.html", matrix_rows=matrix_rows)
+            matrix_rows = cursor.fetchall()
+    except Exception as e:
+        print(f"Database error on /guide: {e}")
+    finally:
+        if conn:
+            conn.close()
+        
+    return render_template('guide.html', matrix_rows=matrix_rows)
 
 def get_connection():
     """Establish connection to Neon PostgreSQL database."""
