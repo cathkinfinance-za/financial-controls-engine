@@ -233,6 +233,7 @@ def po_form():
         
         # Dynamically set quotes_provided to match total attached files count
         quotes_provided = len(all_urls)
+        
 
         # Run Gemini Analysis on newly uploaded attachments
         if gemini_file_payloads:
