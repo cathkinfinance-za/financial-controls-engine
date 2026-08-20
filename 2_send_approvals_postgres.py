@@ -10,7 +10,6 @@ import csv
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from streamlit import status
 from duckduckgo_search import DDGS
 from google import genai
 from google.genai import types
