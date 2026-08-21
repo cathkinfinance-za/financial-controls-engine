@@ -922,5 +922,56 @@ Project Objectives: {project.get('project_objective', '')}
 
     return redirect(url_for('projects_page', project_id=project_id))
 
+
+@app.route('/minutes', methods=['GET', 'POST'])
+def finance_minutes():
+    conn = get_db_connection()
+    if request.method == 'POST':
+        meeting_date = request.form.get('meeting_date')
+        chairperson = request.form.get('chairperson')
+        attendees = request.form.get('attendees')
+        apologies = request.form.get('apologies')
+        notes_summary = request.form.get('notes_summary')
+
+        # Form lists for dynamic action item entries
+        action_descriptions = request.form.getlist('action_description[]')
+        responsible_persons = request.form.getlist('responsible_person[]')
+        target_dates = request.form.getlist('target_date[]')
+
+        with conn.cursor() as cursor:
+            # Insert main meeting metadata
+            cursor.execute("""
+                INSERT INTO meeting_minutes (meeting_date, chairperson, attendees, apologies, notes_summary)
+                VALUES (%s, %s, %s, %s, %s) RETURNING id;
+            """, (meeting_date, chairperson, attendees, apologies, notes_summary))
+            meeting_id = cursor.fetchone()['id']
+
+            # Insert associated action items
+            for desc, resp, target in zip(action_descriptions, responsible_persons, target_dates):
+                if desc.strip() and resp.strip():
+                    cursor.execute("""
+                        INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date)
+                        VALUES (%s, %s, %s, %s);
+                    """, (meeting_id, desc, resp, target))
+            
+            conn.commit()
+        conn.close()
+        return redirect(url_for('finance_minutes'))
+
+    # GET Request: Fetch historical meeting records & action items
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT m.*, 
+                   COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') as action_items
+            FROM meeting_minutes m
+            LEFT JOIN meeting_action_items a ON m.id = a.meeting_id
+            GROUP BY m.id
+            ORDER BY m.meeting_date DESC;
+        """)
+        meetings = cursor.fetchall()
+    conn.close()
+    
+    return render_template('minutes.html', meetings=meetings) 
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

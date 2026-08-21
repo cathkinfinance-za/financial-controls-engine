@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Committee Minutes - Cathkin Estates</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 40px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 40px; }
+        h1 { font-size: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        .action-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn { background: var(--primary-blue); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #6c757d; font-size: 12px; padding: 6px 12px; }
+        .btn-danger { background: #dc3545; }
+        .meeting-card { border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; margin-top: 20px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid var(--border-color); padding: 8px; font-size: 13px; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/guide" style="color: var(--primary-blue); text-decoration: none; font-size: 14px;">← Back to Guide</a>
+        <h1 style="margin-top: 15px;">Finance Committee Meeting Minutes</h1>
+
+        <!-- MINUTES ENTRY FORM -->
+        <form method="POST" action="/minutes">
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Meeting Date</label>
+                    <input type="date" name="meeting_date" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Chairperson</label>
+                    <input type="text" name="chairperson" placeholder="e.g. Finance Chair" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Attendees</label>
+                <input type="text" name="attendees" placeholder="Comma-separated names" required>
+            </div>
+
+            <div class="form-group">
+                <label>Apologies</label>
+                <input type="text" name="apologies" placeholder="Absent members">
+            </div>
+
+            <div class="form-group">
+                <label>Meeting Deliberations & Key Notes</label>
+                <textarea name="notes_summary" rows="4" required></textarea>
+            </div>
+
+            <h3>Action Items</h3>
+            <div id="action-items-container">
+                <div class="action-row">
+                    <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
+                    <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
+                    <input type="date" name="target_date[]" style="flex: 1;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addActionRow()">+ Add Action Item</button>
+
+            <div style="margin-top: 25px;">
+                <button type="submit" class="btn">Save Meeting Minutes</button>
+            </div>
+        </form>
+
+        <!-- HISTORICAL MINUTES -->
+        <h2 style="margin-top: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Previous Meeting Records</h2>
+        {% for m in meetings %}
+        <div class="meeting-card">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+                <span>Date: {{ m.meeting_date }}</span>
+                <span>Chair: {{ m.chairperson }}</span>
+            </div>
+            <p><strong>Attendees:</strong> {{ m.attendees }}</p>
+            {% if m.apologies %}<p><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
+            <p><strong>Summary Notes:</strong></p>
+            <p style="white-space: pre-line; background: #f8f9fa; padding: 10px; border-radius: 4px;">{{ m.notes_summary }}</p>
+
+            {% if m.action_items and m.action_items != [] %}
+            <strong>Assigned Action Items:</strong>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Action Description</th>
+                        <th>Responsible</th>
+                        <th>Target Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in m.action_items %}
+                    <tr>
+                        <td>{{ act.action_description }}</td>
+                        <td>{{ act.responsible_person }}</td>
+                        <td>{{ act.target_date }}</td>
+                        <td>{{ act.status }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted);">No meeting minutes recorded yet.</p>
+        {% endfor %}
+    </div>
+
+    <script>
+        function addActionRow() {
+            const container = document.getElementById('action-items-container');
+            const row = document.createElement('div');
+            row.className = 'action-row';
+            row.innerHTML = `
+                <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
+                <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
+                <input type="date" name="target_date[]" style="flex: 1;">
+                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Committee Minutes - Cathkin Estates</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 40px; margin: 0; }
+        .container { max-width: 900px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 40px; }
+        h1 { font-size: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
+        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
+        .action-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .btn { background: var(--primary-blue); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
+        .btn-secondary { background: #6c757d; font-size: 12px; padding: 6px 12px; }
+        .btn-danger { background: #dc3545; }
+        .meeting-card { border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; margin-top: 20px; background: #fff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid var(--border-color); padding: 8px; font-size: 13px; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/guide" style="color: var(--primary-blue); text-decoration: none; font-size: 14px;">← Back to Guide</a>
+        <h1 style="margin-top: 15px;">Finance Committee Meeting Minutes</h1>
+
+        <!-- MINUTES ENTRY FORM -->
+        <form method="POST" action="/minutes">
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Meeting Date</label>
+                    <input type="date" name="meeting_date" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Chairperson</label>
+                    <input type="text" name="chairperson" placeholder="e.g. Finance Chair" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Attendees</label>
+                <input type="text" name="attendees" placeholder="Comma-separated names" required>
+            </div>
+
+            <div class="form-group">
+                <label>Apologies</label>
+                <input type="text" name="apologies" placeholder="Absent members">
+            </div>
+
+            <div class="form-group">
+                <label>Meeting Deliberations & Key Notes</label>
+                <textarea name="notes_summary" rows="4" required></textarea>
+            </div>
+
+            <h3>Action Items</h3>
+            <div id="action-items-container">
+                <div class="action-row">
+                    <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
+                    <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
+                    <input type="date" name="target_date[]" style="flex: 1;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addActionRow()">+ Add Action Item</button>
+
+            <div style="margin-top: 25px;">
+                <button type="submit" class="btn">Save Meeting Minutes</button>
+            </div>
+        </form>
+
+        <!-- HISTORICAL MINUTES -->
+        <h2 style="margin-top: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Previous Meeting Records</h2>
+        {% for m in meetings %}
+        <div class="meeting-card">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+                <span>Date: {{ m.meeting_date }}</span>
+                <span>Chair: {{ m.chairperson }}</span>
+            </div>
+            <p><strong>Attendees:</strong> {{ m.attendees }}</p>
+            {% if m.apologies %}<p><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
+            <p><strong>Summary Notes:</strong></p>
+            <p style="white-space: pre-line; background: #f8f9fa; padding: 10px; border-radius: 4px;">{{ m.notes_summary }}</p>
+
+            {% if m.action_items and m.action_items != [] %}
+            <strong>Assigned Action Items:</strong>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Action Description</th>
+                        <th>Responsible</th>
+                        <th>Target Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for act in m.action_items %}
+                    <tr>
+                        <td>{{ act.action_description }}</td>
+                        <td>{{ act.responsible_person }}</td>
+                        <td>{{ act.target_date }}</td>
+                        <td>{{ act.status }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="color: var(--text-muted);">No meeting minutes recorded yet.</p>
+        {% endfor %}
+    </div>
+
+    <script>
+        function addActionRow() {
+            const container = document.getElementById('action-items-container');
+            const row = document.createElement('div');
+            row.className = 'action-row';
+            row.innerHTML = `
+                <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
+                <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
+                <input type="date" name="target_date[]" style="flex: 1;">
+                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+    </script>
+</body>
+</html>
