@@ -108,10 +108,12 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Action Description</th>
-                        <th>Responsible</th>
-                        <th>Target Date</th>
-                        <th>Status</th>
+                        <th style="width: 25%;">Action Description</th>
+                        <th style="width: 15%;">Responsible</th>
+                        <th style="width: 12%;">Target Date</th>
+                        <th style="width: 15%;">Status</th>
+                        <th style="width: 23%;">Progress / Notes</th>
+                        <th style="width: 10%;">Action</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -120,7 +122,22 @@
                         <td>{{ act.action_description }}</td>
                         <td>{{ act.responsible_person }}</td>
                         <td>{{ act.target_date }}</td>
-                        <td>{{ act.status }}</td>
+                        <form method="POST" action="/update_action_item">
+                            <input type="hidden" name="action_id" value="{{ act.id }}">
+                            <td>
+                                <select name="status" style="padding: 4px; font-size: 12px;">
+                                    <option value="Pending" {% if act.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                    <option value="In Progress" {% if act.status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="Completed" {% if act.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" name="action_notes" value="{{ act.action_notes or '' }}" placeholder="Add progress notes..." style="padding: 4px; font-size: 12px;">
+                            </td>
+                            <td>
+                                <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">Update</button>
+                            </td>
+                        </form>
                     </tr>
                     {% endfor %}
                 </tbody>
