@@ -81,6 +81,17 @@
         <!-- HISTORICAL MINUTES DROPDOWN SEARCH -->
         <h2 style="margin-top: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Previous Meeting Records</h2>
         
+        {% if meetings %}
+        <div class="form-group">
+            <label for="meeting-select">Select Meeting Date:</label>
+            <select id="meeting-select" onchange="showSelectedMeeting(this.value)">
+                <option value="">-- Select a Meeting Date --</option>
+                {% for m in meetings %}
+                <option value="meeting-{{ m.id }}">Meeting Date: {{ m.meeting_date }} (Chair: {{ m.chairperson }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
         {% for m in meetings %}
         <div id="meeting-{{ m.id }}" class="meeting-card">
             <!-- DISPLAY VIEW -->
