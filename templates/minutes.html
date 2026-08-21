@@ -94,16 +94,55 @@
 
         {% for m in meetings %}
         <div id="meeting-{{ m.id }}" class="meeting-card">
-            <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
-                <span>Date: {{ m.meeting_date }}</span>
-                <span>Chair: {{ m.chairperson }}</span>
+            <!-- DISPLAY VIEW -->
+            <div id="view-mode-{{ m.id }}">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+                    <span>Date: {{ m.meeting_date }}</span>
+                    <span>Chair: {{ m.chairperson }}</span>
+                </div>
+                <p><strong>Attendees:</strong> {{ m.attendees }}</p>
+                {% if m.apologies %}<p><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
+                <p><strong>Summary Notes:</strong></p>
+                <p style="white-space: pre-line; background: #f8f9fa; padding: 10px; border-radius: 4px;">{{ m.notes_summary }}</p>
+                <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', true)">✏️ Edit Meeting Record</button>
             </div>
-            <p><strong>Attendees:</strong> {{ m.attendees }}</p>
-            {% if m.apologies %}<p><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
-            <p><strong>Summary Notes:</strong></p>
-            <p style="white-space: pre-line; background: #f8f9fa; padding: 10px; border-radius: 4px;">{{ m.notes_summary }}</p>
 
+            <!-- EDIT FORM MODE -->
+            <div id="edit-mode-{{ m.id }}" style="display: none;">
+                <form method="POST" action="/update_meeting_minutes">
+                    <input type="hidden" name="meeting_id" value="{{ m.id }}">
+                    <div style="display: flex; gap: 15px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Meeting Date</label>
+                            <input type="date" name="meeting_date" value="{{ m.meeting_date }}" required>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Chairperson</label>
+                            <input type="text" name="chairperson" value="{{ m.chairperson }}" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Attendees</label>
+                        <input type="text" name="attendees" value="{{ m.attendees }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Apologies</label>
+                        <input type="text" name="apologies" value="{{ m.apologies or '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Meeting Deliberations & Key Notes</label>
+                        <textarea name="notes_summary" rows="4" required>{{ m.notes_summary }}</textarea>
+                    </div>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="submit" class="btn">Save Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', false)">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- ACTION ITEMS TABLE BELOW -->
             {% if m.action_items and m.action_items != [] %}
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
             <strong>Assigned Action Items:</strong>
             <table>
                 <thead>
@@ -178,6 +217,19 @@
                 }
             }
         }
+
+    function toggleEditMode(meetingId, isEditing) {
+        const viewMode = document.getElementById(`view-mode-${meetingId}`);
+        const editMode = document.getElementById(`edit-mode-${meetingId}`);
+        
+        if (isEditing) {
+            viewMode.style.display = 'none';
+            editMode.style.display = 'block';
+        } else {
+            viewMode.style.display = 'block';
+            editMode.style.display = 'none';
+        }
+    }
     </script>
 </body>
 </html>

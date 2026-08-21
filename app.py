@@ -992,5 +992,30 @@ def update_action_item():
 
     return redirect(url_for('finance_minutes'))
 
+@app.route('/update_meeting_minutes', methods=['POST'])
+def update_meeting_minutes():
+    meeting_id = request.form.get('meeting_id')
+    meeting_date = request.form.get('meeting_date')
+    chairperson = request.form.get('chairperson')
+    attendees = request.form.get('attendees')
+    apologies = request.form.get('apologies')
+    notes_summary = request.form.get('notes_summary')
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            UPDATE meeting_minutes
+            SET meeting_date = %s,
+                chairperson = %s,
+                attendees = %s,
+                apologies = %s,
+                notes_summary = %s
+            WHERE id = %s;
+        """, (meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+        conn.commit()
+    conn.close()
+
+    return redirect(url_for('finance_minutes'))
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
