@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Framework - Cathkin Estates HOA NPC</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --primary-navy: #0f172a;
+            --border-color: #e2e8f0;
+            
+            /* Pillar Specific Colors */
+            --blue-accent: #2563eb;
+            --blue-bg: #eff6ff;
+            --red-accent: #dc2626;
+            --red-bg: #fef2f2;
+            --green-accent: #16a34a;
+            --green-bg: #f0fdf4;
+            --purple-accent: #7c3aed;
+            --purple-bg: #f5f3ff;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 30px;
+        }
+
+        .slide-container {
+            background: #ffffff;
+            width: 100%;
+            max-width: 1300px;
+            padding: 40px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+        }
+
+        .nav-back {
+            display: inline-block;
+            margin-bottom: 15px;
+            color: var(--blue-accent);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .nav-back:hover {
+            text-decoration: underline;
+        }
+
+        header {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .header-left {
+            flex: 1;
+        }
+
+        .badge-tag {
+            display: inline-block;
+            background-color: #e0f2fe;
+            color: #0369a1;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        h1 {
+            font-size: 26px;
+            color: var(--primary-navy);
+            margin-bottom: 4px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .header-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .header-right {
+            font-size: 12px;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        /* 4 Cards in a Row */
+        .pillar-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 25px;
+        }
+
+        .pillar-card {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px 16px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .pillar-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+
+        .card-companies::before { background-color: var(--blue-accent); }
+        .card-ohs::before { background-color: var(--red-accent); }
+        .card-csos::before { background-color: var(--green-accent); }
+        .card-king::before { background-color: var(--purple-accent); }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .card-companies .icon-box { background-color: var(--blue-bg); color: var(--blue-accent); }
+        .card-ohs .icon-box { background-color: var(--red-bg); color: var(--red-accent); }
+        .card-csos .icon-box { background-color: var(--green-bg); color: var(--green-accent); }
+        .card-king .icon-box { background-color: var(--purple-bg); color: var(--purple-accent); }
+
+        .card-title h2 {
+            font-size: 15px;
+            color: var(--primary-navy);
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .card-title .act-tag {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            display: block;
+            margin-top: 2px;
+        }
+
+        .pillar-card ul {
+            list-style-type: none;
+            padding-left: 0;
+            font-size: 12px;
+            color: var(--text-main);
+            line-height: 1.45;
+        }
+
+        .pillar-card li {
+            margin-bottom: 10px;
+            position: relative;
+            padding-left: 14px;
+        }
+
+        .card-companies li::before { content: "•"; position: absolute; left: 0; color: var(--blue-accent); font-weight: bold; }
+        .card-ohs li::before { content: "•"; position: absolute; left: 0; color: var(--red-accent); font-weight: bold; }
+        .card-csos li::before { content: "•"; position: absolute; left: 0; color: var(--green-accent); font-weight: bold; }
+        .card-king li::before { content: "•"; position: absolute; left: 0; color: var(--purple-accent); font-weight: bold; }
+
+        .pillar-card li:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Executive Summary Banner */
+        .executive-box {
+            background-color: #0f172a;
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 18px 24px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .exec-icon {
+            width: 32px;
+            height: 32px;
+            min-width: 32px;
+            background-color: #1e293b;
+            color: #38bdf8;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .exec-content h3 {
+            font-size: 11px;
+            color: #38bdf8;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            margin-bottom: 4px;
+        }
+
+        .exec-content p {
+            font-size: 12.5px;
+            color: #e2e8f0;
+            line-height: 1.45;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="slide-container">
+        <a href="/guide" class="nav-back">← Back to Guide</a>
+
+        <header>
+            <div class="header-left">
+                <span class="badge-tag">Cathkin Estates HOA NPC</span>
+                <h1>Statutory Motivation: Financial Controls & HSSE</h1>
+                <div class="header-desc">Why implementing a Financial Authority Matrix and OHS Management System is legally mandatory for the Board</div>
+            </div>
+            <div class="header-right">
+                Board Briefing | Governance & Compliance
+            </div>
+        </header>
+
+        <div class="pillar-grid">
+            <!-- Pillar 1: Companies Act -->
+            <div class="pillar-card card-companies">
+                <div class="card-header">
+                    <div class="icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/></svg>
+                    </div>
+                    <div class="card-title">
+                        <h2>Companies Act</h2>
+                        <span class="act-tag">ACT 71 OF 2008</span>
+                    </div>
+                </div>
+                <ul>
+                    <li><strong>Sec 76 Fiduciary Duties:</strong> Directors must act in good faith, with care, skill, and reasonable diligence.</li>
+                    <li><strong>Personal Liability:</strong> Directors face personal financial liability for unapproved expenditure or losses.</li>
+                    <li><strong>Formal Delegation:</strong> Mandates explicit authorization limits and prohibits financial anti-splitting.</li>
+                </ul>
+            </div>
+
+            <!-- Pillar 2: OHS Act & Safety -->
+            <div class="pillar-card card-ohs">
+                <div class="card-header">
+                    <div class="icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    </div>
+                    <div class="card-title">
+                        <h2>OHS Act & Safety</h2>
+                        <span class="act-tag">ACT 85 OF 1993</span>
+                    </div>
+                </div>
+                <ul>
+                    <li><strong>Sec 16(1) / 16(2) Liability:</strong> Statutory criminal and civil liability rests directly on Board & CEO/Management.</li>
+                    <li><strong>Sec 37(2) Contractors:</strong> HOA is legally liable for contractor workplace injuries without formal compliance.</li>
+                    <li><strong>HSSE Imperative:</strong> Systematic risk audits, incident logs, and mandatory estate OHS standards required.</li>
+                </ul>
+            </div>
+
+            <!-- Pillar 3: CSOS Act & MOI -->
+            <div class="pillar-card card-csos">
+                <div class="card-header">
+                    <div class="icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                    </div>
+                    <div class="card-title">
+                        <h2>CSOS Act & MOI</h2>
+                        <span class="act-tag">ACT 9 OF 2011 & GOVERNANCE</span>
+                    </div>
+                </div>
+                <ul>
+                    <li><strong>Financial Oversight:</strong> Statutory duty to ensure prudent management of estate operating & reserve funds.</li>
+                    <li><strong>Audit Trails:</strong> Mandatory procurement compliance (tiered quotes) and unalterable transaction logs.</li>
+                    <li><strong>Fiduciary Stewardship:</strong> Protecting owner levy value and mitigating dispute risks under CSOS oversight.</li>
+                </ul>
+            </div>
+
+            <!-- Pillar 4: King IV Principles -->
+            <div class="pillar-card card-king">
+                <div class="card-header">
+                    <div class="icon-box">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14.5 12.5-8 8a2.119 2.119 0 0 1-3-3l8-8"/><path d="m16 16 6-6"/><path d="m8 8 6-6"/><path d="m9 7 8 8"/><path d="m21 11-8-8"/></svg>
+                    </div>
+                    <div class="card-title">
+                        <h2>King IV Principles</h2>
+                        <span class="act-tag">CORPORATE GOVERNANCE CODE</span>
+                    </div>
+                </div>
+                <ul>
+                    <li><strong>Effective Controls:</strong> Mandates formal internal controls, risk governance, and segregation of duties.</li>
+                    <li><strong>Business Judgment Rule:</strong> Protects Directors against liability <em>only if</em> formal risk systems are active.</li>
+                    <li><strong>Transparency:</strong> Establishes ethical culture, audit integrity, and operational sustainability.</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Executive Summary Banner -->
+        <div class="executive-box">
+            <div class="exec-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div class="exec-content">
+                <h3>BOARD EXECUTIVE SUMMARY</h3>
+                <p>Operating without these systems exposes Directors to <strong>direct personal and statutory legal liability</strong> under the Companies Act and OHS Act. Implementing the Delegation of Financial Authority Matrix and HSSE Framework transitions Cathkin Estates from informal operational risk to <strong>full statutory compliance and governance protection</strong>.</p>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

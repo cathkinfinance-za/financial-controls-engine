@@ -1017,5 +1017,9 @@ def update_meeting_minutes():
 
     return redirect(url_for('finance_minutes'))
 
+@app.route('/legal_framework')
+def legal_framework():
+    return render_template('legal_framework.html')
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
