@@ -962,7 +962,7 @@ def finance_minutes():
     with conn.cursor() as cursor:
         cursor.execute("""
             SELECT m.*, 
-                   COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') as action_items
+                   COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') as meeting_action_items
             FROM meeting_minutes m
             LEFT JOIN meeting_action_items a ON m.id = a.meeting_id
             GROUP BY m.id
@@ -1017,7 +1017,7 @@ def update_meeting_minutes():
         # 2. Delete action items marked for removal
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
-            cursor.execute("DELETE FROM action_items WHERE id = %s;", (act_id,))
+            cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (act_id,))
 
         # 3. Update existing action items
         existing_ids = request.form.getlist('existing_action_id[]')
@@ -1027,7 +1027,7 @@ def update_meeting_minutes():
 
         for i in range(len(existing_ids)):
             cursor.execute("""
-                UPDATE action_items
+                UPDATE meeting_action_items
                 SET action_description = %s,
                     responsible_person = %s,
                     target_date = %s
@@ -1046,7 +1046,7 @@ def update_meeting_minutes():
 
         for i in range(len(new_descriptions)):
             cursor.execute("""
-                INSERT INTO action_items (meeting_id, action_description, responsible_person, target_date, status)
+                INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date, status)
                 VALUES (%s, %s, %s, %s, 'Pending');
             """, (
                 meeting_id,
