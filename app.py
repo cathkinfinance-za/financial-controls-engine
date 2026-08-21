@@ -1003,6 +1003,7 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        # 1. Update primary meeting record
         cursor.execute("""
             UPDATE meeting_minutes
             SET meeting_date = %s,
@@ -1012,6 +1013,48 @@ def update_meeting_minutes():
                 notes_summary = %s
             WHERE id = %s;
         """, (meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+
+        # 2. Delete action items marked for removal
+        delete_action_ids = request.form.getlist('delete_action_id[]')
+        for act_id in delete_action_ids:
+            cursor.execute("DELETE FROM action_items WHERE id = %s;", (act_id,))
+
+        # 3. Update existing action items
+        existing_ids = request.form.getlist('existing_action_id[]')
+        existing_descriptions = request.form.getlist('existing_action_description[]')
+        existing_responsibles = request.form.getlist('existing_responsible_person[]')
+        existing_targets = request.form.getlist('existing_target_date[]')
+
+        for i in range(len(existing_ids)):
+            cursor.execute("""
+                UPDATE action_items
+                SET action_description = %s,
+                    responsible_person = %s,
+                    target_date = %s
+                WHERE id = %s;
+            """, (
+                existing_descriptions[i],
+                existing_responsibles[i],
+                existing_targets[i] if existing_targets[i] else None,
+                existing_ids[i]
+            ))
+
+        # 4. Insert newly added action items
+        new_descriptions = request.form.getlist('new_action_description[]')
+        new_responsibles = request.form.getlist('new_responsible_person[]')
+        new_targets = request.form.getlist('new_target_date[]')
+
+        for i in range(len(new_descriptions)):
+            cursor.execute("""
+                INSERT INTO action_items (meeting_id, action_description, responsible_person, target_date, status)
+                VALUES (%s, %s, %s, %s, 'Pending');
+            """, (
+                meeting_id,
+                new_descriptions[i],
+                new_responsibles[i],
+                new_targets[i] if new_targets[i] else None
+            ))
+
         conn.commit()
     conn.close()
 

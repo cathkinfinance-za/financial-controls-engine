@@ -81,17 +81,6 @@
         <!-- HISTORICAL MINUTES DROPDOWN SEARCH -->
         <h2 style="margin-top: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Previous Meeting Records</h2>
         
-        {% if meetings %}
-        <div class="form-group">
-            <label for="meeting-select">Select Meeting Date:</label>
-            <select id="meeting-select" onchange="showSelectedMeeting(this.value)">
-                <option value="">-- Select a Meeting Date --</option>
-                {% for m in meetings %}
-                <option value="meeting-{{ m.id }}">Meeting Date: {{ m.meeting_date }} (Chair: {{ m.chairperson }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
         {% for m in meetings %}
         <div id="meeting-{{ m.id }}" class="meeting-card">
             <!-- DISPLAY VIEW -->
@@ -133,17 +122,36 @@
                         <label>Meeting Deliberations & Key Notes</label>
                         <textarea name="notes_summary" rows="4" required>{{ m.notes_summary }}</textarea>
                     </div>
-                    <div style="display: flex; gap: 10px;">
+
+                    <!-- EDIT & ADD ACTION ITEMS IN MEETING RECORD -->
+                    <h4 style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Manage Action Items</h4>
+                    <div id="edit-action-items-container-{{ m.id }}">
+                        {% if m.action_items %}
+                            {% for act in m.action_items %}
+                            <div class="action-row" style="margin-bottom: 8px;">
+                                <input type="hidden" name="existing_action_id[]" value="{{ act.id }}">
+                                <input type="text" name="existing_action_description[]" value="{{ act.action_description }}" placeholder="Task Description" style="flex: 2;" required>
+                                <input type="text" name="existing_responsible_person[]" value="{{ act.responsible_person }}" placeholder="Responsible" style="flex: 1;" required>
+                                <input type="date" name="existing_target_date[]" value="{{ act.target_date }}" style="flex: 1;">
+                                <button type="button" class="btn btn-danger btn-secondary" onclick="markActionForDeletion(this)">✕</button>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addEditActionRow('{{ m.id }}')">+ Add New Action Item</button>
+
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
                         <button type="submit" class="btn">Save Changes</button>
                         <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', false)">Cancel</button>
                     </div>
                 </form>
             </div>
 
-            <!-- ACTION ITEMS TABLE BELOW -->
+            <!-- ACTION ITEMS READ-ONLY STATUS TABLE -->
             {% if m.action_items and m.action_items != [] %}
             <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
-            <strong>Assigned Action Items:</strong>
+            <strong>Assigned Action Items Status:</strong>
             <table>
                 <thead>
                     <tr>
@@ -202,6 +210,35 @@
                 <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
             `;
             container.appendChild(row);
+        }
+
+        function addEditActionRow(meetingId) {
+            const container = document.getElementById(`edit-action-items-container-${meetingId}`);
+            const row = document.createElement('div');
+            row.className = 'action-row';
+            row.style.marginBottom = '8px';
+            row.innerHTML = `
+                <input type="hidden" name="new_action_item[]" value="true">
+                <input type="text" name="new_action_description[]" placeholder="Task Description" style="flex: 2;" required>
+                <input type="text" name="new_responsible_person[]" placeholder="Responsible" style="flex: 1;" required>
+                <input type="date" name="new_target_date[]" style="flex: 1;">
+                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function markActionForDeletion(button) {
+            const row = button.parentElement;
+            const actionId = row.querySelector('input[name="existing_action_id[]"]').value;
+            
+            // Add hidden input to notify backend to remove this item ID
+            const deleteInput = document.createElement('input');
+            deleteInput.type = 'hidden';
+            deleteInput.name = 'delete_action_id[]';
+            deleteInput.value = actionId;
+            row.parentElement.appendChild(deleteInput);
+            
+            row.remove();
         }
 
         function showSelectedMeeting(meetingId) {
