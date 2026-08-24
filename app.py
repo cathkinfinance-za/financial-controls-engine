@@ -1099,7 +1099,7 @@ def expenditure_expose():
 
     if GEMINI_AVAILABLE and all_items:
         try:
-            model = genai.GenerativeModel('gemini-1.5-flash')
+            model = genai.GenerativeModel('gemini-3.5-flash')
             prompt = f"""
             You are an expert financial controller for Cathkin Estates Finance Committee.
             Analyze our complete expenditure against budget through {month_label}:
