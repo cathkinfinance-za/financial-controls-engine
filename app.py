@@ -11,6 +11,7 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify, f
 from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
+from datetime import date
 
 
 try:
@@ -1025,17 +1026,20 @@ def update_meeting_minutes():
             if act_id:
                 cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (act_id,))
 
-        # 3. Handle existing AND newly added action items in same list
+        # 3. Handle existing AND newly added action items
         action_ids = request.form.getlist('existing_action_id[]')
         descriptions = request.form.getlist('existing_action_description[]')
         responsibles = request.form.getlist('existing_responsible_person[]')
         targets = request.form.getlist('existing_target_date[]')
 
         for i in range(len(descriptions)):
-            act_id = action_ids[i] if i < len(action_ids) else None
+            act_id = action_ids[i] if (i < len(action_ids) and action_ids[i]) else None
             desc = descriptions[i]
             resp = responsibles[i]
-            target = targets[i] if (i < len(targets) and targets[i]) else None
+            
+            # Fallback to meeting_date or today's date if target_date is left empty
+            raw_target = targets[i] if i < len(targets) else None
+            target = raw_target if (raw_target and raw_target.strip()) else (meeting_date or str(date.today()))
 
             if act_id:  # UPDATE Existing Item
                 cursor.execute("""
@@ -1045,7 +1049,7 @@ def update_meeting_minutes():
                         target_date = %s
                     WHERE id = %s;
                 """, (desc, resp, target, act_id))
-            else:  # INSERT New Item added via "+ Add New Action Item"
+            else:  # INSERT New Action Item
                 cursor.execute("""
                     INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date, status)
                     VALUES (%s, %s, %s, %s, 'Pending');
