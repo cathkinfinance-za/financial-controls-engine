@@ -376,4 +376,42 @@ textarea {
     color: #64748b;
     font-style: italic;
 }
+
+/* Allow the table container to scroll smoothly horizontally on narrow screens */
+#matrix-edit-mode {
+    overflow-x: auto;
+    width: 100%;
+}
+
+#matrix-edit-mode table {
+    width: 100%;
+    min-width: 1000px; /* Ensures columns maintain comfortable widths */
+    border-collapse: collapse;
+}
+
+#matrix-edit-mode th, 
+#matrix-edit-mode td {
+    padding: 8px 6px;
+    vertical-align: top;
+}
+
+/* Expand input fields and allow multi-line textareas for longer descriptions */
+#matrix-edit-mode input[type="text"],
+#matrix-edit-mode input[type="number"],
+#matrix-edit-mode textarea {
+    width: 100%;
+    min-height: 38px;
+    padding: 6px 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical; /* Allows expanding height if needed */
+}
+
+#matrix-edit-mode textarea {
+    height: 48px;
+    line-height: 1.3;
+}
 }

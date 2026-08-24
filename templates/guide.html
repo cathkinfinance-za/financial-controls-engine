@@ -108,19 +108,18 @@
             </table>
         </div>
 
-        <!-- EDIT FORM MODE -->
         <div id="matrix-edit-mode" style="display: none;">
             <form method="POST" action="/update_authority_matrix">
                 <table>
                     <thead>
                         <tr>
-                            <th style="width: 12%;">Category</th>
+                            <th style="width: 13%;">Category</th>
                             <th style="width: 15%;">Description</th>
-                            <th style="width: 9%;">Min (ZAR)</th>
-                            <th style="width: 9%;">Max (ZAR)</th>
-                            <th style="width: 10%;">Reviewers</th>
-                            <th style="width: 7%;">Quotes</th>
-                            <th style="width: 10%;">Approvers</th>
+                            <th style="width: 8%;">Min (ZAR)</th>
+                            <th style="width: 8%;">Max (ZAR)</th>
+                            <th style="width: 11%;">Reviewers</th>
+                            <th style="width: 6%;">Quotes</th>
+                            <th style="width: 11%;">Approvers</th>
                             <th style="width: 12%;">Controls</th>
                             <th style="width: 12%;">Audit Req.</th>
                             <th style="width: 4%;">Action</th>
@@ -141,15 +140,15 @@
                             {% set audit = row.compliance_audit_requirement if row.compliance_audit_requirement is defined else row['compliance_audit_requirement'] %}
                             <tr>
                                 <input type="hidden" name="existing_matrix_id[]" value="{{ row_id }}">
-                                <td><input type="text" name="existing_matrix_category[]" value="{{ cat }}" required></td>
-                                <td><input type="text" name="existing_description[]" value="{{ desc or '' }}"></td>
+                                <td><textarea name="existing_matrix_category[]" required>{{ cat }}</textarea></td>
+                                <td><textarea name="existing_description[]">{{ desc or '' }}</textarea></td>
                                 <td><input type="number" step="0.01" name="existing_min_value[]" value="{{ min_val if min_val is not none else '' }}"></td>
-                                <td><input type="number" step="0.01" name="existing_max_value[]" value="{{ max_val if max_val is not none else '' }}" placeholder="Unlimited"></td>
-                                <td><input type="text" name="existing_reviewer_roles[]" value="{{ rev or '' }}"></td>
+                                <td><input type="number" step="0.01" name="existing_max_value[]" value="{{ max_val if max_val is not none else '' }}" placeholder="Unlim"></td>
+                                <td><textarea name="existing_reviewer_roles[]">{{ rev or '' }}</textarea></td>
                                 <td><input type="number" name="existing_quotes_required[]" value="{{ quotes or '' }}"></td>
-                                <td><input type="text" name="existing_approver_roles[]" value="{{ app or '' }}"></td>
-                                <td><input type="text" name="existing_applicable_controls[]" value="{{ ctrl or '' }}"></td>
-                                <td><input type="text" name="existing_compliance_audit_requirement[]" value="{{ audit or '' }}"></td>
+                                <td><textarea name="existing_approver_roles[]">{{ app or '' }}</textarea></td>
+                                <td><textarea name="existing_applicable_controls[]">{{ ctrl or '' }}</textarea></td>
+                                <td><textarea name="existing_compliance_audit_requirement[]">{{ audit or '' }}</textarea></td>
                                 <td><button type="button" class="btn btn-danger btn-secondary" onclick="markMatrixRowForDeletion(this)">✕</button></td>
                             </tr>
                             {% endfor %}
@@ -157,7 +156,7 @@
                     </tbody>
                 </table>
 
-                <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addMatrixRow()">+ Add Tier Row</button>
+                <button type="button" class="btn btn-secondary" style="margin-top: 10px;" onclick="addMatrixRow()">+ Add Tier Row</button>
 
                 <div style="display: flex; gap: 10px; margin-top: 20px;">
                     <button type="submit" class="btn">Save Matrix Changes</button>
