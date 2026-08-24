@@ -164,20 +164,6 @@
                 </form>
             </div>
 
-        </div>
-        {% endfor %}
-                        {% endif %}
-                    </div>
-                    
-                    <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addEditActionRow('{{ m.id }}')">+ Add New Action Item</button>
-
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button type="submit" class="btn">Save Changes</button>
-                        <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', false)">Cancel</button>
-                    </div>
-                </form>
-            </div>
-
             <!-- ACTION ITEMS READ-ONLY STATUS TABLE -->
             {% if m.action_items and m.action_items != '[]' %}
             <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
