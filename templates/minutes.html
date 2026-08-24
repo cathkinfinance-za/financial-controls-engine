@@ -22,12 +22,16 @@
         .action-row { display: flex; gap: 10px; margin-bottom: 10px; }
         .btn { background: var(--primary-blue); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
         .btn-secondary { background: #6c757d; font-size: 12px; padding: 6px 12px; }
-        .btn-danger { background: #dc3545; }
+        .btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 4px 8px; }
         .meeting-card { border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; margin-top: 20px; background: #fff; display: none; }
         .meeting-card.active { display: block; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid var(--border-color); padding: 8px; font-size: 13px; text-align: left; }
+        th, td { border: 1px solid var(--border-color); padding: 8px; font-size: 13px; text-align: left; vertical-align: middle; }
         th { background: #f8f9fa; }
+        .action-btns { display: flex; gap: 4px; align-items: center; }
+        .status-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; background-color: #e2e3e5; }
+        .status-badge.completed { background-color: #d1e7dd; }
+        .status-badge.in-progress { background-color: #fff3cd; }
     </style>
 </head>
 <body>
@@ -164,19 +168,19 @@
                 </form>
             </div>
 
-            <!-- ACTION ITEMS READ-ONLY STATUS TABLE -->
+            <!-- ACTION ITEMS READ-ONLY & EDIT TABLE -->
             {% if m.action_items and m.action_items != '[]' %}
             <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
             <strong>Assigned Action Items Status:</strong>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Action Description</th>
-                        <th style="width: 15%;">Responsible</th>
+                        <th style="width: 23%;">Action Description</th>
+                        <th style="width: 14%;">Responsible</th>
                         <th style="width: 12%;">Target Date</th>
-                        <th style="width: 15%;">Status</th>
-                        <th style="width: 23%;">Progress / Notes</th>
-                        <th style="width: 10%;">Action</th>
+                        <th style="width: 14%;">Status</th>
+                        <th style="width: 22%;">Progress / Notes</th>
+                        <th style="width: 15%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -187,12 +191,56 @@
                     {% set act_date = act.target_date if act.target_date is defined else act['target_date'] %}
                     {% set act_status = act.status if act.status is defined else act['status'] %}
                     {% set act_notes = act.action_notes if act.action_notes is defined else act['action_notes'] %}
-                    <tr>
+                    
+                    {% set bg_color = '#e2e3e5' %}
+                    {% if act_status == 'Completed' %}
+                        {% set bg_color = '#d1e7dd' %}
+                    {% elif act_status == 'In Progress' %}
+                        {% set bg_color = '#fff3cd' %}
+                    {% endif %}
+
+                    <!-- DISPLAY ROW -->
+                    {% set status_class = '' %}
+                    {% if act_status == 'Completed' %}
+                        {% set status_class = 'completed' %}
+                    {% elif act_status == 'In Progress' %}
+                        {% set status_class = 'in-progress' %}
+                    {% endif %}
+
+                    <tr id="action-row-view-{{ act_id }}">
                         <td>{{ act_desc }}</td>
                         <td>{{ act_resp }}</td>
                         <td>{{ act_date or '' }}</td>
+                        <td>
+                            <span class="status-badge {{ status_class }}">
+                                {{ act_status or 'Pending' }}
+                            </span>
+                        </td>
+                        <td>{{ act_notes or '' }}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="toggleActionItemEdit('{{ act_id }}', true)">✏️ Edit</button>
+                                <form method="POST" action="/delete_action_item" style="display: inline;" onsubmit="return confirm('Delete this action item?');">
+                                    <input type="hidden" name="action_id" value="{{ act_id }}">
+                                    <button type="submit" class="btn btn-danger" style="padding: 3px 7px; font-size: 12px;" title="Delete Action Item">✕</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- EDIT ROW -->
+                    <tr id="action-row-edit-{{ act_id }}" style="display: none; background: #f8f9fa;">
                         <form method="POST" action="/update_action_item">
                             <input type="hidden" name="action_id" value="{{ act_id }}">
+                            <td>
+                                <input type="text" name="action_description" value="{{ act_desc }}" style="padding: 4px; font-size: 12px;" required>
+                            </td>
+                            <td>
+                                <input type="text" name="responsible_person" value="{{ act_resp }}" style="padding: 4px; font-size: 12px;" required>
+                            </td>
+                            <td>
+                                <input type="date" name="target_date" value="{{ act_date or '' }}" style="padding: 4px; font-size: 12px;">
+                            </td>
                             <td>
                                 <select name="status" style="padding: 4px; font-size: 12px;">
                                     <option value="Pending" {% if act_status == 'Pending' %}selected{% endif %}>Pending</option>
@@ -204,7 +252,10 @@
                                 <input type="text" name="action_notes" value="{{ act_notes or '' }}" placeholder="Add progress notes..." style="padding: 4px; font-size: 12px;">
                             </td>
                             <td>
-                                <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">Update</button>
+                                <div class="action-btns">
+                                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; background: #198754;">Save</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="toggleActionItemEdit('{{ act_id }}', false)">Cancel</button>
+                                </div>
                             </td>
                         </form>
                     </tr>
@@ -288,6 +339,19 @@
             } else {
                 viewMode.style.display = 'block';
                 editMode.style.display = 'none';
+            }
+        }
+
+        function toggleActionItemEdit(actionId, isEditing) {
+            const viewRow = document.getElementById(`action-row-view-${actionId}`);
+            const editRow = document.getElementById(`action-row-edit-${actionId}`);
+            
+            if (isEditing) {
+                viewRow.style.display = 'none';
+                editRow.style.display = 'table-row';
+            } else {
+                viewRow.style.display = 'table-row';
+                editRow.style.display = 'none';
             }
         }
     </script>
