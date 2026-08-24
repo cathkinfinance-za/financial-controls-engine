@@ -1064,5 +1064,64 @@ def update_meeting_minutes():
 def legal_framework():
     return render_template('legal_framework.html')
 
+@app.route('/update_meeting_minutes', methods=['POST'])
+def update_meeting_minutes():
+    meeting_id = request.form.get('meeting_id')
+    meeting_date = request.form.get('meeting_date')
+    chairperson = request.form.get('chairperson')
+    attendees = request.form.get('attendees')
+    apologies = request.form.get('apologies')
+    notes_summary = request.form.get('notes_summary')
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        # 1. Update primary meeting record
+        cursor.execute("""
+            UPDATE meeting_minutes
+            SET meeting_date = %s,
+                chairperson = %s,
+                attendees = %s,
+                apologies = %s,
+                notes_summary = %s
+            WHERE id = %s;
+        """, (meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+
+        # 2. Delete action items marked for removal
+        delete_action_ids = request.form.getlist('delete_action_id[]')
+        for act_id in delete_action_ids:
+            if act_id:
+                cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (act_id,))
+
+        # 3. Handle existing AND newly added action items in same list
+        action_ids = request.form.getlist('existing_action_id[]')
+        descriptions = request.form.getlist('existing_action_description[]')
+        responsibles = request.form.getlist('existing_responsible_person[]')
+        targets = request.form.getlist('existing_target_date[]')
+
+        for i in range(len(descriptions)):
+            act_id = action_ids[i] if i < len(action_ids) else None
+            desc = descriptions[i]
+            resp = responsibles[i]
+            target = targets[i] if (i < len(targets) and targets[i]) else None
+
+            if act_id:  # UPDATE Existing Item
+                cursor.execute("""
+                    UPDATE meeting_action_items
+                    SET action_description = %s,
+                        responsible_person = %s,
+                        target_date = %s
+                    WHERE id = %s;
+                """, (desc, resp, target, act_id))
+            else:  # INSERT New Item added via "+ Add New Action Item"
+                cursor.execute("""
+                    INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date, status)
+                    VALUES (%s, %s, %s, %s, 'Pending');
+                """, (meeting_id, desc, resp, target))
+
+        conn.commit()
+    conn.close()
+
+    return redirect(url_for('finance_minutes'))
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
