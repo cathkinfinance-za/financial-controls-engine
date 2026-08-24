@@ -6,38 +6,259 @@
     <title>Finance Committee Minutes - Cathkin Estates</title>
     <style>
         :root {
-            --bg-color: #f8f9fa;
-            --border-color: #e9ecef;
-            --text-main: #212529;
-            --text-muted: #6c757d;
-            --primary-blue: #0d6efd;
+            --bg-color: #f8fafc;
             --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --border-focus: #2563eb;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-secondary: #334155;
+            
+            --primary-blue: #2563eb;
+            --primary-blue-hover: #1d4ed8;
+            --secondary-bg: #f1f5f9;
+            --secondary-text: #475569;
+            --secondary-border: #cbd5e1;
+            --secondary-hover: #e2e8f0;
+            
+            --danger-bg: #fef2f2;
+            --danger-text: #dc2626;
+            --danger-border: #fecaca;
+            --danger-hover: #fee2e2;
+
+            --badge-pending-bg: #fef3c7;
+            --badge-pending-text: #92400e;
+            --badge-progress-bg: #e0f2fe;
+            --badge-progress-text: #0369a1;
+            --badge-completed-bg: #dcfce7;
+            --badge-completed-text: #166534;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 40px; margin: 0; }
-        .container { max-width: 900px; margin: 0 auto; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 40px; }
-        h1 { font-size: 24px; border-bottom: 2px solid var(--border-color); padding-bottom: 10px; margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 5px; }
-        input[type="text"], input[type="date"], textarea, select { width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; }
-        .action-row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .btn { background: var(--primary-blue); color: white; border: none; padding: 10px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
-        .btn-secondary { background: #6c757d; font-size: 12px; padding: 6px 12px; }
-        .btn-danger { background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; padding: 4px 8px; }
-        .meeting-card { border: 1px solid var(--border-color); padding: 20px; border-radius: 6px; margin-top: 20px; background: #fff; display: none; }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            padding: 40px 20px; 
+            margin: 0; 
+            line-height: 1.5;
+        }
+
+        .container { 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background: var(--card-bg); 
+            border: 1px solid var(--border-color); 
+            border-radius: 8px; 
+            padding: 32px 40px; 
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 { 
+            font-size: 22px; 
+            font-weight: 600;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 12px; 
+            margin-top: 12px;
+            margin-bottom: 24px; 
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 40px; 
+            border-bottom: 1px solid var(--border-color); 
+            padding-bottom: 8px;
+        }
+
+        h3, h4 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        .form-group { margin-bottom: 18px; }
+
+        label { 
+            display: block; 
+            font-weight: 600; 
+            font-size: 13px; 
+            color: var(--text-secondary);
+            margin-bottom: 6px; 
+        }
+
+        input[type="text"], input[type="date"], textarea, select { 
+            width: 100%; 
+            padding: 8px 12px; 
+            font-family: inherit;
+            font-size: 13px; 
+            color: var(--text-main);
+            background-color: #ffffff;
+            border: 1px solid var(--secondary-border); 
+            border-radius: 6px; 
+            box-sizing: border-box; 
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        input[type="text"]:focus, input[type="date"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--border-focus);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        .action-row { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 10px; 
+            align-items: center;
+        }
+
+        /* --- BUTTON STYLES --- */
+        .btn { 
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: var(--primary-blue); 
+            color: white; 
+            border: 1px solid transparent; 
+            padding: 8px 16px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 13px;
+            font-weight: 500; 
+            text-decoration: none; 
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn:hover {
+            background: var(--primary-blue-hover);
+        }
+
+        .btn-secondary { 
+            background: var(--secondary-bg); 
+            color: var(--secondary-text);
+            border: 1px solid var(--secondary-border);
+            font-size: 13px; 
+            padding: 7px 14px; 
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary-hover);
+            color: var(--text-main);
+        }
+
+        .btn-danger { 
+            background: var(--danger-bg); 
+            color: var(--danger-text); 
+            border: 1px solid var(--danger-border); 
+            border-radius: 6px; 
+            cursor: pointer; 
+            padding: 6px 10px; 
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.15s ease-in-out;
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-hover);
+        }
+
+        /* --- CARDS & TABLES --- */
+        .meeting-card { 
+            border: 1px solid var(--border-color); 
+            padding: 24px; 
+            border-radius: 8px; 
+            margin-top: 20px; 
+            background: #ffffff; 
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            display: none; 
+        }
+
         .meeting-card.active { display: block; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid var(--border-color); padding: 8px; font-size: 13px; text-align: left; vertical-align: middle; }
-        th { background: #f8f9fa; }
-        .action-btns { display: flex; gap: 4px; align-items: center; }
-        .status-badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; background-color: #e2e3e5; }
-        .status-badge.completed { background-color: #d1e7dd; }
-        .status-badge.in-progress { background-color: #fff3cd; }
+
+        table { 
+            width: 100%; 
+            border-collapse: separate; 
+            border-spacing: 0;
+            margin-top: 12px; 
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        th, td { 
+            border-bottom: 1px solid var(--border-color); 
+            padding: 10px 12px; 
+            font-size: 13px; 
+            text-align: left; 
+            vertical-align: middle; 
+        }
+
+        th { 
+            background: var(--bg-color); 
+            color: var(--secondary-text);
+            font-weight: 600;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .action-btns { 
+            display: flex; 
+            gap: 6px; 
+            align-items: center; 
+        }
+
+        /* --- STATUS BADGES --- */
+        .status-badge { 
+            display: inline-block;
+            padding: 3px 10px; 
+            border-radius: 9999px; 
+            font-size: 12px; 
+            font-weight: 500;
+            background-color: var(--badge-pending-bg); 
+            color: var(--badge-pending-text);
+            text-transform: capitalize;
+        }
+
+        .status-badge.in-progress { 
+            background-color: var(--badge-progress-bg); 
+            color: var(--badge-progress-text);
+        }
+
+        .status-badge.completed { 
+            background-color: var(--badge-completed-bg); 
+            color: var(--badge-completed-text);
+        }
+
+        .back-link {
+            color: var(--primary-blue); 
+            text-decoration: none; 
+            font-size: 13px;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/guide" style="color: var(--primary-blue); text-decoration: none; font-size: 14px;">← Back to Guide</a>
-        <h1 style="margin-top: 15px;">Finance Committee Meeting Minutes</h1>
+        <a href="/guide" class="back-link">← Back to Guide</a>
+        <h1>Finance Committee Meeting Minutes</h1>
 
         <!-- MINUTES ENTRY FORM -->
         <form method="POST" action="/minutes">
@@ -77,16 +298,16 @@
             </div>
             <button type="button" class="btn btn-secondary" onclick="addActionRow()">+ Add Action Item</button>
 
-            <div style="margin-top: 25px;">
+            <div style="margin-top: 24px;">
                 <button type="submit" class="btn">Save Meeting Minutes</button>
             </div>
         </form>
 
         <!-- HISTORICAL MINUTES DROPDOWN SEARCH -->
-        <h2 style="margin-top: 40px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">Previous Meeting Records</h2>
+        <h2>Previous Meeting Records</h2>
         
         {% if meetings %}
-        <div class="form-group">
+        <div class="form-group" style="margin-top: 16px;">
             <label for="meeting-select">Select Meeting Date:</label>
             <select id="meeting-select" onchange="showSelectedMeeting(this.value)">
                 <option value="">-- Select a Meeting Date --</option>
@@ -101,15 +322,15 @@
             
             <!-- DISPLAY READ-ONLY VIEW MODE -->
             <div id="view-mode-{{ m.id }}">
-                <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-weight: 600; font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;">
                     <span>Date: {{ m.meeting_date }}</span>
                     <span>Chair: {{ m.chairperson }}</span>
                 </div>
-                <p><strong>Attendees:</strong> {{ m.attendees }}</p>
-                {% if m.apologies %}<p><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
-                <p><strong>Summary Notes:</strong></p>
-                <p style="white-space: pre-line; background: #f8f9fa; padding: 10px; border-radius: 4px;">{{ m.notes_summary }}</p>
-                <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', true)">✏️ Edit Meeting Record</button>
+                <p style="margin: 6px 0; font-size: 14px;"><strong>Attendees:</strong> {{ m.attendees }}</p>
+                {% if m.apologies %}<p style="margin: 6px 0; font-size: 14px;"><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
+                <p style="margin: 12px 0 6px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.025em;">Summary Notes</p>
+                <div style="white-space: pre-line; background: var(--bg-color); border: 1px solid var(--border-color); padding: 14px; border-radius: 6px; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">{{ m.notes_summary }}</div>
+                <button type="button" class="btn btn-secondary" style="margin-top: 16px;" onclick="toggleEditMode('{{ m.id }}', true)">✏️ Edit Meeting Record</button>
             </div>
 
             <!-- EDIT FORM MODE -->
@@ -140,7 +361,7 @@
                     </div>
 
                     <!-- ACTION ITEMS INSIDE FORM -->
-                    <h4 style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Manage Action Items</h4>
+                    <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">Manage Action Items</h4>
                     <div id="edit-action-items-container-{{ m.id }}">
                         {% if m.action_items and m.action_items != '[]' %}
                             {% for act in m.action_items %}
@@ -153,13 +374,13 @@
                                 <input type="text" name="existing_action_description[]" value="{{ act_desc }}" placeholder="Task Description" style="flex: 2;" required>
                                 <input type="text" name="existing_responsible_person[]" value="{{ act_resp }}" placeholder="Responsible" style="flex: 1;" required>
                                 <input type="date" name="existing_target_date[]" value="{{ act_date or '' }}" style="flex: 1;">
-                                <button type="button" class="btn btn-danger btn-secondary" onclick="markActionForDeletion(this)">✕</button>
+                                <button type="button" class="btn btn-danger" onclick="markActionForDeletion(this)">✕</button>
                             </div>
                             {% endfor %}
                         {% endif %}
                     </div>
                     
-                    <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addEditActionRow('{{ m.id }}')">+ Add New Action Item</button>
+                    <button type="button" class="btn btn-secondary" style="margin-top: 8px;" onclick="addEditActionRow('{{ m.id }}')">+ Add New Action Item</button>
 
                     <div style="display: flex; gap: 10px; margin-top: 20px;">
                         <button type="submit" class="btn">Save Changes</button>
@@ -170,16 +391,16 @@
 
             <!-- ACTION ITEMS READ-ONLY & EDIT TABLE -->
             {% if m.action_items and m.action_items != '[]' %}
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
-            <strong>Assigned Action Items Status:</strong>
+            <hr style="margin: 24px 0 16px 0; border: none; border-top: 1px solid var(--border-color);">
+            <div style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">Assigned Action Items Status</div>
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 23%;">Action Description</th>
-                        <th style="width: 14%;">Responsible</th>
+                        <th style="width: 25%;">Action Description</th>
+                        <th style="width: 12%;">Responsible</th>
                         <th style="width: 12%;">Target Date</th>
-                        <th style="width: 14%;">Status</th>
-                        <th style="width: 22%;">Progress / Notes</th>
+                        <th style="width: 12%;">Status</th>
+                        <th style="width: 24%;">Progress / Notes</th>
                         <th style="width: 15%;">Actions</th>
                     </tr>
                 </thead>
@@ -192,14 +413,6 @@
                     {% set act_status = act.status if act.status is defined else act['status'] %}
                     {% set act_notes = act.action_notes if act.action_notes is defined else act['action_notes'] %}
                     
-                    {% set bg_color = '#e2e3e5' %}
-                    {% if act_status == 'Completed' %}
-                        {% set bg_color = '#d1e7dd' %}
-                    {% elif act_status == 'In Progress' %}
-                        {% set bg_color = '#fff3cd' %}
-                    {% endif %}
-
-                    <!-- DISPLAY ROW -->
                     {% set status_class = '' %}
                     {% if act_status == 'Completed' %}
                         {% set status_class = 'completed' %}
@@ -207,6 +420,7 @@
                         {% set status_class = 'in-progress' %}
                     {% endif %}
 
+                    <!-- DISPLAY ROW -->
                     <tr id="action-row-view-{{ act_id }}">
                         <td>{{ act_desc }}</td>
                         <td>{{ act_resp }}</td>
@@ -219,42 +433,42 @@
                         <td>{{ act_notes or '' }}</td>
                         <td>
                             <div class="action-btns">
-                                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="toggleActionItemEdit('{{ act_id }}', true)">✏️ Edit</button>
+                                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="toggleActionItemEdit('{{ act_id }}', true)">✏️ Edit</button>
                                 <form method="POST" action="/delete_action_item" style="display: inline;" onsubmit="return confirm('Delete this action item?');">
                                     <input type="hidden" name="action_id" value="{{ act_id }}">
-                                    <button type="submit" class="btn btn-danger" style="padding: 3px 7px; font-size: 12px;" title="Delete Action Item">✕</button>
+                                    <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" title="Delete Action Item">✕</button>
                                 </form>
                             </div>
                         </td>
                     </tr>
 
                     <!-- EDIT ROW -->
-                    <tr id="action-row-edit-{{ act_id }}" style="display: none; background: #f8f9fa;">
+                    <tr id="action-row-edit-{{ act_id }}" style="display: none; background: var(--bg-color);">
                         <form method="POST" action="/update_action_item">
                             <input type="hidden" name="action_id" value="{{ act_id }}">
                             <td>
-                                <input type="text" name="action_description" value="{{ act_desc }}" style="padding: 4px; font-size: 12px;" required>
+                                <input type="text" name="action_description" value="{{ act_desc }}" required>
                             </td>
                             <td>
-                                <input type="text" name="responsible_person" value="{{ act_resp }}" style="padding: 4px; font-size: 12px;" required>
+                                <input type="text" name="responsible_person" value="{{ act_resp }}" required>
                             </td>
                             <td>
-                                <input type="date" name="target_date" value="{{ act_date or '' }}" style="padding: 4px; font-size: 12px;">
+                                <input type="date" name="target_date" value="{{ act_date or '' }}">
                             </td>
                             <td>
-                                <select name="status" style="padding: 4px; font-size: 12px;">
+                                <select name="status">
                                     <option value="Pending" {% if act_status == 'Pending' %}selected{% endif %}>Pending</option>
                                     <option value="In Progress" {% if act_status == 'In Progress' %}selected{% endif %}>In Progress</option>
                                     <option value="Completed" {% if act_status == 'Completed' %}selected{% endif %}>Completed</option>
                                 </select>
                             </td>
                             <td>
-                                <input type="text" name="action_notes" value="{{ act_notes or '' }}" placeholder="Add progress notes..." style="padding: 4px; font-size: 12px;">
+                                <input type="text" name="action_notes" value="{{ act_notes or '' }}" placeholder="Add progress notes...">
                             </td>
                             <td>
                                 <div class="action-btns">
-                                    <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px; background: #198754;">Save</button>
-                                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;" onclick="toggleActionItemEdit('{{ act_id }}', false)">Cancel</button>
+                                    <button type="submit" class="btn" style="padding: 4px 8px; font-size: 12px;">Save</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="toggleActionItemEdit('{{ act_id }}', false)">Cancel</button>
                                 </div>
                             </td>
                         </form>
@@ -267,7 +481,7 @@
         {% endfor %}
 
         {% else %}
-        <p style="color: var(--text-muted);">No meeting minutes recorded yet.</p>
+        <p style="color: var(--text-muted); margin-top: 12px;">No meeting minutes recorded yet.</p>
         {% endif %}
     </div>
 
@@ -280,7 +494,7 @@
                 <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
                 <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
                 <input type="date" name="target_date[]" style="flex: 1;">
-                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">✕</button>
             `;
             container.appendChild(row);
         }
@@ -297,7 +511,7 @@
                 <input type="text" name="existing_action_description[]" placeholder="Task Description" style="flex: 2;" required>
                 <input type="text" name="existing_responsible_person[]" placeholder="Responsible" style="flex: 1;" required>
                 <input type="date" name="existing_target_date[]" style="flex: 1;">
-                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
+                <button type="button" class="btn btn-danger" onclick="this.parentElement.remove()">✕</button>
             `;
             container.appendChild(row);
         }
