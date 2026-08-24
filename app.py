@@ -1061,7 +1061,8 @@ def expenditure_expose():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Dynamically inject the validated column identifier safely
+        # Exclude rolled-up parent items ending in /000
+        # Dynamically pull the selected month alongside YTD metrics
         query = f"""
             SELECT gl_code, description, 
                    COALESCE({selected_month}, 0) AS selected_month_actual,
@@ -1070,7 +1071,8 @@ def expenditure_expose():
                    COALESCE(variance, 0) AS variance, 
                    COALESCE(total_budget, 0) AS total_budget
             FROM public.master_budget
-            ORDER BY variance DESC;
+            WHERE gl_code NOT LIKE '%/000'
+            ORDER BY gl_code ASC;
         """
         cur.execute(query)
         all_items = cur.fetchall()
@@ -1080,19 +1082,37 @@ def expenditure_expose():
     except Exception as e:
         flash(f"Database error fetching expenditure records: {str(e)}", "danger")
 
-    over_budget_items = [item for item in all_items if float(item['ytd']) > float(item['budget_ytd'])]
+    # Separate into Income (GL 1...) and Expenditure (GL 2...)
+    income_items = [item for item in all_items if str(item['gl_code']).startswith('1')]
+    expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2')]
+
+    # Expenditure Overruns: Actual Spend > Budget (ytd > budget_ytd)
+    over_budget_expenditure = [item for item in expenditure_items if float(item['ytd']) > float(item['budget_ytd'])]
     
-    total_ytd_spend = sum(float(item['ytd']) for item in all_items)
-    total_ytd_budget = sum(float(item['budget_ytd']) for item in all_items)
-    total_selected_month_spend = sum(float(item['selected_month_actual']) for item in all_items)
-    total_overrun = sum(float(item['variance']) for item in over_budget_items)
-    net_variance = total_ytd_spend - total_ytd_budget
+    # Income Shortfalls: Actual Income < Budget (ytd < budget_ytd)
+    under_budget_income = [item for item in income_items if float(item['ytd']) < float(item['budget_ytd'])]
+
+    # Macro Calculations
+    total_ytd_income = sum(float(item['ytd']) for item in income_items)
+    total_ytd_income_budget = sum(float(item['budget_ytd']) for item in income_items)
+    
+    total_ytd_expenditure = sum(float(item['ytd']) for item in expenditure_items)
+    total_ytd_expenditure_budget = sum(float(item['budget_ytd']) for item in expenditure_items)
+
+    total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
+    total_expenditure_overrun = sum(float(item['variance']) for item in over_budget_expenditure)
 
     month_label = ALLOWED_MONTHS[selected_month]
 
-    all_spend_text = "\n".join([
-        f"- GL {item['gl_code']} ({item['description']}): {month_label} R{float(item['selected_month_actual']):,.2f} | YTD Actual R{float(item['ytd']):,.2f} | YTD Budget R{float(item['budget_ytd']):,.2f} | Variance R{float(item['variance']):,.2f}"
-        for item in all_items
+    # Format structured text for AI analysis
+    income_summary = "\n".join([
+        f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}"
+        for i in income_items
+    ])
+    
+    expenditure_summary = "\n".join([
+        f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f} (Variance: R{float(e['variance']):,.2f})"
+        for e in expenditure_items
     ])
 
     ai_analysis = "AI analysis is currently disabled or unavailable."
@@ -1102,21 +1122,25 @@ def expenditure_expose():
             model = genai.GenerativeModel('gemini-3.5-flash')
             prompt = f"""
             You are an expert financial controller for Cathkin Estates Finance Committee.
-            Analyze our complete expenditure against budget through {month_label}:
+            Analyze our complete YTD income and expenditure performance through {month_label} (excluding rolled-up summary accounts):
 
-            MACRO METRICS:
-            - Selected Month ({month_label}) Total Spend: R{total_selected_month_spend:,.2f}
-            - Overall YTD Spend: R{total_ytd_spend:,.2f}
-            - Overall YTD Budget: R{total_ytd_budget:,.2f}
-            - Combined Net Variance: R{net_variance:,.2f}
+            INCOME OVERVIEW (GL Series 1):
+            - YTD Total Income Collected: R{total_ytd_income:,.2f}
+            - YTD Total Income Budgeted: R{total_ytd_income_budget:,.2f}
+            Line Items:
+            {income_summary}
 
-            LINE-BY-LINE EXPENDITURE DATA:
-            {all_spend_text}
+            EXPENDITURE OVERVIEW (GL Series 2):
+            - YTD Total Expenditure: R{total_ytd_expenditure:,.2f}
+            - YTD Total Expenditure Budget: R{total_ytd_expenditure_budget:,.2f}
+            - Overrun Exposure: R{total_expenditure_overrun:,.2f}
+            Line Items:
+            {expenditure_summary}
 
             Provide a concise, 3-section executive commentary for the Finance Committee meeting:
-            1. **Macro Financial Health**: Summarize total estate spend performance focusing on {month_label} trends.
-            2. **Variance Analysis**: Highlight top drivers pushing specific line items over budget.
-            3. **Mitigation & Savings**: Identify key areas with favorable variances (savings) and suggest 2 concrete actions.
+            1. **Income vs Spend Macro Health**: Evaluate net estate surplus/deficit position.
+            2. **Revenue Shortfalls & Over-Budget Drivers**: Point out any revenue collections falling short of budget and top expenditure overrun items.
+            3. **Key Recommendations**: Suggest 2 concrete corrective financial actions.
             """
             response = model.generate_content(prompt)
             ai_analysis = response.text
@@ -1125,12 +1149,16 @@ def expenditure_expose():
 
     return render_template(
         'expenditure_expose.html',
-        all_items=all_items,
-        over_budget_items=over_budget_items,
-        total_ytd_spend=total_ytd_spend,
-        total_ytd_budget=total_ytd_budget,
+        income_items=income_items,
+        expenditure_items=expenditure_items,
+        over_budget_expenditure=over_budget_expenditure,
+        under_budget_income=under_budget_income,
+        total_ytd_income=total_ytd_income,
+        total_ytd_income_budget=total_ytd_income_budget,
+        total_ytd_expenditure=total_ytd_expenditure,
+        total_ytd_expenditure_budget=total_ytd_expenditure_budget,
         total_selected_month_spend=total_selected_month_spend,
-        total_overrun=total_overrun,
+        total_expenditure_overrun=total_expenditure_overrun,
         selected_month=selected_month,
         allowed_months=ALLOWED_MONTHS,
         ai_analysis=ai_analysis

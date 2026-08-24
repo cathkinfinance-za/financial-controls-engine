@@ -250,26 +250,23 @@
         {% endwith %}
 
         <!-- KPI Summary Cards -->
+    
         <div class="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-label">{{ allowed_months[selected_month] }} Spend</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_selected_month_spend) }}</div>
+                <div class="kpi-label">YTD Actual Income (1xxx)</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_income) }}</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Total YTD Actual</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_spend) }}</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Total YTD Budget</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_budget) }}</div>
+                <div class="kpi-label">YTD Actual Spend (2xxx)</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure) }}</div>
             </div>
             <div class="kpi-card danger">
-                <div class="kpi-label">Overrun Exposure</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_overrun) }}</div>
+                <div class="kpi-label">Expenditure Overrun</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_expenditure_overrun) }}</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">Items Over Budget</div>
-                <div class="kpi-value">{{ over_budget_items|length }}</div>
+                <div class="kpi-label">Over-Budget Spend Items</div>
+                <div class="kpi-value">{{ over_budget_expenditure|length }}</div>
             </div>
         </div>
 
