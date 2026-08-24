@@ -820,32 +820,26 @@ Project Objectives: {project.get('project_objective', '')}
 # --- MINUTES ---
 @app.route('/minutes', methods=['GET', 'POST'])
 def finance_minutes():
-    selected_id = request.args.get('meeting_id')
     conn = get_db_connection()
-    
     with conn.cursor() as cursor:
-        cursor.execute("SELECT id, meeting_date, chairperson FROM meeting_minutes ORDER BY meeting_date DESC;")
+        cursor.execute("""
+            SELECT id, meeting_date, chairperson, attendees, apologies, notes_summary 
+            FROM meeting_minutes 
+            ORDER BY meeting_date DESC;
+        """)
         meetings = cursor.fetchall()
         
-        selected_meeting = None
-        if selected_id:
-            cursor.execute("SELECT * FROM meeting_minutes WHERE id = %s;", (selected_id,))
-            selected_meeting = cursor.fetchone()
-        elif meetings:
-            cursor.execute("SELECT * FROM meeting_minutes WHERE id = %s;", (meetings[0]['id'],))
-            selected_meeting = cursor.fetchone()
-            
-        if selected_meeting:
+        # Attach action items to each meeting card
+        for m in meetings:
             cursor.execute("""
                 SELECT id, action_description, responsible_person, target_date, status 
                 FROM meeting_action_items 
                 WHERE meeting_id = %s ORDER BY id ASC;
-            """, (selected_meeting['id'],))
-            selected_meeting['action_items'] = cursor.fetchall()
+            """, (m['id'],))
+            m['action_items'] = cursor.fetchall()
 
     conn.close()
-    return render_template('minutes.html', meetings=meetings, selected_meeting=selected_meeting)
-
+    return render_template('minutes.html', meetings=meetings)
 
 @app.route('/update_action_item', methods=['POST'])
 def update_action_item():

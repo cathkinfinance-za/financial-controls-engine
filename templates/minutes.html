@@ -94,7 +94,8 @@
 
         {% for m in meetings %}
         <div id="meeting-{{ m.id }}" class="meeting-card">
-            <!-- DISPLAY VIEW -->
+            
+            <!-- DISPLAY READ-ONLY VIEW MODE -->
             <div id="view-mode-{{ m.id }}">
                 <div style="display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 10px;">
                     <span>Date: {{ m.meeting_date }}</span>
@@ -131,10 +132,10 @@
                     </div>
                     <div class="form-group">
                         <label>Meeting Deliberations & Key Notes</label>
-                        <textarea name="notes_summary" rows="4" required>{{ m.notes_summary }}</textarea>
+                        <textarea name="notes_summary" rows="5" required>{{ m.notes_summary }}</textarea>
                     </div>
 
-                    <!-- EDIT & ADD ACTION ITEMS IN MEETING RECORD -->
+                    <!-- ACTION ITEMS INSIDE FORM -->
                     <h4 style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Manage Action Items</h4>
                     <div id="edit-action-items-container-{{ m.id }}">
                         {% if m.action_items and m.action_items != '[]' %}
@@ -151,6 +152,20 @@
                                 <button type="button" class="btn btn-danger btn-secondary" onclick="markActionForDeletion(this)">✕</button>
                             </div>
                             {% endfor %}
+                        {% endif %}
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addEditActionRow('{{ m.id }}')">+ Add New Action Item</button>
+
+                    <div style="display: flex; gap: 10px; margin-top: 20px;">
+                        <button type="submit" class="btn">Save Changes</button>
+                        <button type="button" class="btn btn-secondary" onclick="toggleEditMode('{{ m.id }}', false)">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+        {% endfor %}
                         {% endif %}
                     </div>
                     
