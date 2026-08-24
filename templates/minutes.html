@@ -356,9 +356,14 @@
                         <input type="text" name="apologies" value="{{ m.apologies or '' }}">
                     </div>
                     <div class="form-group">
-                        <label>Meeting Deliberations & Key Notes</label>
-                        <textarea name="notes_summary" rows="5" required>{{ m.notes_summary }}</textarea>
-                    </div>
+                            <label>Meeting Deliberations & Key Notes</label>
+                            <textarea name="notes_summary" rows="8" required>STANDING AGENDA ITEMS:
+                        1. Eskom Recovery
+                        2. Review of Action Items & Matters Arising
+                        3. Over-Budget Expenditure Expose
+                        --------------------------------------------------
+                        </textarea>
+                        </div>
 
                     <!-- ACTION ITEMS INSIDE FORM -->
                     <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">Manage Action Items</h4>
