@@ -8,9 +8,9 @@ from psycopg2.extras import RealDictCursor
 import vercel_blob
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from werkzeug.utils import secure_filename
-
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
+from flask import request
 
 try:
     import google.generativeai as genai
@@ -1040,6 +1040,101 @@ def delete_action_item():
             conn.close()
     return redirect(url_for('finance_minutes'))
 
+
+ALLOWED_MONTHS = {
+    'mar_2026': 'March 2026',
+    'apr_2026': 'April 2026',
+    'may_2026': 'May 2026',
+    'jun_2026': 'June 2026',
+    'jul_2026': 'July 2026',
+    'aug_2026': 'August 2026'
+}
+
+@app.route('/expenditure_expose')
+def expenditure_expose():
+    selected_month = request.args.get('month', 'aug_2026')
+    if selected_month not in ALLOWED_MONTHS:
+        selected_month = 'aug_2026'
+
+    all_items = []
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Dynamically inject the validated column identifier safely
+        query = f"""
+            SELECT gl_code, description, 
+                   COALESCE({selected_month}, 0) AS selected_month_actual,
+                   COALESCE(ytd, 0) AS ytd, 
+                   COALESCE(budget_ytd, 0) AS budget_ytd, 
+                   COALESCE(variance, 0) AS variance, 
+                   COALESCE(total_budget, 0) AS total_budget
+            FROM public.master_budget
+            ORDER BY variance DESC;
+        """
+        cur.execute(query)
+        all_items = cur.fetchall()
+        
+        cur.close()
+        conn.close()
+    except Exception as e:
+        flash(f"Database error fetching expenditure records: {str(e)}", "danger")
+
+    over_budget_items = [item for item in all_items if float(item['ytd']) > float(item['budget_ytd'])]
+    
+    total_ytd_spend = sum(float(item['ytd']) for item in all_items)
+    total_ytd_budget = sum(float(item['budget_ytd']) for item in all_items)
+    total_selected_month_spend = sum(float(item['selected_month_actual']) for item in all_items)
+    total_overrun = sum(float(item['variance']) for item in over_budget_items)
+    net_variance = total_ytd_spend - total_ytd_budget
+
+    month_label = ALLOWED_MONTHS[selected_month]
+
+    all_spend_text = "\n".join([
+        f"- GL {item['gl_code']} ({item['description']}): {month_label} R{float(item['selected_month_actual']):,.2f} | YTD Actual R{float(item['ytd']):,.2f} | YTD Budget R{float(item['budget_ytd']):,.2f} | Variance R{float(item['variance']):,.2f}"
+        for item in all_items
+    ])
+
+    ai_analysis = "AI analysis is currently disabled or unavailable."
+
+    if GEMINI_AVAILABLE and all_items:
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            prompt = f"""
+            You are an expert financial controller for Cathkin Estates Finance Committee.
+            Analyze our complete expenditure against budget through {month_label}:
+
+            MACRO METRICS:
+            - Selected Month ({month_label}) Total Spend: R{total_selected_month_spend:,.2f}
+            - Overall YTD Spend: R{total_ytd_spend:,.2f}
+            - Overall YTD Budget: R{total_ytd_budget:,.2f}
+            - Combined Net Variance: R{net_variance:,.2f}
+
+            LINE-BY-LINE EXPENDITURE DATA:
+            {all_spend_text}
+
+            Provide a concise, 3-section executive commentary for the Finance Committee meeting:
+            1. **Macro Financial Health**: Summarize total estate spend performance focusing on {month_label} trends.
+            2. **Variance Analysis**: Highlight top drivers pushing specific line items over budget.
+            3. **Mitigation & Savings**: Identify key areas with favorable variances (savings) and suggest 2 concrete actions.
+            """
+            response = model.generate_content(prompt)
+            ai_analysis = response.text
+        except Exception as e:
+            ai_analysis = f"AI Analysis temporarily unavailable: {str(e)}"
+
+    return render_template(
+        'expenditure_expose.html',
+        all_items=all_items,
+        over_budget_items=over_budget_items,
+        total_ytd_spend=total_ytd_spend,
+        total_ytd_budget=total_ytd_budget,
+        total_selected_month_spend=total_selected_month_spend,
+        total_overrun=total_overrun,
+        selected_month=selected_month,
+        allowed_months=ALLOWED_MONTHS,
+        ai_analysis=ai_analysis
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

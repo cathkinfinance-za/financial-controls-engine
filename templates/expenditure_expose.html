@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expenditure Expose - Cathkin Estates</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --danger-bg: #fef2f2;
+            --danger-text: #dc2626;
+            --danger-border: #fecaca;
+            --accent-blue: #2563eb;
+            --ai-bg: #f0f9ff;
+            --ai-border: #bae6fd;
+            --ai-text: #0369a1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 32px 16px;
+        }
+
+        .container {
+            max-width: 1040px;
+            margin: 0 auto;
+        }
+
+        /* Top Bar & Header */
+        .top-nav {
+            margin-bottom: 16px;
+        }
+
+        .back-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0 24px 0;
+            letter-spacing: -0.02em;
+        }
+
+        /* Flash Message Alert Styles */
+        .alert {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            border: 1px solid;
+        }
+
+        .alert-danger {
+            background-color: var(--danger-bg);
+            color: var(--danger-text);
+            border-color: var(--danger-border);
+        }
+
+        .alert-info {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #bfdbfe;
+        }
+
+        /* KPI Metric Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        }
+
+        .kpi-card.danger {
+            background: var(--danger-bg);
+            border-color: var(--danger-border);
+        }
+
+        .kpi-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+
+        .kpi-card.danger .kpi-label {
+            color: #991b1b;
+        }
+
+        .kpi-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .kpi-card.danger .kpi-value {
+            color: var(--danger-text);
+        }
+
+        /* AI Analysis Callout */
+        .ai-card {
+            background: var(--ai-bg);
+            border: 1px solid var(--ai-border);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 32px;
+        }
+
+        .ai-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--ai-text);
+            margin-bottom: 12px;
+        }
+
+        .ai-body {
+            font-size: 14px;
+            line-height: 1.6;
+            color: #1e293b;
+            white-space: pre-wrap;
+        }
+
+        /* Section Headings */
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-main);
+        }
+
+        /* Table Design */
+        .table-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: #f1f5f9;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.04em;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .badge-overrun {
+            color: var(--danger-text);
+            font-weight: 600;
+            background-color: var(--danger-bg);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 32px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Top Navigation -->
+        <div class="top-nav">
+            <a href="/minutes" class="back-link">← Back to Minutes Dashboard</a>
+            <h1 class="header-title">Standing Agenda: Over-Budget Expenditure Expose</h1>
+        </div>
+
+        <!-- Month Selector Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #ffffff; padding: 12px 16px; border: 1px solid var(--border-color); border-radius: 8px;">
+            <span style="font-size: 14px; font-weight: 600;">Filter Period</span>
+            <form method="GET" action="/expenditure_expose" style="margin: 0;">
+                <select name="month" onchange="this.form.submit()" style="padding: 6px 12px; font-size: 13px; border-radius: 6px; border: 1px solid var(--border-color); font-weight: 500; cursor: pointer;">
+                    {% for col_name, display_name in allowed_months.items() %}
+                        <option value="{{ col_name }}" {% if selected_month == col_name %}selected{% endif %}>
+                            {{ display_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </form>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                <div class="alert {% if category == 'danger' %}alert-danger{% else %}alert-info{% endif %}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- KPI Summary Cards -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">{{ allowed_months[selected_month] }} Spend</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_selected_month_spend) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total YTD Actual</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_spend) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Total YTD Budget</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_budget) }}</div>
+            </div>
+            <div class="kpi-card danger">
+                <div class="kpi-label">Overrun Exposure</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_overrun) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Items Over Budget</div>
+                <div class="kpi-value">{{ over_budget_items|length }}</div>
+            </div>
+        </div>
+
+        <!-- Gemini AI Financial Analysis -->
+        <div class="ai-card">
+            <div class="ai-header">
+                <span>🤖 Gemini Financial Controller Commentary</span>
+            </div>
+            <div class="ai-body">{{ ai_analysis }}</div>
+        </div>
+
+        <!-- Over-Budget Line Items Table -->
+        <div class="section-title">Over-Budget Line Items Requiring Review</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>GL Code</th>
+                        <th>Description</th>
+                        <th class="text-right">{{ allowed_months[selected_month] }}</th>
+                        <th class="text-right">YTD Actual</th>
+                        <th class="text-right">YTD Budget</th>
+                        <th class="text-right">Variance (Over)</th>
+                        <th class="text-right">Full Year Budget</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in over_budget_items %}
+                    <tr>
+                        <td><strong>{{ item.gl_code }}</strong></td>
+                        <td>{{ item.description }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.selected_month_actual) }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.ytd) }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.budget_ytd) }}</td>
+                        <td class="text-right">
+                            <span class="badge-overrun">+R {{ "{:,.2f}".format(item.variance) }}</span>
+                        </td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.total_budget) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            No GL line items are currently exceeding YTD budget allocations.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
