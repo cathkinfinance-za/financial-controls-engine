@@ -925,21 +925,36 @@ def update_authority_matrix():
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            row_ids = request.form.getlist('row_id[]')
-            categories = request.form.getlist('matrix_category[]')
-            descriptions = request.form.getlist('description[]')
-            min_values = request.form.getlist('min_value[]')
-            max_values = request.form.getlist('max_value[]')
-            reviewer_roles = request.form.getlist('reviewer_roles[]')
-            quotes_req = request.form.getlist('quotes_required[]')
-            approver_roles = request.form.getlist('approver_roles[]')
-            applicable_controls = request.form.getlist('applicable_controls[]')
+            # 1. Handle Deletions
+            delete_ids = request.form.getlist('delete_matrix_id[]')
+            for del_id in delete_ids:
+                if del_id:
+                    cursor.execute("DELETE FROM approval_matrix WHERE id = %s;", (del_id,))
+
+            # 2. Handle Updates to Existing Rows
+            row_ids = request.form.getlist('existing_matrix_id[]')
+            categories = request.form.getlist('existing_matrix_category[]')
+            descriptions = request.form.getlist('existing_description[]')
+            min_values = request.form.getlist('existing_min_value[]')
+            max_values = request.form.getlist('existing_max_value[]')
+            reviewer_roles = request.form.getlist('existing_reviewer_roles[]')
+            quotes_req = request.form.getlist('existing_quotes_required[]')
+            approver_roles = request.form.getlist('existing_approver_roles[]')
+            applicable_controls = request.form.getlist('existing_applicable_controls[]')
+            audit_reqs = request.form.getlist('existing_compliance_audit_requirement[]')
 
             for i in range(len(row_ids)):
                 r_id = row_ids[i]
-                min_val = float(min_values[i]) if min_values[i] else 0.0
-                max_val = float(max_values[i]) if max_values[i] else None
-                quotes = int(quotes_req[i]) if quotes_req[i] else 1
+                min_val = float(min_values[i]) if (i < len(min_values) and min_values[i].strip()) else 0.0
+                max_val = float(max_values[i]) if (i < len(max_values) and max_values[i].strip()) else None
+                quotes = int(quotes_req[i]) if (i < len(quotes_req) and quotes_req[i].strip()) else None
+                
+                cat = categories[i] if i < len(categories) else ''
+                desc = descriptions[i] if i < len(descriptions) else None
+                rev = reviewer_roles[i] if i < len(reviewer_roles) else None
+                app_roles = approver_roles[i] if i < len(approver_roles) else None
+                controls = applicable_controls[i] if i < len(applicable_controls) else None
+                audit = audit_reqs[i] if i < len(audit_reqs) else None
 
                 cursor.execute("""
                     UPDATE approval_matrix
@@ -950,12 +965,51 @@ def update_authority_matrix():
                         reviewer_roles = %s,
                         quotes_required = %s,
                         approver_roles = %s,
-                        applicable_controls = %s
+                        applicable_controls = %s,
+                        compliance_audit_requirement = %s
                     WHERE id = %s;
                 """, (
-                    categories[i], descriptions[i], min_val, max_val,
-                    reviewer_roles[i], quotes, approver_roles[i],
-                    applicable_controls[i], r_id
+                    cat, desc, min_val, max_val,
+                    rev, quotes, app_roles,
+                    controls, audit, r_id
+                ))
+
+            # 3. Handle Insertion of Newly Added Tier Rows
+            new_categories = request.form.getlist('new_matrix_category[]')
+            new_descriptions = request.form.getlist('new_description[]')
+            new_min_values = request.form.getlist('new_min_value[]')
+            new_max_values = request.form.getlist('new_max_value[]')
+            new_reviewer_roles = request.form.getlist('new_reviewer_roles[]')
+            new_quotes_req = request.form.getlist('new_quotes_required[]')
+            new_approver_roles = request.form.getlist('new_approver_roles[]')
+            new_applicable_controls = request.form.getlist('new_applicable_controls[]')
+            new_audit_reqs = request.form.getlist('new_compliance_audit_requirement[]')
+
+            for i in range(len(new_categories)):
+                if not new_categories[i].strip():
+                    continue
+
+                min_val = float(new_min_values[i]) if (i < len(new_min_values) and new_min_values[i].strip()) else 0.0
+                max_val = float(new_max_values[i]) if (i < len(new_max_values) and new_max_values[i].strip()) else None
+                quotes = int(new_quotes_req[i]) if (i < len(new_quotes_req) and new_quotes_req[i].strip()) else None
+
+                cat = new_categories[i]
+                desc = new_descriptions[i] if i < len(new_descriptions) else None
+                rev = new_reviewer_roles[i] if i < len(new_reviewer_roles) else None
+                app_roles = new_approver_roles[i] if i < len(new_approver_roles) else None
+                controls = new_applicable_controls[i] if i < len(new_applicable_controls) else None
+                audit = new_audit_reqs[i] if i < len(new_audit_reqs) else None
+
+                cursor.execute("""
+                    INSERT INTO approval_matrix (
+                        matrix_category, description, min_value, max_value,
+                        reviewer_roles, quotes_required, approver_roles,
+                        applicable_controls, compliance_audit_requirement
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """, (
+                    cat, desc, min_val, max_val,
+                    rev, quotes, app_roles,
+                    controls, audit
                 ))
 
             conn.commit()
@@ -967,6 +1021,24 @@ def update_authority_matrix():
         conn.close()
 
     return redirect(url_for('render_guide_page'))
+
+
+@app.route('/delete_action_item', methods=['POST'])
+def delete_action_item():
+    action_id = request.form.get('action_id')
+    if action_id:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (action_id,))
+            conn.commit()
+            flash("Action item deleted successfully.")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error deleting action item: {str(e)}")
+        finally:
+            conn.close()
+    return redirect(url_for('finance_minutes'))
 
 
 if __name__ == "__main__":
