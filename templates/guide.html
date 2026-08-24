@@ -25,7 +25,7 @@
             line-height: 1.6;
         }
         .dashboard-container {
-            max-width: 900px;
+            max-width: 1100px;
             margin: 0 auto;
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -40,10 +40,15 @@
         ul { margin-bottom: 15px; padding-left: 20px; }
         li { margin-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        th, td { border: 1px solid var(--border-color); padding: 10px; text-align: left; font-size: 14px; }
+        th, td { border: 1px solid var(--border-color); padding: 8px; text-align: left; font-size: 13px; }
         th { background-color: #f8f9fa; font-weight: 600; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 6px; border: 1px solid var(--border-color); border-radius: 4px; box-sizing: border-box; font-size: 12px; }
+        .btn { background: var(--primary-blue); color: white; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; font-size: 13px; }
+        .btn-secondary { background: #6c757d; font-size: 12px; padding: 5px 10px; }
+        .btn-danger { background: var(--danger-red); }
         .highlight { background-color: #f1f3f5; padding: 15px; border-radius: 4px; border-left: 4px solid var(--primary-blue); margin: 15px 0; }
         .code-box { background-color: #212529; color: #f8f9fa; padding: 12px; border-radius: 4px; font-family: monospace; font-size: 13px; margin: 10px 0; }
+        .matrix-row-edit { display: flex; gap: 8px; margin-bottom: 10px; border: 1px solid var(--border-color); padding: 10px; border-radius: 4px; background: #fff; flex-wrap: wrap; }
     </style>
 </head>
 <body>
@@ -53,97 +58,161 @@
         <div class="highlight">
             <strong>Compliance Status Engine Guide</strong><br>
             <em>Function: Programmatic Evaluation of Financial Authority Limits & Multi-Stage Compliance Workflows</em><br>
-            This document translates the automated financial controls engine into sequential business rules. The engine evaluates purchase orders through multi-phase quality gates, executes AI compliance audits, routes structured email dispatches based on permissions, and continuously scans inbox replies to update the database state in real time.
+            This document translates the automated financial controls engine into sequential business rules[cite: 5]. The engine evaluates purchase orders through multi-phase quality gates, executes AI compliance audits, routes structured email dispatches based on permissions, and continuously scans inbox replies to update the database state in real time[cite: 5].
         </div>
         
         <h2>1. Purpose and Scope</h2>
-        <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association. It applies to all elected Directors, Portfolio Committee Members, the Finance Committee, the Estate Manager, and the appointed Managing Agent (GEMS).</p>
+        <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association[cite: 5]. It applies to all elected Directors, Portfolio Committee Members, the Finance Committee, the Estate Manager, and the appointed Managing Agent (GEMS)[cite: 5].</p>
         
         <h2>2. Schedule of Financial Authorities</h2>
-        <p>The authorization parameters, review structures, and compliance requirements governing operational and capital outlays are structured via the system's <code>approval_matrix</code> table:</p>
-        
-        <table>
-            <thead>
-                <tr>
-                    <th>Matrix Category</th>
-                    <th>Description</th>
-                    <th>Min Value (ZAR)</th>
-                    <th>Max Value (ZAR)</th>
-                    <th>Reviewer Roles</th>
-                    <th>Quotes Required</th>
-                    <th>Approver Roles</th>
-                    <th>Applicable Controls</th>
-                    <th>Compliance Audit Requirement</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for row in matrix_rows %}
-                <tr>
-                    <td>{{ row.matrix_category }}</td>
-                    <td>{{ row.description }}</td>
-                    <td>R{{ "{:,.2f}".format(row.min_value) if row.min_value is not none else '0.00' }}</td>
-                    <td>{{ "R{:,.2f}".format(row.max_value) if row.max_value is not none else 'Unlimited' }}</td>
-                    <td>{{ row.reviewer_roles or 'N/A' }}</td>
-                    <td>{{ row.quotes_required or 'N/A' }}</td>
-                    <td>{{ row.approver_roles or 'N/A' }}</td>
-                    <td>{{ row.applicable_controls or 'N/A' }}</td>
-                    <td>{{ row.compliance_audit_requirement or 'N/A' }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="9" style="text-align: center; color: #6c757d;">No approval matrix records found in database.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <p>The authorization parameters, review structures, and compliance requirements governing operational and capital outlays are structured via the system's <code>approval_matrix</code> table[cite: 5]:</p>
+
+        <!-- DISPLAY VIEW MODE -->
+        <div id="matrix-view-mode">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="toggleMatrixEditMode(true)">✏️ Edit Authority Matrix</button>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Matrix Category</th>
+                        <th>Description</th>
+                        <th>Min Value (ZAR)</th>
+                        <th>Max Value (ZAR)</th>
+                        <th>Reviewer Roles</th>
+                        <th>Quotes Required</th>
+                        <th>Approver Roles</th>
+                        <th>Applicable Controls</th>
+                        <th>Compliance Audit Requirement</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in matrix_rows %}
+                    <tr>
+                        <td><strong>{{ row.matrix_category }}</strong></td>
+                        <td>{{ row.description }}</td>
+                        <td>R{{ "{:,.2f}".format(row.min_value) if row.min_value is not none else '0.00' }}</td>
+                        <td>{{ "R{:,.2f}".format(row.max_value) if row.max_value is not none else 'Unlimited' }}</td>
+                        <td>{{ row.reviewer_roles or 'N/A' }}</td>
+                        <td>{{ row.quotes_required or 'N/A' }}</td>
+                        <td>{{ row.approver_roles or 'N/A' }}</td>
+                        <td>{{ row.applicable_controls or 'N/A' }}</td>
+                        <td>{{ row.compliance_audit_requirement or 'N/A' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #6c757d;">No approval matrix records found in database.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- EDIT FORM MODE -->
+        <div id="matrix-edit-mode" style="display: none;">
+            <form method="POST" action="/update_authority_matrix">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 12%;">Category</th>
+                            <th style="width: 15%;">Description</th>
+                            <th style="width: 9%;">Min (ZAR)</th>
+                            <th style="width: 9%;">Max (ZAR)</th>
+                            <th style="width: 10%;">Reviewers</th>
+                            <th style="width: 7%;">Quotes</th>
+                            <th style="width: 10%;">Approvers</th>
+                            <th style="width: 12%;">Controls</th>
+                            <th style="width: 12%;">Audit Req.</th>
+                            <th style="width: 4%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="matrix-edit-tbody">
+                        {% if matrix_rows %}
+                            {% for row in matrix_rows %}
+                            {% set row_id = row.id if row.id is defined else row['id'] %}
+                            {% set cat = row.matrix_category if row.matrix_category is defined else row['matrix_category'] %}
+                            {% set desc = row.description if row.description is defined else row['description'] %}
+                            {% set min_val = row.min_value if row.min_value is defined else row['min_value'] %}
+                            {% set max_val = row.max_value if row.max_value is defined else row['max_value'] %}
+                            {% set rev = row.reviewer_roles if row.reviewer_roles is defined else row['reviewer_roles'] %}
+                            {% set quotes = row.quotes_required if row.quotes_required is defined else row['quotes_required'] %}
+                            {% set app = row.approver_roles if row.approver_roles is defined else row['approver_roles'] %}
+                            {% set ctrl = row.applicable_controls if row.applicable_controls is defined else row['applicable_controls'] %}
+                            {% set audit = row.compliance_audit_requirement if row.compliance_audit_requirement is defined else row['compliance_audit_requirement'] %}
+                            <tr>
+                                <input type="hidden" name="existing_matrix_id[]" value="{{ row_id }}">
+                                <td><input type="text" name="existing_matrix_category[]" value="{{ cat }}" required></td>
+                                <td><input type="text" name="existing_description[]" value="{{ desc or '' }}"></td>
+                                <td><input type="number" step="0.01" name="existing_min_value[]" value="{{ min_val if min_val is not none else '' }}"></td>
+                                <td><input type="number" step="0.01" name="existing_max_value[]" value="{{ max_val if max_val is not none else '' }}" placeholder="Unlimited"></td>
+                                <td><input type="text" name="existing_reviewer_roles[]" value="{{ rev or '' }}"></td>
+                                <td><input type="number" name="existing_quotes_required[]" value="{{ quotes or '' }}"></td>
+                                <td><input type="text" name="existing_approver_roles[]" value="{{ app or '' }}"></td>
+                                <td><input type="text" name="existing_applicable_controls[]" value="{{ ctrl or '' }}"></td>
+                                <td><input type="text" name="existing_compliance_audit_requirement[]" value="{{ audit or '' }}"></td>
+                                <td><button type="button" class="btn btn-danger btn-secondary" onclick="markMatrixRowForDeletion(this)">✕</button></td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+
+                <button type="button" class="btn btn-secondary" style="margin-top: 5px;" onclick="addMatrixRow()">+ Add Tier Row</button>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button type="submit" class="btn">Save Matrix Changes</button>
+                    <button type="button" class="btn btn-secondary" onclick="toggleMatrixEditMode(false)">Cancel</button>
+                </div>
+            </form>
+        </div>
         
         <h2>3. Core Operational Regulations</h2>
         <h3>3.1 The Anti-Splitting Directive</h3>
-        <p>Large projects, single procurement orders, or related service invoices may not be split into multiple smaller purchase orders or partial payments to circumvent the threshold limits defined in Section 2. Threshold compliance is determined by the total cumulative cost of the required work or asset procurement.</p>
+        <p>Large projects, single procurement orders, or related service invoices may not be split into multiple smaller purchase orders or partial payments to circumvent the threshold limits defined in Section 2[cite: 5]. Threshold compliance is determined by the total cumulative cost of the required work or asset procurement[cite: 5].</p>
         
         <h3>3.2 Procurement Sourcing Thresholds</h3>
         <ul>
-            <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor.</li>
-            <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated.</li>
-            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee.</li>
+            <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor[cite: 5].</li>
+            <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated[cite: 5].</li>
+            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee[cite: 5].</li>
         </ul>
 
         <h2>4. Automated Workflow & Outbound Email Dispatch Engine</h2>
-        <p>When a Purchase Order is submitted, <code>2_send_approvals_postgres.py</code> evaluates the PO status and executes automated email dispatch based on the <code>approval_permission</code> designated in the <code>approvers</code> database table:</p>
+        <p>When a Purchase Order is submitted, <code>2_send_approvals_postgres.py</code> evaluates the PO status and executes automated email dispatch based on the <code>approval_permission</code> designated in the <code>approvers</code> database table[cite: 5]:</p>
 
         <h3>4.1 Multi-Stage Dispatch & Recipient Routing</h3>
         <ul>
-            <li><strong>Stage 1: Submit for Finance Review</strong>
+            <li><strong>Stage 1: Submit for Finance Review</strong>[cite: 5]
                 <ul>
-                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Finance Review'</code>.</li>
-                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Estate Manager'</code>.</li>
+                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Finance Review'</code>[cite: 5].</li>
+                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Estate Manager'</code>[cite: 5].</li>
                     <li><strong>Required Call-To-Action Text:</strong><br>
-                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".</div>
+                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".</div>[cite: 5]
                     </li>
-                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Finance Review</code>.</li>
+                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Finance Review</code>[cite: 5].</li>
                 </ul>
             </li>
-            <li><strong>Stage 2: Submit for Approval</strong>
+            <li><strong>Stage 2: Submit for Approval</strong>[cite: 5]
                 <ul>
-                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Approval Authority'</code>.</li>
-                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Finance Review'</code> AND <code>approval_permission = 'Estate Manager'</code>.</li>
+                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Approval Authority'</code>[cite: 5].</li>
+                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Finance Review'</code> AND <code>approval_permission = 'Estate Manager'</code>[cite: 5].</li>
                     <li><strong>Required Call-To-Action Text:</strong><br>
-                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".</div>
+                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".</div>[cite: 5]
                     </li>
-                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Sent</code>.</li>
+                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Sent</code>[cite: 5].</li>
                 </ul>
             </li>
         </ul>
 
         <h3>4.2 AI Recommendation Persistence</h3>
-        <p>To optimize execution speed and prevent re-running costly LLM analyses, the system checks whether an <code>ai_recommendation_summary</code> already exists in the database:</p>
+        <p>To optimize execution speed and prevent re-running costly LLM analyses, the system checks whether an <code>ai_recommendation_summary</code> already exists in the database[cite: 5]:</p>
         <ul>
-            <li><strong>Initial Analysis:</strong> When sent for <code>Submit for Finance Review</code>, the Gemini AI Engine evaluates quotes, vendor OSINT records, and GL budget run-rates, storing the analysis in <code>po_log.ai_recommendation_summary</code>.</li>
-            <li><strong>Summary Reuse:</strong> When the item transitions to <code>Submit for Approval</code>, the engine detects the existing summary and automatically reuses the exact AI audit output in the approval email body without re-triggering the Gemini API.</li>
+            <li><strong>Initial Analysis:</strong> When sent for <code>Submit for Finance Review</code>, the Gemini AI Engine evaluates quotes, vendor OSINT records, and GL budget run-rates, storing the analysis in <code>po_log.ai_recommendation_summary</code>[cite: 5].</li>
+            <li><strong>Summary Reuse:</strong> When the item transitions to <code>Submit for Approval</code>, the engine detects the existing summary and automatically reuses the exact AI audit output in the approval email body without re-triggering the Gemini API[cite: 5].</li>
         </ul>
 
         <h2>5. Automated Reply Processing Engine</h2>
-        <p>The background process <code>3_process_replies_postgres.py</code> continuously monitors the incoming IMAP email inbox for responses containing bracketed PO numbers (e.g., <code>[PO-2026-001]</code>) and updates <code>po_log</code> accordingly:</p>
+        <p>The background process <code>3_process_replies_postgres.py</code> continuously monitors the incoming IMAP email inbox for responses containing bracketed PO numbers (e.g., <code>[PO-2026-001]</code>) and updates <code>po_log</code> accordingly[cite: 5]:</p>
 
         <table>
             <thead>
@@ -184,10 +253,59 @@
 
         <h2>6. Executive Safeguards & Audit Control</h2>
         <ul>
-            <li><strong>Unalterable Audit Trails:</strong> Every outbound email dispatch and inbound reply is logged chronologically to the PostgreSQL <code>workflow_control_log</code> table and localized audit log file.</li>
-            <li><strong>Context-Aware Parsing:</strong> The reply processor strips out historical email threads and splitters (e.g., <code>-----Original Message-----</code>) to evaluate only top-level replies from validated approvers.</li>
-            <li><strong>Fiscal Runway Monitoring:</strong> Post-purchase balances are checked against the estate's 2-Month Run-rate Buffer Pool during AI synthesis to flag structural deficit risks before approval sign-offs occur.</li>
+            <li><strong>Unalterable Audit Trails:</strong> Every outbound email dispatch and inbound reply is logged chronologically to the PostgreSQL <code>workflow_control_log</code> table and localized audit log file[cite: 5].</li>
+            <li><strong>Context-Aware Parsing:</strong> The reply processor strips out historical email threads and splitters (e.g., <code>-----Original Message-----</code>) to evaluate only top-level replies from validated approvers[cite: 5].</li>
+            <li><strong>Fiscal Runway Monitoring:</strong> Post-purchase balances are checked against the estate's 2-Month Run-rate Buffer Pool during AI synthesis to flag structural deficit risks before approval sign-offs occur[cite: 5].</li>
         </ul>
     </div>
+
+    <script>
+        function toggleMatrixEditMode(isEditing) {
+            const viewMode = document.getElementById('matrix-view-mode');
+            const editMode = document.getElementById('matrix-edit-mode');
+            
+            if (isEditing) {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            } else {
+                viewMode.style.display = 'block';
+                editMode.style.display = 'none';
+            }
+        }
+
+        function addMatrixRow() {
+            const tbody = document.getElementById('matrix-edit-tbody');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <input type="hidden" name="new_matrix_row[]" value="true">
+                <td><input type="text" name="new_matrix_category[]" placeholder="Category" required></td>
+                <td><input type="text" name="new_description[]" placeholder="Description"></td>
+                <td><input type="number" step="0.01" name="new_min_value[]" placeholder="0.00"></td>
+                <td><input type="number" step="0.01" name="new_max_value[]" placeholder="Unlimited"></td>
+                <td><input type="text" name="new_reviewer_roles[]" placeholder="Reviewers"></td>
+                <td><input type="number" name="new_quotes_required[]" placeholder="Quotes"></td>
+                <td><input type="text" name="new_approver_roles[]" placeholder="Approvers"></td>
+                <td><input type="text" name="new_applicable_controls[]" placeholder="Controls"></td>
+                <td><input type="text" name="new_compliance_audit_requirement[]" placeholder="Audit Req"></td>
+                <td><button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.parentElement.remove()">✕</button></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function markMatrixRowForDeletion(button) {
+            const row = button.parentElement.parentElement;
+            const matrixIdInput = row.querySelector('input[name="existing_matrix_id[]"]');
+            
+            if (matrixIdInput && matrixIdInput.value) {
+                const deleteInput = document.createElement('input');
+                deleteInput.type = 'hidden';
+                deleteInput.name = 'delete_matrix_id[]';
+                deleteInput.value = matrixIdInput.value;
+                row.parentElement.appendChild(deleteInput);
+            }
+            
+            row.remove();
+        }
+    </script>
 </body>
 </html>
