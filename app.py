@@ -920,5 +920,54 @@ def update_meeting_minutes():
     return redirect(url_for('finance_minutes'))
 
 
+@app.route('/update_authority_matrix', methods=['POST'])
+def update_authority_matrix():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            row_ids = request.form.getlist('row_id[]')
+            categories = request.form.getlist('matrix_category[]')
+            descriptions = request.form.getlist('description[]')
+            min_values = request.form.getlist('min_value[]')
+            max_values = request.form.getlist('max_value[]')
+            reviewer_roles = request.form.getlist('reviewer_roles[]')
+            quotes_req = request.form.getlist('quotes_required[]')
+            approver_roles = request.form.getlist('approver_roles[]')
+            applicable_controls = request.form.getlist('applicable_controls[]')
+
+            for i in range(len(row_ids)):
+                r_id = row_ids[i]
+                min_val = float(min_values[i]) if min_values[i] else 0.0
+                max_val = float(max_values[i]) if max_values[i] else None
+                quotes = int(quotes_req[i]) if quotes_req[i] else 1
+
+                cursor.execute("""
+                    UPDATE approval_matrix
+                    SET matrix_category = %s,
+                        description = %s,
+                        min_value = %s,
+                        max_value = %s,
+                        reviewer_roles = %s,
+                        quotes_required = %s,
+                        approver_roles = %s,
+                        applicable_controls = %s
+                    WHERE id = %s;
+                """, (
+                    categories[i], descriptions[i], min_val, max_val,
+                    reviewer_roles[i], quotes, approver_roles[i],
+                    applicable_controls[i], r_id
+                ))
+
+            conn.commit()
+            flash("Approval & Authority Matrix updated successfully.")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error updating matrix: {str(e)}")
+    finally:
+        conn.close()
+
+    return redirect(url_for('render_guide_page'))
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
