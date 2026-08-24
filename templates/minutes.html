@@ -137,13 +137,17 @@
                     <!-- EDIT & ADD ACTION ITEMS IN MEETING RECORD -->
                     <h4 style="margin-top: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">Manage Action Items</h4>
                     <div id="edit-action-items-container-{{ m.id }}">
-                        {% if m.action_items %}
+                        {% if m.action_items and m.action_items != '[]' %}
                             {% for act in m.action_items %}
+                            {% set act_id = act.id if act.id is defined else act['id'] %}
+                            {% set act_desc = act.action_description if act.action_description is defined else act['action_description'] %}
+                            {% set act_resp = act.responsible_person if act.responsible_person is defined else act['responsible_person'] %}
+                            {% set act_date = act.target_date if act.target_date is defined else act['target_date'] %}
                             <div class="action-row" style="margin-bottom: 8px;">
-                                <input type="hidden" name="existing_action_id[]" value="{{ act.id }}">
-                                <input type="text" name="existing_action_description[]" value="{{ act.action_description }}" placeholder="Task Description" style="flex: 2;" required>
-                                <input type="text" name="existing_responsible_person[]" value="{{ act.responsible_person }}" placeholder="Responsible" style="flex: 1;" required>
-                                <input type="date" name="existing_target_date[]" value="{{ act.target_date }}" style="flex: 1;">
+                                <input type="hidden" name="existing_action_id[]" value="{{ act_id }}">
+                                <input type="text" name="existing_action_description[]" value="{{ act_desc }}" placeholder="Task Description" style="flex: 2;" required>
+                                <input type="text" name="existing_responsible_person[]" value="{{ act_resp }}" placeholder="Responsible" style="flex: 1;" required>
+                                <input type="date" name="existing_target_date[]" value="{{ act_date or '' }}" style="flex: 1;">
                                 <button type="button" class="btn btn-danger btn-secondary" onclick="markActionForDeletion(this)">✕</button>
                             </div>
                             {% endfor %}
@@ -160,7 +164,7 @@
             </div>
 
             <!-- ACTION ITEMS READ-ONLY STATUS TABLE -->
-            {% if m.action_items and m.action_items != [] %}
+            {% if m.action_items and m.action_items != '[]' %}
             <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--border-color);">
             <strong>Assigned Action Items Status:</strong>
             <table>
@@ -176,21 +180,27 @@
                 </thead>
                 <tbody>
                     {% for act in m.action_items %}
+                    {% set act_id = act.id if act.id is defined else act['id'] %}
+                    {% set act_desc = act.action_description if act.action_description is defined else act['action_description'] %}
+                    {% set act_resp = act.responsible_person if act.responsible_person is defined else act['responsible_person'] %}
+                    {% set act_date = act.target_date if act.target_date is defined else act['target_date'] %}
+                    {% set act_status = act.status if act.status is defined else act['status'] %}
+                    {% set act_notes = act.action_notes if act.action_notes is defined else act['action_notes'] %}
                     <tr>
-                        <td>{{ act.action_description }}</td>
-                        <td>{{ act.responsible_person }}</td>
-                        <td>{{ act.target_date }}</td>
+                        <td>{{ act_desc }}</td>
+                        <td>{{ act_resp }}</td>
+                        <td>{{ act_date or '' }}</td>
                         <form method="POST" action="/update_action_item">
-                            <input type="hidden" name="action_id" value="{{ act.id }}">
+                            <input type="hidden" name="action_id" value="{{ act_id }}">
                             <td>
                                 <select name="status" style="padding: 4px; font-size: 12px;">
-                                    <option value="Pending" {% if act.status == 'Pending' %}selected{% endif %}>Pending</option>
-                                    <option value="In Progress" {% if act.status == 'In Progress' %}selected{% endif %}>In Progress</option>
-                                    <option value="Completed" {% if act.status == 'Completed' %}selected{% endif %}>Completed</option>
+                                    <option value="Pending" {% if act_status == 'Pending' %}selected{% endif %}>Pending</option>
+                                    <option value="In Progress" {% if act_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="Completed" {% if act_status == 'Completed' %}selected{% endif %}>Completed</option>
                                 </select>
                             </td>
                             <td>
-                                <input type="text" name="action_notes" value="{{ act.action_notes or '' }}" placeholder="Add progress notes..." style="padding: 4px; font-size: 12px;">
+                                <input type="text" name="action_notes" value="{{ act_notes or '' }}" placeholder="Add progress notes..." style="padding: 4px; font-size: 12px;">
                             </td>
                             <td>
                                 <button type="submit" class="btn btn-secondary" style="padding: 4px 8px; font-size: 11px;">Update</button>
@@ -240,24 +250,24 @@
 
         function markActionForDeletion(button) {
             const row = button.parentElement;
-            const actionId = row.querySelector('input[name="existing_action_id[]"]').value;
+            const actionIdInput = row.querySelector('input[name="existing_action_id[]"]');
             
-            // Add hidden input to notify backend to remove this item ID
-            const deleteInput = document.createElement('input');
-            deleteInput.type = 'hidden';
-            deleteInput.name = 'delete_action_id[]';
-            deleteInput.value = actionId;
-            row.parentElement.appendChild(deleteInput);
+            if (actionIdInput && actionIdInput.value) {
+                // Add hidden input to notify backend to remove this item ID
+                const deleteInput = document.createElement('input');
+                deleteInput.type = 'hidden';
+                deleteInput.name = 'delete_action_id[]';
+                deleteInput.value = actionIdInput.value;
+                row.parentElement.appendChild(deleteInput);
+            }
             
             row.remove();
         }
 
         function showSelectedMeeting(meetingId) {
-            // Hide all meeting cards first
             const cards = document.querySelectorAll('.meeting-card');
             cards.forEach(card => card.classList.remove('active'));
 
-            // Display the selected meeting card
             if (meetingId) {
                 const selectedCard = document.getElementById(meetingId);
                 if (selectedCard) {
@@ -266,18 +276,18 @@
             }
         }
 
-    function toggleEditMode(meetingId, isEditing) {
-        const viewMode = document.getElementById(`view-mode-${meetingId}`);
-        const editMode = document.getElementById(`edit-mode-${meetingId}`);
-        
-        if (isEditing) {
-            viewMode.style.display = 'none';
-            editMode.style.display = 'block';
-        } else {
-            viewMode.style.display = 'block';
-            editMode.style.display = 'none';
+        function toggleEditMode(meetingId, isEditing) {
+            const viewMode = document.getElementById(`view-mode-${meetingId}`);
+            const editMode = document.getElementById(`edit-mode-${meetingId}`);
+            
+            if (isEditing) {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            } else {
+                viewMode.style.display = 'block';
+                editMode.style.display = 'none';
+            }
         }
-    }
     </script>
 </body>
 </html>
