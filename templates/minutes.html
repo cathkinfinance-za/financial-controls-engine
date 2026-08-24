@@ -235,14 +235,16 @@
 
         function addEditActionRow(meetingId) {
             const container = document.getElementById(`edit-action-items-container-${meetingId}`);
+            if (!container) return;
+
             const row = document.createElement('div');
             row.className = 'action-row';
             row.style.marginBottom = '8px';
             row.innerHTML = `
-                <input type="hidden" name="new_action_item[]" value="true">
-                <input type="text" name="new_action_description[]" placeholder="Task Description" style="flex: 2;" required>
-                <input type="text" name="new_responsible_person[]" placeholder="Responsible" style="flex: 1;" required>
-                <input type="date" name="new_target_date[]" style="flex: 1;">
+                <input type="hidden" name="existing_action_id[]" value="">
+                <input type="text" name="existing_action_description[]" placeholder="Task Description" style="flex: 2;" required>
+                <input type="text" name="existing_responsible_person[]" placeholder="Responsible" style="flex: 1;" required>
+                <input type="date" name="existing_target_date[]" style="flex: 1;">
                 <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
             `;
             container.appendChild(row);
@@ -253,7 +255,6 @@
             const actionIdInput = row.querySelector('input[name="existing_action_id[]"]');
             
             if (actionIdInput && actionIdInput.value) {
-                // Add hidden input to notify backend to remove this item ID
                 const deleteInput = document.createElement('input');
                 deleteInput.type = 'hidden';
                 deleteInput.name = 'delete_action_id[]';
@@ -287,23 +288,6 @@
                 viewMode.style.display = 'block';
                 editMode.style.display = 'none';
             }
-        }
-
-
-
-        function addEditActionRow(meetingId) {
-            const container = document.getElementById(`edit-action-items-container-${meetingId}`);
-            const row = document.createElement('div');
-            row.className = 'action-row';
-            row.style.marginBottom = '8px';
-            row.innerHTML = `
-                <input type="hidden" name="existing_action_id[]" value="">
-                <input type="text" name="existing_action_description[]" placeholder="Task Description" style="flex: 2;" required>
-                <input type="text" name="existing_responsible_person[]" placeholder="Responsible" style="flex: 1;" required>
-                <input type="date" name="existing_target_date[]" style="flex: 1;">
-                <button type="button" class="btn btn-danger btn-secondary" onclick="this.parentElement.remove()">✕</button>
-            `;
-            container.appendChild(row);
         }
     </script>
 </body>

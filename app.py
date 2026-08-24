@@ -1,18 +1,16 @@
 import os
 import io
 import json
+from datetime import date
 import psycopg2
 import psycopg2.extras
-import vercel_blob
-from ai_matrix_drafter_postgres import execute_phase1
-from vendor_comparison_engine_postgres import execute_phase2
 from psycopg2.extras import RealDictCursor
+import vercel_blob
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
 from werkzeug.utils import secure_filename
+
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
-from datetime import date
-
 
 try:
     import google.generativeai as genai
@@ -27,45 +25,16 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
-# --- 1. NEW DASHBOARD HOME PAGE ROUTE ---
-@app.route("/")
-def dashboard_home():
-    """Renders the central management dashboard as the home page."""
-    return render_template("dashboard.html")
+def get_db_connection():
+    """Establishes and returns a connection to the Neon PostgreSQL database."""
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is missing.")
+    return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
-@app.route('/guide')
-def render_guide_page():
-    conn = None
-    matrix_rows = []
-    try:
-        conn = get_db_connection()
-        # Pass RealDictCursor here so rows match dictionary keys expected by guide.html
-        with conn.cursor(cursor_factory=RealDictCursor) as cursor:
-            cursor.execute("""
-                SELECT id, matrix_category, description, min_value, max_value, 
-                       reviewer_roles, quotes_required, approver_roles, 
-                       applicable_controls, compliance_audit_requirement 
-                FROM approval_matrix 
-                ORDER BY id ASC;
-            """)
-            matrix_rows = cursor.fetchall()
-    except Exception as e:
-        print(f"Database error on /guide: {e}")
-    finally:
-        if conn:
-            conn.close()
-        
-    return render_template('guide.html', matrix_rows=matrix_rows)
-
-def get_connection():
-    """Establish connection to Neon PostgreSQL database."""
-    return psycopg2.connect(os.getenv("DATABASE_URL"))
 
 def analyze_po_with_gemini(uploaded_files_data, form_data):
-    """
-    Sends uploaded file streams to Gemini Flash for extraction & compliance checking.
-    uploaded_files_data: list of tuples -> (file_bytes, filename, mime_type)
-    """
+    """Sends uploaded file streams to Gemini Flash for extraction & compliance checking."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
         return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
 
@@ -74,7 +43,6 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
         model = genai.GenerativeModel('gemini-3.5-flash')
         
         for file_bytes, filename, mime_type in uploaded_files_data:
-            # Use io.BytesIO so genai receives a readable stream
             bio = io.BytesIO(file_bytes)
             bio.name = filename
             
@@ -108,13 +76,56 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
         return f"AI Analysis failed: {str(err)}"
         
     finally:
-        # Clean up files uploaded to Gemini File API
         for file_obj in gemini_file_objects:
             try:
                 genai.delete_file(file_obj.name)
             except Exception as e:
                 print(f"Gemini File Cleanup Error: {e}")
 
+
+# Helper to fetch all projects for the sidebar
+def get_all_projects_summary(cursor):
+    cursor.execute("SELECT id, project_reference, name FROM projects ORDER BY id DESC;")
+    return cursor.fetchall()
+
+
+# --- DASHBOARD & GENERAL ROUTES ---
+@app.route("/")
+def dashboard_home():
+    """Renders the central management dashboard as the home page."""
+    return render_template("dashboard.html")
+
+
+@app.route('/guide')
+def render_guide_page():
+    conn = None
+    matrix_rows = []
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT id, matrix_category, description, min_value, max_value, 
+                       reviewer_roles, quotes_required, approver_roles, 
+                       applicable_controls, compliance_audit_requirement 
+                FROM approval_matrix 
+                ORDER BY id ASC;
+            """)
+            matrix_rows = cursor.fetchall()
+    except Exception as e:
+        print(f"Database error on /guide: {e}")
+    finally:
+        if conn:
+            conn.close()
+        
+    return render_template('guide.html', matrix_rows=matrix_rows)
+
+
+@app.route('/legal_framework')
+def legal_framework():
+    return render_template('legal_framework.html')
+
+
+# --- PURCHASE ORDERS ---
 @app.route("/api/budget-details")
 def budget_details():
     """API endpoint for live JS fetching of budget summary metrics on GL Code change."""
@@ -122,9 +133,9 @@ def budget_details():
     if not gl_code:
         return jsonify({})
 
-    conn = get_connection()
+    conn = get_db_connection()
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             cur.execute("""
                 SELECT 
                     COALESCE(ytd, 0.00) AS ytd_actual, 
@@ -143,12 +154,11 @@ def budget_details():
     finally:
         conn.close()
 
-@app.route("/", methods=["GET", "POST"])
+
 @app.route("/po_form", methods=["GET", "POST"])
 @app.route("/simple", methods=["GET", "POST"])
-
 def po_form():
-    conn = get_connection()
+    conn = get_db_connection()
     message = None
     selected_po = None
     financial_summary = None
@@ -165,7 +175,6 @@ def po_form():
         justification_notes = request.form.get("justification_notes", "").strip()
         submission_status = request.form.get("submission_status")
 
-        # Approvals Fields
         actioned_date = request.form.get("actioned_date") or None
         actioned_by = request.form.get("actioned_by", "").strip()
         approval_notes = request.form.get("approval_notes", "").strip()
@@ -177,12 +186,11 @@ def po_form():
         except ValueError:
             estimated_cost = 0.0
 
-        # 1. Check hidden form input first, then fall back to DB lookup to preserve existing URLs
         existing_filepath_str = request.form.get("existing_quote_filepath", "").strip()
 
         if not existing_filepath_str and (original_po or new_po):
             try:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with conn.cursor() as cur:
                     lookup_target = original_po if original_po else new_po
                     cur.execute("SELECT quote_filepath FROM po_log WHERE po_number = %s;", (lookup_target,))
                     existing_row = cur.fetchone()
@@ -193,7 +201,6 @@ def po_form():
 
         existing_urls = [u.strip() for u in existing_filepath_str.split(",") if u.strip()]
 
-        # --- MULTI-FILE VERCEL BLOB UPLOAD & GEMINI PREPARATION ---
         raw_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
         new_urls = []
         gemini_file_payloads = []
@@ -204,7 +211,6 @@ def po_form():
                     file_bytes = quote_file.read()
                     safe_filename = secure_filename(quote_file.filename)
                     
-                    # 1. Save to Vercel Blob using "private" access
                     blob_response = vercel_blob.put(
                         f"quotes/{safe_filename}", 
                         file_bytes, 
@@ -214,12 +220,10 @@ def po_form():
                         }
                     )
                     
-                    # Extract URL from response (handles dict or object response)
                     url = blob_response.get('url') if isinstance(blob_response, dict) else getattr(blob_response, 'url', None)
                     if url:
                         new_urls.append(url)
 
-                    # 2. Collect bytes for Gemini
                     gemini_file_payloads.append((
                         file_bytes, 
                         safe_filename, 
@@ -228,15 +232,10 @@ def po_form():
                 except Exception as upload_err:
                     print(f"File Processing Error ({quote_file.filename}): {upload_err}")
 
-        # Combine existing and newly uploaded attachment URLs
         all_urls = existing_urls + new_urls
         combined_quote_filepath = ",".join(all_urls) if all_urls else None
-        
-        # Dynamically set quotes_provided to match total attached files count
         quotes_provided = len(all_urls)
-        
 
-        # Run Gemini Analysis on newly uploaded attachments
         if gemini_file_payloads:
             ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
             if ai_summary:
@@ -244,7 +243,7 @@ def po_form():
 
         if new_po:
             try:
-                with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                with conn.cursor() as cur:
                     gl_code_id = None
                     if gl_code:
                         cur.execute("SELECT id FROM master_budget WHERE gl_code = %s;", (gl_code,))
@@ -311,9 +310,8 @@ def po_form():
                 conn.rollback()
                 message = f"Error saving purchase order: {e}"
 
-    # --- GET REQUEST / DATA RENDERING ---
     try:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+        with conn.cursor() as cur:
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
             gl_records = cur.fetchall()
 
@@ -362,21 +360,11 @@ def po_form():
     )
 
 
-def get_db_connection():
-    """Establishes and returns a connection to the Neon PostgreSQL database."""
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise ValueError("DATABASE_URL environment variable is missing.")
-    
-    conn = psycopg2.connect(
-        db_url,
-        cursor_factory=RealDictCursor
-    )
-    return conn
-
+# --- SYSTEM PROMPTS & AUDIT ---
 @app.route('/prompts')
 def render_prompts_page():
     return render_template('prompts.html')
+
 
 @app.route('/api/prompts', methods=['GET', 'POST'])
 def handle_prompts_api():
@@ -386,14 +374,12 @@ def handle_prompts_api():
             if request.method == 'GET':
                 process_name = request.args.get('process')
                 
-                # If no process parameter passed, return a list of all process names
                 if not process_name:
                     cursor.execute("SELECT DISTINCT process FROM system_prompts ORDER BY process ASC;")
                     rows = cursor.fetchall()
                     processes = [row['process'] for row in rows]
                     return jsonify(processes), 200
 
-                # Fetch specific prompt details
                 cursor.execute(
                     "SELECT process, prompt_template, description, is_active FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
                     (process_name,)
@@ -438,55 +424,34 @@ def view_audit_log():
     conn.close()
     return render_template('audit_log.html', logs=logs)
 
-# Helper to fetch all projects for the sidebar
-def get_all_projects_summary(cursor):
-    cursor.execute("SELECT id, project_reference, name FROM projects ORDER BY id DESC;")
-    return cursor.fetchall()
 
-
-# 1. Base route: Opens blank project form
-@app.route("/projects/", methods=["GET"])
+# --- PROJECTS & PROCUREMENT ---
 @app.route("/projects", methods=["GET"])
-def new_project_page():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    all_projects = get_all_projects_summary(cursor)
-    
-    cursor.close()
-    conn.close()
-    
-    # Renders template with project=None (blank form)
-    return render_template("projects.html", project=None, vendors=[], criteria_list=[], scores_map={}, all_projects=all_projects)
-
-# Route to list or access projects dashboard
-@app.route("/projects")
 @app.route("/projects/<int:project_id>", methods=["GET"])
-def projects_page(project_id):
+def projects_page(project_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Sidebar data
     all_projects = get_all_projects_summary(cursor)
 
-    # Active Project
+    if not project_id:
+        cursor.close()
+        conn.close()
+        return render_template("projects.html", project=None, vendors=[], criteria_list=[], scores_map={}, all_projects=all_projects)
+
     cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
     project = cursor.fetchone()
 
-    # Active Vendors
     cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
     vendors = cursor.fetchall()
 
-    # Criteria list
     cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s ORDER BY id ASC;", (project_id,))
     criteria_list = cursor.fetchall()
 
-    # Pricing items per vendor
     for vendor in vendors:
         cursor.execute("SELECT * FROM options_line_items_pricing WHERE procurement_option_id = %s ORDER BY id ASC;", (vendor["id"],))
         vendor["pricing_items"] = cursor.fetchall()
 
-    # Qualitative scores map
     cursor.execute("""
         SELECT line_item_id, procurement_option_id, weighting_id, score 
         FROM options_line_items_non_pricing 
@@ -513,6 +478,7 @@ def projects_page(project_id):
         scores_map=scores_map,
         all_projects=all_projects
     )
+
 
 @app.route("/create-project", methods=["POST"])
 def create_project():
@@ -550,61 +516,7 @@ def create_project():
     flash("New project created successfully.")
     return redirect(url_for("projects_page", project_id=new_id))
 
-@app.route('/projects/<int:project_id>')
-def view_project(project_id):
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
-        project = cursor.fetchone()
 
-        cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
-        vendors = cursor.fetchall()
-
-        # 1. Fetch unified project criteria weightings
-        cursor.execute("""
-            SELECT * FROM project_weightings 
-            WHERE project_id = %s 
-            ORDER BY id ASC;
-        """, (project_id,))
-        criteria_list = cursor.fetchall()
-
-        # 2. Fetch pricing line items per vendor
-        for vendor in vendors:
-            cursor.execute("""
-                SELECT * FROM options_line_items_pricing 
-                WHERE procurement_option_id = %s 
-                ORDER BY id ASC;
-            """, (vendor["id"],))
-            vendor["pricing_items"] = cursor.fetchall()
-
-        # 3. Map non-pricing scores by (weighting_id, vendor_id)
-        cursor.execute("""
-            SELECT line_item_id, procurement_option_id, weighting_id, score 
-            FROM options_line_items_non_pricing 
-            WHERE procurement_option_id IN (
-                SELECT id FROM procurement_options WHERE project_id = %s
-            );
-        """, (project_id,))
-        scores_raw = cursor.fetchall()
-        
-        # Build score map: scores_map[weighting_id][vendor_id] = {id, score}
-        scores_map = {}
-        for row in scores_raw:
-            w_id = row["weighting_id"]
-            v_id = row["procurement_option_id"]
-            if w_id not in scores_map:
-                scores_map[w_id] = {}
-            scores_map[w_id][v_id] = row
-
-    conn.close()
-    return render_template(
-        "projects.html", 
-        project=project, 
-        vendors=vendors, 
-        criteria_list=criteria_list, 
-        scores_map=scores_map
-    )
-# --- 2. QUOTE UPLOAD ROUTE ---
 @app.route("/upload-quote", methods=["POST"])
 def upload_quote():
     raw_project_id = request.form.get("project_id", "1").strip()
@@ -619,7 +531,6 @@ def upload_quote():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Verify or create parent project
     cursor.execute("SELECT id FROM projects WHERE id = %s;", (project_id,))
     if not cursor.fetchone():
         cursor.execute("""
@@ -645,13 +556,12 @@ def upload_quote():
 
     return redirect(url_for("projects_page", project_id=project_id))
 
-# --- 3. DRAFT MATRIX VIA AI (PHASE 1) ROUTE ---
+
 @app.route("/draft-matrix/<int:project_id>", methods=["POST"])
 def draft_matrix(project_id):
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Save prompt adjustments or metadata changes prior to AI run
     prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
     cursor.execute("""
         UPDATE projects 
@@ -662,7 +572,6 @@ def draft_matrix(project_id):
     cursor.close()
     conn.close()
 
-    # Execute Phase 1 Multi-Modal Gemini Extraction
     try:
         execute_phase1(project_id)
         flash("AI Matrix Draft completed successfully.")
@@ -671,15 +580,14 @@ def draft_matrix(project_id):
 
     return redirect(url_for("projects_page", project_id=project_id))
 
+
 @app.route("/recalculate-matrix/<int:project_id>", methods=["POST"])
 def recalculate_matrix(project_id):
-    # Safely parse and convert the weight input
     try:
         raw_weight = float(request.form.get("price_weighting", 30))
     except (ValueError, TypeError):
         raw_weight = 30.0
 
-    # Normalize whole percentage (e.g., 50.0) to decimal (0.50)
     price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -692,7 +600,6 @@ def recalculate_matrix(project_id):
     cursor.close()
     conn.close()
 
-    # Execute Phase 2 Scoring Engine
     try:
         execute_phase2(project_id)
         flash("Matrix recalculated with updated weightings.")
@@ -701,7 +608,7 @@ def recalculate_matrix(project_id):
 
     return redirect(url_for("projects_page", project_id=project_id))
 
-# --- 5. UPDATE PROJECT DEFINITIONS ROUTE ---
+
 @app.route("/update-project/<int:project_id>", methods=["POST"])
 def update_project(project_id):
     project_reference = request.form.get("project_reference", "")
@@ -721,7 +628,6 @@ def update_project(project_id):
     cursor = conn.cursor()
 
     try:
-        # 1. Update Project Definitions
         cursor.execute("""
             UPDATE projects 
             SET project_reference = %s,
@@ -741,7 +647,6 @@ def update_project(project_id):
             price_weighting, executive_sourcing_recommendation, project_id
         ))
 
-        # 2. Dynamic Update of Pricing and Non-Pricing Line Items
         for key, value in request.form.items():
             if key.startswith("pricing_name_"):
                 item_id = key.replace("pricing_name_", "")
@@ -794,22 +699,18 @@ def delete_vendor(vendor_id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # Get project_id before deleting
             cursor.execute("SELECT project_id, vendor_name FROM procurement_options WHERE id = %s;", (vendor_id,))
             vendor = cursor.fetchone()
             
             if not vendor:
                 flash("Vendor option not found.")
-                return redirect(url_for('new_project_page'))
+                return redirect(url_for('projects_page'))
 
             project_id = vendor['project_id']
             vendor_name = vendor['vendor_name']
 
-            # Delete child line items
             cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (vendor_id,))
             cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (vendor_id,))
-
-            # Delete vendor parent row
             cursor.execute("DELETE FROM procurement_options WHERE id = %s;", (vendor_id,))
             
             conn.commit()
@@ -822,6 +723,7 @@ def delete_vendor(vendor_id):
 
     return redirect(url_for('projects_page', project_id=project_id))
 
+
 @app.route('/generate-recommendation/<int:project_id>', methods=['POST'])
 def generate_recommendation(project_id):
     if not GEMINI_AVAILABLE:
@@ -831,7 +733,6 @@ def generate_recommendation(project_id):
     conn = get_db_connection()
     try:
         with conn.cursor() as cursor:
-            # 1. Fetch Project Details
             cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
             project = cursor.fetchone()
 
@@ -839,7 +740,6 @@ def generate_recommendation(project_id):
                 flash('Project not found.')
                 return redirect(url_for('projects_page', project_id=project_id))
 
-            # 2. Fetch Vendors (Procurement Options)
             cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
             vendors = cursor.fetchall()
 
@@ -847,7 +747,6 @@ def generate_recommendation(project_id):
                 flash('Cannot generate recommendation without vendor options.')
                 return redirect(url_for('projects_page', project_id=project_id))
 
-            # 3. Fetch System Prompts
             cursor.execute("SELECT prompt_template FROM system_prompts WHERE process = 'executive_recommendation' AND is_active = TRUE;")
             rec_row = cursor.fetchone()
             
@@ -857,8 +756,6 @@ def generate_recommendation(project_id):
             prompt_template = rec_row['prompt_template'] if rec_row else ""
             company_assessment_context = company_row['prompt_template'] if company_row else ""
 
-            # 4. Identify winner and cheapest option
-            # Fallback keys check for common field names in database schema
             sorted_by_score = sorted(vendors, key=lambda v: v.get('final_weighted_score_output') or v.get('weighted_score') or 0, reverse=True)
             sorted_by_cost = sorted(vendors, key=lambda v: v.get('projected_5yr_total') or v.get('total_cost') or float('inf'))
 
@@ -873,7 +770,6 @@ def generate_recommendation(project_id):
             raw_cost = cheapest.get('projected_5yr_total') or cheapest.get('total_cost') or 0
             min_cost = f"{int(round(float(raw_cost))):,}"
 
-            # 5. Inject variables into task template
             formatted_task_prompt = prompt_template.format(
                 winner_name=winner_name,
                 winning_score=winning_score,
@@ -881,7 +777,6 @@ def generate_recommendation(project_id):
                 min_cost=min_cost
             )
 
-            # 6. Construct full prompt payload
             full_prompt = f"""
 === COMPANY & SYSTEM DIRECTIVES ===
 {company_assessment_context}
@@ -899,12 +794,10 @@ Project Objectives: {project.get('project_objective', '')}
 {formatted_task_prompt}
 """
 
-            # 7. Call Gemini API
             model = genai.GenerativeModel('gemini-3.5-flash')
             response = model.generate_content(full_prompt)
             generated_text = response.text if response and response.text else "No content generated."
 
-            # 8. Save output back to Neon PostgreSQL
             cursor.execute("""
                 UPDATE projects 
                 SET executive_sourcing_recommendation = %s, 
@@ -924,55 +817,35 @@ Project Objectives: {project.get('project_objective', '')}
     return redirect(url_for('projects_page', project_id=project_id))
 
 
+# --- MINUTES ---
 @app.route('/minutes', methods=['GET', 'POST'])
 def finance_minutes():
+    selected_id = request.args.get('meeting_id')
     conn = get_db_connection()
-    if request.method == 'POST':
-        meeting_date = request.form.get('meeting_date')
-        chairperson = request.form.get('chairperson')
-        attendees = request.form.get('attendees')
-        apologies = request.form.get('apologies')
-        notes_summary = request.form.get('notes_summary')
-
-        # Form lists for dynamic action item entries
-        action_descriptions = request.form.getlist('action_description[]')
-        responsible_persons = request.form.getlist('responsible_person[]')
-        target_dates = request.form.getlist('target_date[]')
-
-        with conn.cursor() as cursor:
-            # Insert main meeting metadata
-            cursor.execute("""
-                INSERT INTO meeting_minutes (meeting_date, chairperson, attendees, apologies, notes_summary)
-                VALUES (%s, %s, %s, %s, %s) RETURNING id;
-            """, (meeting_date, chairperson, attendees, apologies, notes_summary))
-            meeting_id = cursor.fetchone()['id']
-
-            # Insert associated action items
-            for desc, resp, target in zip(action_descriptions, responsible_persons, target_dates):
-                if desc.strip() and resp.strip():
-                    cursor.execute("""
-                        INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date)
-                        VALUES (%s, %s, %s, %s);
-                    """, (meeting_id, desc, resp, target))
-            
-            conn.commit()
-        conn.close()
-        return redirect(url_for('finance_minutes'))
-
-    # GET Request: Fetch historical meeting records & action items
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            SELECT m.*, 
-                   COALESCE(json_agg(a.*) FILTER (WHERE a.id IS NOT NULL), '[]') as meeting_action_items
-            FROM meeting_minutes m
-            LEFT JOIN meeting_action_items a ON m.id = a.meeting_id
-            GROUP BY m.id
-            ORDER BY m.meeting_date DESC;
-        """)
-        meetings = cursor.fetchall()
-    conn.close()
     
-    return render_template('minutes.html', meetings=meetings) 
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT id, meeting_date, chairperson FROM meeting_minutes ORDER BY meeting_date DESC;")
+        meetings = cursor.fetchall()
+        
+        selected_meeting = None
+        if selected_id:
+            cursor.execute("SELECT * FROM meeting_minutes WHERE id = %s;", (selected_id,))
+            selected_meeting = cursor.fetchone()
+        elif meetings:
+            cursor.execute("SELECT * FROM meeting_minutes WHERE id = %s;", (meetings[0]['id'],))
+            selected_meeting = cursor.fetchone()
+            
+        if selected_meeting:
+            cursor.execute("""
+                SELECT id, action_description, responsible_person, target_date, status 
+                FROM meeting_action_items 
+                WHERE meeting_id = %s ORDER BY id ASC;
+            """, (selected_meeting['id'],))
+            selected_meeting['action_items'] = cursor.fetchall()
+
+    conn.close()
+    return render_template('minutes.html', meetings=meetings, selected_meeting=selected_meeting)
+
 
 @app.route('/update_action_item', methods=['POST'])
 def update_action_item():
@@ -994,10 +867,6 @@ def update_action_item():
     return redirect(url_for('finance_minutes'))
 
 
-@app.route('/legal_framework')
-def legal_framework():
-    return render_template('legal_framework.html')
-
 @app.route('/update_meeting_minutes', methods=['POST'])
 def update_meeting_minutes():
     meeting_id = request.form.get('meeting_id')
@@ -1009,7 +878,6 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        # 1. Update primary meeting record
         cursor.execute("""
             UPDATE meeting_minutes
             SET meeting_date = %s,
@@ -1020,13 +888,11 @@ def update_meeting_minutes():
             WHERE id = %s;
         """, (meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
 
-        # 2. Delete action items marked for removal
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
             if act_id:
                 cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (act_id,))
 
-        # 3. Handle existing AND newly added action items
         action_ids = request.form.getlist('existing_action_id[]')
         descriptions = request.form.getlist('existing_action_description[]')
         responsibles = request.form.getlist('existing_responsible_person[]')
@@ -1037,11 +903,10 @@ def update_meeting_minutes():
             desc = descriptions[i]
             resp = responsibles[i]
             
-            # Fallback to meeting_date or today's date if target_date is left empty
             raw_target = targets[i] if i < len(targets) else None
             target = raw_target if (raw_target and raw_target.strip()) else (meeting_date or str(date.today()))
 
-            if act_id:  # UPDATE Existing Item
+            if act_id:
                 cursor.execute("""
                     UPDATE meeting_action_items
                     SET action_description = %s,
@@ -1049,7 +914,7 @@ def update_meeting_minutes():
                         target_date = %s
                     WHERE id = %s;
                 """, (desc, resp, target, act_id))
-            else:  # INSERT New Action Item
+            else:
                 cursor.execute("""
                     INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date, status)
                     VALUES (%s, %s, %s, %s, 'Pending');
@@ -1059,6 +924,7 @@ def update_meeting_minutes():
     conn.close()
 
     return redirect(url_for('finance_minutes'))
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
