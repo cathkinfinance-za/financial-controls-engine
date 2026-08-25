@@ -1104,10 +1104,10 @@ def expenditure_expose():
         
         if ytd > budget_ytd:
             item_dict = dict(item)
-            # Store as absolute positive difference
-            item_dict['variance'] = round(ytd - budget_ytd, 2)
-            # Calculate YTD percentage relative to budget
-            item_dict['ytd_pct'] = (ytd / budget_ytd * 100.0) if budget_ytd > 0 else 0.0
+            # Round variance to 0 decimal places
+            item_dict['variance'] = round(ytd - budget_ytd)
+            # Round percentage to 0 decimal places
+            item_dict['ytd_pct'] = round((ytd / budget_ytd * 100.0)) if budget_ytd > 0 else 0
             over_budget_expenditure.append(item_dict)
 
     # Sort descending from highest numerical variance to lowest
@@ -1121,10 +1121,10 @@ def expenditure_expose():
         
         if ytd < budget_ytd:
             item_dict = dict(item)
-            # Store variance as positive magnitude of shortfall (Budget - Actual)
-            item_dict['variance'] = round(budget_ytd - ytd, 2)
-            # Calculate YTD percentage relative to budget
-            item_dict['ytd_pct'] = (ytd / budget_ytd * 100.0) if budget_ytd > 0 else 0.0
+            # Round variance shortfall to 0 decimal places
+            item_dict['variance'] = round(budget_ytd - ytd)
+            # Round percentage to 0 decimal places
+            item_dict['ytd_pct'] = round((ytd / budget_ytd * 100.0)) if budget_ytd > 0 else 0
             under_budget_income.append(item_dict)
 
     # Sort from largest income shortfall to smallest
