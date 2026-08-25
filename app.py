@@ -11,7 +11,7 @@ from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
 from flask import request
-
+from collections import defaultdict
 
 try:
     import google.generativeai as genai
@@ -32,7 +32,6 @@ def get_db_connection():
     if not db_url:
         raise ValueError("DATABASE_URL environment variable is missing.")
     return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
-
 
 def analyze_po_with_gemini(uploaded_files_data, form_data):
     """Sends uploaded file streams to Gemini Flash for extraction & compliance checking."""
@@ -119,7 +118,6 @@ def render_guide_page():
             conn.close()
         
     return render_template('guide.html', matrix_rows=matrix_rows)
-
 
 @app.route('/legal_framework')
 def legal_framework():
@@ -1091,7 +1089,7 @@ def expenditure_expose():
         all_items = cur.fetchall()
 
 
-        # 3. Fetch Cashbook Compliance Audit Register
+        # 3. Fetch Cashbook Compliance Audit Register & Group by Verdict Category
         cur.execute("""
             SELECT 
                 transaction_date,
@@ -1107,7 +1105,16 @@ def expenditure_expose():
             FROM vw_cashbook_compliance_audit
             ORDER BY transaction_date DESC;
         """)
-        audit_transactions = cur.fetchall()
+        raw_audit_rows = cur.fetchall()
+
+        # Group audit items by category and compute aggregate Rand totals
+        grouped_audit = defaultdict(list)
+        category_totals = defaultdict(float)
+
+        for row in raw_audit_rows:
+            verdict = row['compliance_verdict']
+            grouped_audit[verdict].append(row)
+            category_totals[verdict] += float(abs(row['amount']))
         
         cur.close()
         conn.close()
@@ -1241,12 +1248,13 @@ def expenditure_expose():
         total_ytd_expenditure_budget=total_ytd_expenditure_budget,
         total_selected_month_spend=total_selected_month_spend,
         total_expenditure_overrun=total_expenditure_overrun,
-        total_expenditure_variance=total_expenditure_variance,  # <-- ADD THIS LINE
+        total_expenditure_variance=total_expenditure_variance,
         selected_month=selected_month,
         allowed_months=ALLOWED_MONTHS,
         ai_analysis=ai_analysis,
         is_cached=bool(cached_analysis),
-        audit_transactions=audit_transactions
+        grouped_audit=grouped_audit,
+        category_totals=category_totals
     )
 
 

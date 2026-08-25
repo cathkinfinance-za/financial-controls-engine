@@ -459,8 +459,25 @@
             </table>
         </div>
 
-        <!-- 3. Cashbook Compliance Audit Register -->
-        <div class="section-title">Cashbook Compliance Audit Register (Sections 2 & 3)</div>
+        <!-- 3. Cashbook Compliance Audit Register (Grouped by Category) -->
+        <div class="section-title">Cashbook Compliance Audit Register (Grouped by Verdict)</div>
+        
+        {% for category, items in grouped_audit.items() %}
+        <div style="display: flex; justify-content: space-between; align-items: center; margin: 20px 0 8px 0;">
+            <span style="font-size: 14px; font-weight: 600; color: var(--text-main);">
+                {% if 'COMPLIANT' in category and 'NON-COMPLIANT' not in category %}
+                    ✅ {{ category }}
+                {% elif 'FLAGGED' in category or 'SUSPECTED' in category %}
+                    ⚠️ {{ category }}
+                {% else %}
+                    🛑 {{ category }}
+                {% endif %}
+            </span>
+            <span style="font-size: 12px; font-weight: 600; background: #f1f5f9; padding: 4px 10px; border-radius: 12px; color: var(--text-muted);">
+                {{ items|length }} Items — R {{ "{:,.2f}".format(category_totals[category]) }}
+            </span>
+        </div>
+
         <div class="table-container">
             <table>
                 <thead>
@@ -476,7 +493,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for row in audit_transactions %}
+                    {% for row in items %}
                     <tr>
                         <td>{{ row.transaction_date }}</td>
                         <td><strong>{{ row.transaction_text }}</strong></td>
@@ -516,13 +533,23 @@
                             {% endif %}
                         </td>
                     </tr>
-                    {% else %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="table-container">
+            <table>
+                <tbody>
                     <tr>
                         <td colspan="8" class="empty-state">
                             No cashbook audit records found for this period.
                         </td>
                     </tr>
-                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
                 </tbody>
             </table>
         </div>
