@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 
 def clean_amount(text_value):
-    """Converts string metrics to float, handling negative accounting brackets."""
+    """Converts accounting formatted text into floats."""
     if not text_value or str(text_value).strip() in ["", "-"]:
         return 0.0
     cleaned = re.sub(r'[\s\xa0R]', '', str(text_value))
@@ -40,48 +40,49 @@ def fetch_and_sync_cashbook_allocations():
         print("Connecting to WeconnectU report server...")
         page.goto(URL, timeout=90000, wait_until="networkidle")
         
-        print("Navigating and scrolling to Cashbook Allocations section...")
-        # Scroll down incrementally to trigger any lazy-loaded tables
-        for _ in range(5):
-            page.evaluate("window.scrollBy(0, 1000)")
-            page.wait_for_timeout(1000)
+        print("Waiting for #payment-cashbook container...")
+        page.wait_for_selector("#payment-cashbook", timeout=30000)
 
-        # Attempt to click cashbook tab if it exists
-        try:
-            cashbook_tab = page.locator("text=Cashbook Allocations").first
-            if cashbook_tab.is_visible():
-                cashbook_tab.scroll_into_view_if_needed()
-                cashbook_tab.click()
-                page.wait_for_timeout(3000)
-        except Exception:
-            pass
-
-        # Give dynamic JavaScript time to fill tables
-        page.wait_for_timeout(5000)
+        # Scroll into view so all pay-info divs render
+        page.eval_on_selector("#payment-cashbook", "el => el.scrollIntoView()")
+        page.wait_for_timeout(3000)
 
         html_content = page.content()
         browser.close()
 
     soup = BeautifulSoup(html_content, 'html.parser')
     
+    cashbook_container = soup.find(id="payment-cashbook")
+    if not cashbook_container:
+        print("❌ Error: #payment-cashbook element not found in DOM.")
+        return
+
+    # Target parent section to ensure we catch box-info wrapper
+    parent_section = cashbook_container.parent if cashbook_container.parent else cashbook_container
+
     allocations_data = []
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
     supplier_pattern = re.compile(r'^(?:SUPPLIER|DEBTOR)\s+([A-Z0-9]+):', re.IGNORECASE)
 
-    # Strategy 1: Search standard HTML <tr> tags
-    for tr in soup.find_all('tr'):
-        cells = [td.text.strip() for td in tr.find_all(['td', 'th'])]
-        if len(cells) < 3:
+    # Search for all div elements with class "pay-info"
+    rows = parent_section.find_all('div', class_='pay-info')
+
+    for row in rows:
+        # Extract immediate child divs (Date, Transaction, Amount, Allocation)
+        cols = [div.text.strip() for div in row.find_all('div', recursive=False)]
+        
+        if len(cols) < 3:
             continue
-            
-        trans_date = parse_date(cells[0])
+
+        trans_date = parse_date(cols[0])
         if not trans_date:
-            continue  # Must start with valid YYYY-MM-DD date
+            continue  # Filters out the header row "Date | Transaction | Amount | Allocation"
 
-        transaction_text = cells[1]
-        amount = clean_amount(cells[2])
-        allocation_raw = cells[3] if len(cells) > 3 else ""
+        transaction_text = cols[1]
+        amount = clean_amount(cols[2])
+        allocation_raw = cols[3] if len(cols) > 3 else ""
 
+        # Skip non-transaction opening balances
         if transaction_text.lower() == "opening balance":
             continue
 
@@ -99,46 +100,11 @@ def fetch_and_sync_cashbook_allocations():
             "supplier_code": supplier_match.group(1) if supplier_match else None
         })
 
-    # Strategy 2: Flexbox/Grid fallback if 0 standard <tr> rows were matched
-    if not allocations_data:
-        print("⚠️ Standard table rows not found. Running div grid fallbacks...")
-        # Search for date pattern YYYY-MM-DD in text elements
-        date_pattern = re.compile(r'^\d{4}-\d{2}-\d{2}$')
-        
-        for elem in soup.find_all(text=date_pattern):
-            parent = elem.find_parent(['div', 'li', 'tr'])
-            if parent:
-                texts = [t.strip() for t in parent.stripped_strings if t.strip()]
-                if len(texts) >= 3:
-                    trans_date = parse_date(texts[0])
-                    if trans_date:
-                        transaction_text = texts[1]
-                        amount = clean_amount(texts[2])
-                        allocation_raw = texts[3] if len(texts) > 3 else ""
-                        
-                        if transaction_text.lower() == "opening balance":
-                            continue
-
-                        transaction_type = "INCOME" if amount >= 0 else "EXPENSE"
-                        gl_match = gl_pattern.search(allocation_raw)
-                        supplier_match = supplier_pattern.search(allocation_raw)
-
-                        allocations_data.append({
-                            "transaction_date": trans_date,
-                            "transaction_text": transaction_text,
-                            "amount": amount,
-                            "transaction_type": transaction_type,
-                            "allocation_raw": allocation_raw,
-                            "gl_code": gl_match.group(1) if gl_match else None,
-                            "supplier_code": supplier_match.group(1) if supplier_match else None
-                        })
-
     df = pd.DataFrame(allocations_data)
     if df.empty:
-        print("⚠️ Warning: 0 cashbook rows parsed. Please verify report target page load.")
+        print("⚠️ Warning: 0 cashbook rows parsed from div.pay-info.")
         return
 
-    # Deduplicate extracted entries
     df = df.drop_duplicates(subset=["transaction_date", "transaction_text", "amount"])
     print(f"Parsed {len(df)} cashbook allocation entries ({len(df[df['transaction_type'] == 'INCOME'])} Income, {len(df[df['transaction_type'] == 'EXPENSE'])} Expense).")
 
@@ -163,7 +129,7 @@ def fetch_and_sync_cashbook_allocations():
                 cur.execute(upsert_query, row.to_dict())
             conn.commit()
         conn.close()
-        print("🟢 Success! Income & Expense cashbook allocations synced to PostgreSQL.")
+        print("🟢 Success! Cashbook allocations synced to PostgreSQL.")
     except Exception as e:
         print(f"🔴 Database sync failed: {e}")
 
