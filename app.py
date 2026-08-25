@@ -1109,6 +1109,7 @@ def expenditure_expose():
 
     total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
     total_expenditure_overrun = sum(float(item['variance']) for item in over_budget_expenditure)
+    total_expenditure_variance = total_ytd_expenditure - total_ytd_expenditure_budget
 
     month_label = ALLOWED_MONTHS[selected_month]
 

@@ -214,7 +214,14 @@
             color: var(--text-muted);
             padding: 32px;
         }
-    </style>
+
+        .kpi-card.success {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+        .kpi-card.success .kpi-label { color: #166534; }
+        .kpi-card.success .kpi-value { color: #15803d; }
+            </style>
 </head>
 <body>
     <div class="container">
@@ -256,9 +263,17 @@
                 <div class="kpi-label">YTD Actual Income (1xxx)</div>
                 <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_income) }}</div>
             </div>
-            <div class="kpi-card">
-                <div class="kpi-label">YTD Actual Spend (2xxx)</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure) }}</div>
+            <div class="kpi-card {% if total_expenditure_variance > 0 %}danger{% else %}success{% endif %}">
+                <div class="kpi-label">
+                    {% if total_expenditure_variance > 0 %}Expenditure Overrun{% else %}Expenditure Underrun (Savings){% endif %}
+                </div>
+                <div class="kpi-value">
+                    {% if total_expenditure_variance > 0 %}
+                        +R {{ "{:,.2f}".format(total_expenditure_variance) }}
+                    {% else %}
+                        R {{ "{:,.2f}".format(total_expenditure_variance) }}
+                    {% endif %}
+                </div>
             </div>
             <div class="kpi-card danger">
                 <div class="kpi-label">Expenditure Overrun</div>
