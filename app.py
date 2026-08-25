@@ -11,10 +11,11 @@ from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
 from flask import request
+from google import genai
 
 try:
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     GEMINI_AVAILABLE = True
 except ModuleNotFoundError:
     genai = None
@@ -1245,7 +1246,7 @@ def refresh_expenditure_ai(month):
 
 
 @app.route('/expenditure')
-def expenditure_expose():
+def expenditure_summary():
     conn = get_db_connection()
     cur = conn.cursor()
     
