@@ -98,6 +98,11 @@
             border-color: var(--danger-border);
         }
 
+        .kpi-card.success {
+            background: #f0fdf4;
+            border-color: #bbf7d0;
+        }
+
         .kpi-label {
             font-size: 11px;
             font-weight: 600;
@@ -107,9 +112,8 @@
             margin-bottom: 6px;
         }
 
-        .kpi-card.danger .kpi-label {
-            color: #991b1b;
-        }
+        .kpi-card.danger .kpi-label { color: #991b1b; }
+        .kpi-card.success .kpi-label { color: #166534; }
 
         .kpi-value {
             font-size: 20px;
@@ -117,9 +121,8 @@
             color: var(--text-main);
         }
 
-        .kpi-card.danger .kpi-value {
-            color: var(--danger-text);
-        }
+        .kpi-card.danger .kpi-value { color: var(--danger-text); }
+        .kpi-card.success .kpi-value { color: #15803d; }
 
         /* AI Analysis Callout */
         .ai-card {
@@ -214,14 +217,7 @@
             color: var(--text-muted);
             padding: 32px;
         }
-
-        .kpi-card.success {
-            background: #f0fdf4;
-            border-color: #bbf7d0;
-        }
-        .kpi-card.success .kpi-label { color: #166534; }
-        .kpi-card.success .kpi-value { color: #15803d; }
-            </style>
+    </style>
 </head>
 <body>
     <div class="container">
@@ -257,6 +253,33 @@
         {% endwith %}
 
         <!-- KPI Summary Cards -->
+        {% set net_variance = total_ytd_expenditure - total_ytd_expenditure_budget %}
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">YTD Actual Income (1xxx)</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_income) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">YTD Actual Spend (2xxx)</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure) }}</div>
+            </div>
+            <div class="kpi-card {% if net_variance > 0 %}danger{% else %}success{% endif %}">
+                <div class="kpi-label">
+                    {% if net_variance > 0 %}Net Expenditure Overrun{% else %}Net Expenditure Savings{% endif %}
+                </div>
+                <div class="kpi-value">
+                    {% if net_variance > 0 %}
+                        +R {{ "{:,.2f}".format(net_variance) }}
+                    {% else %}
+                        R {{ "{:,.2f}".format(net_variance) }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Over-Budget Spend Items</div>
+                <div class="kpi-value">{{ over_budget_expenditure|length }}</div>
+            </div>
+        </div>
 
         <!-- Gemini AI Financial Analysis Card with Refresh Action -->
         <div class="ai-card">
@@ -268,8 +291,8 @@
                     {% endif %}
                 </div>
                 <a href="/expenditure_expose/refresh/{{ selected_month }}" 
-                style="font-size: 12px; color: var(--accent-blue); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
-                title="Clear cache and re-run Gemini analysis for this period">
+                   style="font-size: 12px; color: var(--accent-blue); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                   title="Clear cache and re-run Gemini analysis for this period">
                     🔄 Re-analyze with AI
                 </a>
             </div>
