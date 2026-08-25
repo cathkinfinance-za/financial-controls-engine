@@ -11,11 +11,11 @@ from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
 from flask import request
-from google import genai
+
 
 try:
     import google.generativeai as genai
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     GEMINI_AVAILABLE = True
 except ModuleNotFoundError:
     genai = None
