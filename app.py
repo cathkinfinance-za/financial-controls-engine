@@ -1057,12 +1057,23 @@ def expenditure_expose():
         selected_month = 'aug_2026'
 
     all_items = []
+    cached_analysis = None
+
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Exclude rolled-up parent items ending in /000
-        # Dynamically pull the selected month alongside YTD metrics
+        # 1. Check for cached AI analysis first
+        cur.execute("""
+            SELECT analysis_text 
+            FROM public.expenditure_ai_cache 
+            WHERE month_code = %s;
+        """, (selected_month,))
+        cache_row = cur.fetchone()
+        if cache_row:
+            cached_analysis = cache_row['analysis_text']
+
+        # 2. Fetch line items excluding rolled-up parent items ending in /000
         query = f"""
             SELECT gl_code, description, 
                    COALESCE({selected_month}, 0) AS selected_month_actual,
@@ -1080,19 +1091,16 @@ def expenditure_expose():
         cur.close()
         conn.close()
     except Exception as e:
-        flash(f"Database error fetching expenditure records: {str(e)}", "danger")
+        flash(f"Database error: {str(e)}", "danger")
 
-    # Separate into Income (GL 1...) and Expenditure (GL 2...)
+    # Categorize items by series prefix
     income_items = [item for item in all_items if str(item['gl_code']).startswith('1')]
     expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2')]
 
-    # Expenditure Overruns: Actual Spend > Budget (ytd > budget_ytd)
     over_budget_expenditure = [item for item in expenditure_items if float(item['ytd']) > float(item['budget_ytd'])]
-    
-    # Income Shortfalls: Actual Income < Budget (ytd < budget_ytd)
     under_budget_income = [item for item in income_items if float(item['ytd']) < float(item['budget_ytd'])]
 
-    # Macro Calculations
+    # Macro totals
     total_ytd_income = sum(float(item['ytd']) for item in income_items)
     total_ytd_income_budget = sum(float(item['budget_ytd']) for item in income_items)
     
@@ -1104,48 +1112,62 @@ def expenditure_expose():
 
     month_label = ALLOWED_MONTHS[selected_month]
 
-    # Format structured text for AI analysis
-    income_summary = "\n".join([
-        f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}"
-        for i in income_items
-    ])
-    
-    expenditure_summary = "\n".join([
-        f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f} (Variance: R{float(e['variance']):,.2f})"
-        for e in expenditure_items
-    ])
-
-    ai_analysis = "AI analysis is currently disabled or unavailable."
-
-    if GEMINI_AVAILABLE and all_items:
+    # 3. Handle AI Analysis generation or use cached version
+    if cached_analysis:
+        ai_analysis = cached_analysis
+    elif GEMINI_AVAILABLE and all_items:
         try:
+            income_summary = "\n".join([
+                f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}"
+                for i in income_items
+            ])
+            
+            expenditure_summary = "\n".join([
+                f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f} (Variance: R{float(e['variance']):,.2f})"
+                for e in expenditure_items
+            ])
+
             model = genai.GenerativeModel('gemini-3.5-flash')
             prompt = f"""
             You are an expert financial controller for Cathkin Estates Finance Committee.
-            Analyze our complete YTD income and expenditure performance through {month_label} (excluding rolled-up summary accounts):
+            Analyze our YTD income and expenditure performance through {month_label} (excluding rolled-up accounts):
 
             INCOME OVERVIEW (GL Series 1):
-            - YTD Total Income Collected: R{total_ytd_income:,.2f}
-            - YTD Total Income Budgeted: R{total_ytd_income_budget:,.2f}
+            - YTD Income Collected: R{total_ytd_income:,.2f} | YTD Budget: R{total_ytd_income_budget:,.2f}
             Line Items:
             {income_summary}
 
             EXPENDITURE OVERVIEW (GL Series 2):
-            - YTD Total Expenditure: R{total_ytd_expenditure:,.2f}
-            - YTD Total Expenditure Budget: R{total_ytd_expenditure_budget:,.2f}
+            - YTD Expenditure: R{total_ytd_expenditure:,.2f} | YTD Budget: R{total_ytd_expenditure_budget:,.2f}
             - Overrun Exposure: R{total_expenditure_overrun:,.2f}
             Line Items:
             {expenditure_summary}
 
-            Provide a concise, 3-section executive commentary for the Finance Committee meeting:
-            1. **Income vs Spend Macro Health**: Evaluate net estate surplus/deficit position.
-            2. **Revenue Shortfalls & Over-Budget Drivers**: Point out any revenue collections falling short of budget and top expenditure overrun items.
-            3. **Key Recommendations**: Suggest 2 concrete corrective financial actions.
+            Provide a concise executive commentary:
+            1. **Income vs Spend Macro Health**: Net surplus/deficit position.
+            2. **Revenue Shortfalls & Over-Budget Drivers**: Top problem areas.
+            3. **Key Recommendations**: 2 concrete corrective actions.
             """
             response = model.generate_content(prompt)
             ai_analysis = response.text
+
+            # Save generated response to cache database
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO public.expenditure_ai_cache (month_code, analysis_text)
+                VALUES (%s, %s)
+                ON CONFLICT (month_code) 
+                DO UPDATE SET analysis_text = EXCLUDED.analysis_text, created_at = CURRENT_TIMESTAMP;
+            """, (selected_month, ai_analysis))
+            conn.commit()
+            cur.close()
+            conn.close()
+
         except Exception as e:
             ai_analysis = f"AI Analysis temporarily unavailable: {str(e)}"
+    else:
+        ai_analysis = "AI analysis is currently disabled or unavailable."
 
     return render_template(
         'expenditure_expose.html',
@@ -1161,8 +1183,25 @@ def expenditure_expose():
         total_expenditure_overrun=total_expenditure_overrun,
         selected_month=selected_month,
         allowed_months=ALLOWED_MONTHS,
-        ai_analysis=ai_analysis
+        ai_analysis=ai_analysis,
+        is_cached=bool(cached_analysis)
     )
+
+
+@app.route('/expenditure_expose/refresh/<month>')
+def refresh_expenditure_ai(month):
+    if month in ALLOWED_MONTHS:
+        try:
+            conn = get_db_connection()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM public.expenditure_ai_cache WHERE month_code = %s;", (month,))
+            conn.commit()
+            cur.close()
+            conn.close()
+            flash(f"AI commentary cache cleared for {ALLOWED_MONTHS[month]}. Re-generating...", "info")
+        except Exception as e:
+            flash(f"Error clearing cache: {str(e)}", "danger")
+    return redirect(url_for('expenditure_expose', month=month))
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -270,12 +270,22 @@
             </div>
         </div>
 
-        <!-- Gemini AI Financial Analysis -->
+        <!-- Gemini AI Financial Analysis Card with Refresh Action -->
         <div class="ai-card">
-            <div class="ai-header">
-                <span>🤖 Gemini Financial Controller Commentary</span>
+            <div class="ai-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span>🤖 Gemini Financial Controller Commentary</span>
+                    {% if is_cached %}
+                        <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-weight: 500;">Cached</span>
+                    {% endif %}
+                </div>
+                <a href="/expenditure_expose/refresh/{{ selected_month }}" 
+                style="font-size: 12px; color: var(--accent-blue); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                title="Clear cache and re-run Gemini analysis for this period">
+                    🔄 Re-analyze with AI
+                </a>
             </div>
-            <div class="ai-body">{{ ai_analysis }}</div>
+            <div class="ai-body" style="margin-top: 12px;">{{ ai_analysis }}</div>
         </div>
 
         <!-- Over-Budget Line Items Table -->
