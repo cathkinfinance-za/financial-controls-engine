@@ -1106,6 +1106,8 @@ def expenditure_expose():
             item_dict = dict(item)
             # Store as absolute positive difference
             item_dict['variance'] = round(ytd - budget_ytd, 2)
+            # Calculate YTD percentage relative to budget
+            item_dict['ytd_pct'] = (ytd / budget_ytd * 100.0) if budget_ytd > 0 else 0.0
             over_budget_expenditure.append(item_dict)
 
     # Sort descending from highest numerical variance to lowest
@@ -1121,6 +1123,8 @@ def expenditure_expose():
             item_dict = dict(item)
             # Store variance as positive magnitude of shortfall (Budget - Actual)
             item_dict['variance'] = round(budget_ytd - ytd, 2)
+            # Calculate YTD percentage relative to budget
+            item_dict['ytd_pct'] = (ytd / budget_ytd * 100.0) if budget_ytd > 0 else 0.0
             under_budget_income.append(item_dict)
 
     # Sort from largest income shortfall to smallest
@@ -1203,7 +1207,7 @@ def expenditure_expose():
             ai_analysis = f"AI Analysis temporarily unavailable: {str(e)}"
     else:
         ai_analysis = "AI analysis is currently disabled or unavailable."
-        
+
     return render_template(
         'expenditure_expose.html',
         income_items=income_items,
