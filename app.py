@@ -1145,50 +1145,57 @@ def expenditure_expose():
         ai_analysis = cached_analysis
     elif GEMINI_AVAILABLE and all_items:
         try:
-            income_summary = "\n".join([
-                f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}"
-                for i in income_items
-            ])
-            
-            expenditure_summary = "\n".join([
-                f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f} (Variance: R{float(e['variance']):,.2f})"
-                for e in expenditure_items
-            ])
-
-            model = genai.GenerativeModel('gemini-3.5-flash')
-            prompt = f"""
-            You are an expert financial controller for Cathkin Estates Finance Committee.
-            Analyze our YTD income and expenditure performance through {month_label} (excluding rolled-up accounts):
-
-            INCOME OVERVIEW (GL Series 1):
-            - YTD Income Collected: R{total_ytd_income:,.2f} | YTD Budget: R{total_ytd_income_budget:,.2f}
-            Line Items:
-            {income_summary}
-
-            EXPENDITURE OVERVIEW (GL Series 2):
-            - YTD Expenditure: R{total_ytd_expenditure:,.2f} | YTD Budget: R{total_ytd_expenditure_budget:,.2f}
-            - Overrun Exposure: R{total_expenditure_overrun:,.2f}
-            Line Items:
-            {expenditure_summary}
-
-            Provide a concise executive commentary:
-            1. **Income vs Spend Macro Health**: Net surplus/deficit position.
-            2. **Revenue Shortfalls & Over-Budget Drivers**: Top problem areas.
-            3. **Key Recommendations**: 2 concrete corrective actions.
-            """
-            response = model.generate_content(prompt)
-            ai_analysis = response.text
-
-            # Save generated response to cache database
             conn = get_db_connection()
             cur = conn.cursor()
+
+            # Query template from database
             cur.execute("""
-                INSERT INTO public.expenditure_ai_cache (month_code, analysis_text)
-                VALUES (%s, %s)
-                ON CONFLICT (month_code) 
-                DO UPDATE SET analysis_text = EXCLUDED.analysis_text, created_at = CURRENT_TIMESTAMP;
-            """, (selected_month, ai_analysis))
-            conn.commit()
+                SELECT prompt_template 
+                FROM public.system_prompts 
+                WHERE LOWER(process) = LOWER('expenditure_expose') AND is_active = TRUE;
+            """)
+            prompt_row = cur.fetchone()
+
+            if not prompt_row or not prompt_row.get('prompt_template'):
+                ai_analysis = "AI analysis is currently disabled or template is missing in system_prompts."
+            else:
+                income_summary = "\n".join([
+                    f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}"
+                    for i in income_items
+                ])
+                
+                expenditure_summary = "\n".join([
+                    f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f} (Variance: R{float(e['variance']):,.2f})"
+                    for e in expenditure_items
+                ])
+
+                prompt_template = prompt_row['prompt_template']
+
+                # Format template with runtime values
+                formatted_prompt = prompt_template.format(
+                    month_label=month_label,
+                    total_ytd_income=total_ytd_income,
+                    total_ytd_income_budget=total_ytd_income_budget,
+                    income_summary=income_summary,
+                    total_ytd_expenditure=total_ytd_expenditure,
+                    total_ytd_expenditure_budget=total_ytd_expenditure_budget,
+                    total_expenditure_overrun=total_expenditure_overrun,
+                    expenditure_summary=expenditure_summary
+                )
+
+                model = genai.GenerativeModel('gemini-3.5-flash')
+                response = model.generate_content(formatted_prompt)
+                ai_analysis = response.text
+
+                # Save generated response to cache database
+                cur.execute("""
+                    INSERT INTO public.expenditure_ai_cache (month_code, analysis_text)
+                    VALUES (%s, %s)
+                    ON CONFLICT (month_code) 
+                    DO UPDATE SET analysis_text = EXCLUDED.analysis_text, created_at = CURRENT_TIMESTAMP;
+                """, (selected_month, ai_analysis))
+                conn.commit()
+
             cur.close()
             conn.close()
 
@@ -1196,7 +1203,7 @@ def expenditure_expose():
             ai_analysis = f"AI Analysis temporarily unavailable: {str(e)}"
     else:
         ai_analysis = "AI analysis is currently disabled or unavailable."
-
+        
     return render_template(
         'expenditure_expose.html',
         income_items=income_items,

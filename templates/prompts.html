@@ -146,6 +146,7 @@
                 <select id="processSelect" onchange="loadPrompt()">
                     <option value="Quote evaluation">Quote evaluation</option>
                     <option value="Company assessment">Company assessment</option>
+                    <option value="expenditure_expose">Financial Expose Analysis</option>
                 </select>
             </div>
 
@@ -187,7 +188,11 @@
         "{coi_status}", "{coi_details}", "{extracted_vendor_name}", 
         "{cipc_num}", "{vat_num}", "{quoted_amount}", 
         "{includes_vat}", "{search_context}",
-        "{winner_name}", "{winning_score}", "{cheapest_vendor}", "{min_cost}"
+        "{winner_name}", "{winning_score}", "{cheapest_vendor}", "{min_cost}",
+        // Financial Expose Placeholders:
+        "{month_label}", "{total_ytd_income}", "{total_ytd_income_budget}", 
+        "{income_summary}", "{total_ytd_expenditure}", "{total_ytd_expenditure_budget}", 
+        "{total_expenditure_overrun}", "{expenditure_summary}"
     ];
 
     function updateBadgeState() {
