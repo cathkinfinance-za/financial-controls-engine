@@ -1,0 +1,37 @@
+name: Sync Cashbook Allocations
+
+on:
+  schedule:
+    # Runs daily at 02:00 UTC (4:00 AM SAST)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allows manual run from GitHub Actions tab
+
+jobs:
+  sync-cashbook:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright pandas beautifulsoup4 psycopg2-binary
+
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run Cashbook Sync Script
+        env:
+          WECONNECTU_URL: ${{ secrets.WECONNECTU_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python refresh_cashbook_db.py
