@@ -1086,8 +1086,28 @@ def expenditure_expose():
             WHERE gl_code NOT LIKE '%/000'
             ORDER BY gl_code ASC;
         """
+        
         cur.execute(query)
         all_items = cur.fetchall()
+
+
+        # 3. Fetch Cashbook Compliance Audit Register
+        cur.execute("""
+            SELECT 
+                transaction_date,
+                transaction_text,
+                amount,
+                gl_code,
+                supplier_code,
+                authority_tier,
+                min_quotes_required,
+                po_number,
+                quotes_attached,
+                compliance_verdict
+            FROM vw_cashbook_compliance_audit
+            ORDER BY transaction_date DESC;
+        """)
+        audit_transactions = cur.fetchall()
         
         cur.close()
         conn.close()
@@ -1225,7 +1245,8 @@ def expenditure_expose():
         selected_month=selected_month,
         allowed_months=ALLOWED_MONTHS,
         ai_analysis=ai_analysis,
-        is_cached=bool(cached_analysis)
+        is_cached=bool(cached_analysis),
+        audit_transactions=audit_transactions
     )
 
 
