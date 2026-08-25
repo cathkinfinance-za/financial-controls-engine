@@ -1097,8 +1097,35 @@ def expenditure_expose():
     income_items = [item for item in all_items if str(item['gl_code']).startswith('1')]
     expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2')]
 
-    over_budget_expenditure = [item for item in expenditure_items if float(item['ytd']) > float(item['budget_ytd'])]
-    under_budget_income = [item for item in income_items if float(item['ytd']) < float(item['budget_ytd'])]
+    over_budget_expenditure = []
+    for item in expenditure_items:
+        ytd = float(item['ytd'])
+        budget_ytd = float(item['budget_ytd'])
+        
+        if ytd > budget_ytd:
+            item_dict = dict(item)
+            # Store as absolute positive difference
+            item_dict['variance'] = round(ytd - budget_ytd, 2)
+            over_budget_expenditure.append(item_dict)
+
+    # Sort descending from highest numerical variance to lowest
+    over_budget_expenditure.sort(key=lambda x: x['variance'], reverse=True)
+
+    # Calculate positive income shortfall magnitude and sort descending
+    under_budget_income = []
+    for item in income_items:
+        ytd = float(item['ytd'])
+        budget_ytd = float(item['budget_ytd'])
+        
+        if ytd < budget_ytd:
+            item_dict = dict(item)
+            # Store variance as positive magnitude of shortfall (Budget - Actual)
+            item_dict['variance'] = round(budget_ytd - ytd, 2)
+            under_budget_income.append(item_dict)
+
+    # Sort from largest income shortfall to smallest
+    under_budget_income.sort(key=lambda x: x['variance'], reverse=True)
+
 
     # Macro totals
     total_ytd_income = sum(float(item['ytd']) for item in income_items)

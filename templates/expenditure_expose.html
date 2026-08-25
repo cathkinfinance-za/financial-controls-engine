@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expenditure Expose - Cathkin Estates</title>
+    <title>Financial Expose - Cathkin Estates</title>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -14,6 +14,9 @@
             --danger-bg: #fef2f2;
             --danger-text: #dc2626;
             --danger-border: #fecaca;
+            --success-bg: #f0fdf4;
+            --success-text: #15803d;
+            --success-border: #bbf7d0;
             --accent-blue: #2563eb;
             --ai-bg: #f0f9ff;
             --ai-border: #bae6fd;
@@ -33,10 +36,7 @@
             margin: 0 auto;
         }
 
-        /* Top Bar & Header */
-        .top-nav {
-            margin-bottom: 16px;
-        }
+        .top-nav { margin-bottom: 16px; }
 
         .back-link {
             color: var(--accent-blue);
@@ -45,9 +45,7 @@
             font-weight: 500;
         }
 
-        .back-link:hover {
-            text-decoration: underline;
-        }
+        .back-link:hover { text-decoration: underline; }
 
         .header-title {
             font-size: 24px;
@@ -56,7 +54,6 @@
             letter-spacing: -0.02em;
         }
 
-        /* Flash Message Alert Styles */
         .alert {
             padding: 12px 16px;
             border-radius: 6px;
@@ -80,7 +77,7 @@
         /* KPI Metric Cards */
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
             margin-bottom: 24px;
         }
@@ -99,8 +96,8 @@
         }
 
         .kpi-card.success {
-            background: #f0fdf4;
-            border-color: #bbf7d0;
+            background: var(--success-bg);
+            border-color: var(--success-border);
         }
 
         .kpi-label {
@@ -122,7 +119,7 @@
         }
 
         .kpi-card.danger .kpi-value { color: var(--danger-text); }
-        .kpi-card.success .kpi-value { color: #15803d; }
+        .kpi-card.success .kpi-value { color: var(--success-text); }
 
         /* AI Analysis Callout */
         .ai-card {
@@ -136,7 +133,7 @@
         .ai-header {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
             font-size: 14px;
             font-weight: 600;
             color: var(--ai-text);
@@ -150,21 +147,20 @@
             white-space: pre-wrap;
         }
 
-        /* Section Headings */
         .section-title {
             font-size: 16px;
             font-weight: 600;
-            margin-bottom: 12px;
+            margin: 28px 0 12px 0;
             color: var(--text-main);
         }
 
-        /* Table Design */
         .table-container {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            margin-bottom: 24px;
         }
 
         table {
@@ -191,17 +187,10 @@
             color: var(--text-main);
         }
 
-        tr:last-child td {
-            border-bottom: none;
-        }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: #f8fafc; }
 
-        tr:hover td {
-            background-color: #f8fafc;
-        }
-
-        .text-right {
-            text-align: right;
-        }
+        .text-right { text-align: right; }
 
         .badge-overrun {
             color: var(--danger-text);
@@ -224,7 +213,7 @@
         <!-- Top Navigation -->
         <div class="top-nav">
             <a href="/minutes" class="back-link">← Back to Minutes Dashboard</a>
-            <h1 class="header-title">Standing Agenda: Over-Budget Expenditure Expose</h1>
+            <h1 class="header-title">Standing Agenda: Financial Variance Expose</h1>
         </div>
 
         <!-- Month Selector Bar -->
@@ -252,26 +241,57 @@
             {% endif %}
         {% endwith %}
 
-        <!-- KPI Summary Cards -->
-        {% set net_variance = total_ytd_expenditure - total_ytd_expenditure_budget %}
+        <!-- 1. Income KPI Cards -->
+        {% set income_variance = total_ytd_income_budget - total_ytd_income %}
+        <div class="section-title" style="margin-top: 0;">Income Performance (1xxx)</div>
         <div class="kpi-grid">
             <div class="kpi-card">
-                <div class="kpi-label">YTD Actual Income (1xxx)</div>
+                <div class="kpi-label">YTD Actual Income</div>
                 <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_income) }}</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-label">YTD Actual Spend (2xxx)</div>
-                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure) }}</div>
+                <div class="kpi-label">YTD Budgeted Income</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_income_budget) }}</div>
             </div>
-            <div class="kpi-card {% if net_variance > 0 %}danger{% else %}success{% endif %}">
+            <div class="kpi-card {% if income_variance > 0 %}danger{% else %}success{% endif %}">
                 <div class="kpi-label">
-                    {% if net_variance > 0 %}Net Expenditure Overrun{% else %}Net Expenditure Savings{% endif %}
+                    {% if income_variance > 0 %}Income Shortfall{% else %}Income Surplus{% endif %}
                 </div>
                 <div class="kpi-value">
-                    {% if net_variance > 0 %}
-                        +R {{ "{:,.2f}".format(net_variance) }}
+                    {% if income_variance > 0 %}
+                        -R {{ "{:,.2f}".format(income_variance) }}
                     {% else %}
-                        R {{ "{:,.2f}".format(net_variance) }}
+                        +R {{ "{:,.2f}".format(income_variance|abs) }}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Under-Budget Income Items</div>
+                <div class="kpi-value">{{ under_budget_income|length }}</div>
+            </div>
+        </div>
+
+        <!-- 2. Expenditure KPI Cards -->
+        {% set exp_variance = total_ytd_expenditure - total_ytd_expenditure_budget %}
+        <div class="section-title">Expenditure Performance (2xxx)</div>
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">YTD Actual Spend</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure) }}</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">YTD Budgeted Spend</div>
+                <div class="kpi-value">R {{ "{:,.2f}".format(total_ytd_expenditure_budget) }}</div>
+            </div>
+            <div class="kpi-card {% if exp_variance > 0 %}danger{% else %}success{% endif %}">
+                <div class="kpi-label">
+                    {% if exp_variance > 0 %}Net Spend Overrun{% else %}Net Spend Savings{% endif %}
+                </div>
+                <div class="kpi-value">
+                    {% if exp_variance > 0 %}
+                        +R {{ "{:,.2f}".format(exp_variance) }}
+                    {% else %}
+                        R {{ "{:,.2f}".format(exp_variance) }}
                     {% endif %}
                 </div>
             </div>
@@ -281,9 +301,9 @@
             </div>
         </div>
 
-        <!-- Gemini AI Financial Analysis Card with Refresh Action -->
+        <!-- Gemini AI Financial Controller Commentary -->
         <div class="ai-card">
-            <div class="ai-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="ai-header">
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span>🤖 Gemini Financial Controller Commentary</span>
                     {% if is_cached %}
@@ -291,16 +311,16 @@
                     {% endif %}
                 </div>
                 <a href="/expenditure_expose/refresh/{{ selected_month }}" 
-                   style="font-size: 12px; color: var(--accent-blue); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                   style="font-size: 12px; color: var(--accent-blue); text-decoration: none; font-weight: 600;"
                    title="Clear cache and re-run Gemini analysis for this period">
                     🔄 Re-analyze with AI
                 </a>
             </div>
-            <div class="ai-body" style="margin-top: 12px;">{{ ai_analysis }}</div>
+            <div class="ai-body">{{ ai_analysis }}</div>
         </div>
 
-        <!-- Over-Budget Line Items Table -->
-        <div class="section-title">Over-Budget Line Items Requiring Review</div>
+        <!-- Over-Budget Expenditure Table -->
+        <div class="section-title">Over-Budget Expenditure Line Items</div>
         <div class="table-container">
             <table>
                 <thead>
@@ -331,6 +351,45 @@
                     <tr>
                         <td colspan="7" class="empty-state">
                             No GL line items are currently exceeding YTD budget allocations.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Under-Budget Income Table -->
+        <div class="section-title">Under-Budget Income Line Items (Shortfalls)</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>GL Code</th>
+                        <th>Description</th>
+                        <th class="text-right">{{ allowed_months[selected_month] }}</th>
+                        <th class="text-right">YTD Actual</th>
+                        <th class="text-right">YTD Budget</th>
+                        <th class="text-right">Shortfall</th>
+                        <th class="text-right">Full Year Budget</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in under_budget_income %}
+                    <tr>
+                        <td><strong>{{ item.gl_code }}</strong></td>
+                        <td>{{ item.description }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.selected_month_actual) }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.ytd) }}</td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.budget_ytd) }}</td>
+                        <td class="text-right">
+                            <span class="badge-overrun">-R {{ "{:,.2f}".format(item.variance) }}</span>
+                        </td>
+                        <td class="text-right">R {{ "{:,.2f}".format(item.total_budget) }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-state">
+                            No income accounts are currently tracking below YTD budget expectations.
                         </td>
                     </tr>
                     {% endfor %}
