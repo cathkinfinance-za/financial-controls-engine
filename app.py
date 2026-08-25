@@ -1108,14 +1108,33 @@ def expenditure_expose():
         raw_audit_rows = cur.fetchall()
 
         # Group audit items by category and compute aggregate Rand totals
-        grouped_audit = defaultdict(list)
+        grouped_audit_raw = defaultdict(list)
         category_totals = defaultdict(float)
 
         for row in raw_audit_rows:
             verdict = row['compliance_verdict']
-            grouped_audit[verdict].append(row)
+            grouped_audit_raw[verdict].append(row)
             category_totals[verdict] += float(abs(row['amount']))
-        
+
+        # Define priority order (Critical first, Exempt/Payroll last)
+        VERDICT_ORDER = {
+            'NON-COMPLIANT: Missing Approved PO': 1,
+            'FLAGGED: Unbudgeted / Suspense Allocation': 2,
+            'FLAGGED: Anti-Splitting Suspected': 3,
+            'COMPLIANT: Petty/Minor Spend (No PO Required)': 4,
+            'COMPLIANT': 5,
+            'COMPLIANT: Exempt (Payroll Spend)': 6
+        }
+
+        # Sort dictionary keys based on priority rank
+        sorted_categories = sorted(
+            grouped_audit_raw.keys(),
+            key=lambda cat: VERDICT_ORDER.get(cat, 99)
+        )
+
+        # Build ordered dictionary for Jinja template
+        grouped_audit = {cat: grouped_audit_raw[cat] for cat in sorted_categories}
+
         cur.close()
         conn.close()
     except Exception as e:
