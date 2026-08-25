@@ -501,9 +501,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if row.compliance_verdict == 'COMPLIANT' %}
+                            {% if 'COMPLIANT' in row.compliance_verdict and 'NON-COMPLIANT' not in row.compliance_verdict %}
                                 <span class="badge-compliance badge-compliant">
-                                    ✓ Compliant
+                                    ✓ {{ row.compliance_verdict.replace('COMPLIANT: ', '') }}
                                 </span>
                             {% elif 'FLAGGED' in row.compliance_verdict %}
                                 <span class="badge-compliance badge-flagged" title="Requires Review">
