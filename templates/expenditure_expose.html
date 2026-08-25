@@ -226,6 +226,36 @@
             color: var(--text-muted);
             padding: 32px;
         }
+
+        /* Compliance Badge Base Styling */
+        .badge-compliance {
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Status Variants */
+        .badge-compliant {
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+
+        .badge-flagged {
+            background-color: #fff3cd;
+            color: #664d03;
+            border: 1px solid #ffecb5;
+        }
+
+        .badge-non-compliant {
+            background-color: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
     </style>
 </head>
 <body>
@@ -422,6 +452,74 @@
                     <tr>
                         <td colspan="8" class="empty-state">
                             No income accounts are currently tracking below YTD budget expectations.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 3. Cashbook Compliance Audit Register -->
+        <div class="section-title">Cashbook Compliance Audit Register (Sections 2 & 3)</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Transaction Description</th>
+                        <th class="text-right">Amount</th>
+                        <th>GL / Supplier Code</th>
+                        <th>Authority Tier</th>
+                        <th>Quotes (Attached/Req)</th>
+                        <th>PO Ref</th>
+                        <th>Compliance Verdict</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in audit_transactions %}
+                    <tr>
+                        <td>{{ row.transaction_date }}</td>
+                        <td><strong>{{ row.transaction_text }}</strong></td>
+                        <td class="text-right">R {{ "{:,.2f}".format(row.amount) }}</td>
+                        <td>
+                            <span class="badge-pct">{{ row.gl_code or 'No GL' }}</span><br>
+                            <span style="font-size: 11px; color: var(--text-muted);">{{ row.supplier_code or '-' }}</span>
+                        </td>
+                        <td><span style="font-size: 12px; color: var(--text-muted);">{{ row.authority_tier }}</span></td>
+                        <td>
+                            {% if row.quotes_attached < row.min_quotes_required %}
+                                <span style="color: var(--danger-text); font-weight: 600;">{{ row.quotes_attached }} / {{ row.min_quotes_required }}</span>
+                            {% else %}
+                                <span style="color: var(--success-text); font-weight: 600;">{{ row.quotes_attached }} / {{ row.min_quotes_required }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.po_number %}
+                                <span style="font-weight: 500; color: var(--accent-blue);">{{ row.po_number }}</span>
+                            {% else %}
+                                <span style="color: var(--text-muted);">Unlinked</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if row.compliance_verdict == 'COMPLIANT' %}
+                                <span class="badge-compliance badge-compliant">
+                                    ✓ Compliant
+                                </span>
+                            {% elif 'FLAGGED' in row.compliance_verdict %}
+                                <span class="badge-compliance badge-flagged" title="Requires Review">
+                                    ⚠️ {{ row.compliance_verdict.replace('FLAGGED: ', '') }}
+                                </span>
+                            {% else %}
+                                <span class="badge-compliance badge-non-compliant" title="Action Required">
+                                    🛑 {{ row.compliance_verdict.replace('NON-COMPLIANT: ', '') }}
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="empty-state">
+                            No cashbook audit records found for this period.
                         </td>
                     </tr>
                     {% endfor %}

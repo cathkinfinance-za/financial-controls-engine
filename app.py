@@ -1243,5 +1243,32 @@ def refresh_expenditure_ai(month):
             flash(f"Error clearing cache: {str(e)}", "danger")
     return redirect(url_for('expenditure_expose', month=month))
 
+
+@app.route('/expenditure')
+def expenditure_expose():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    # Query the cashbook audit view
+    cur.execute("""
+        SELECT 
+            transaction_date,
+            transaction_text,
+            amount,
+            gl_code,
+            supplier_code,
+            authority_tier,
+            po_number,
+            quotes_attached,
+            compliance_verdict
+        FROM vw_cashbook_compliance_audit
+        ORDER BY transaction_date DESC;
+    """)
+    transactions = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return render_template('expenditure_expose.html', transactions=transactions)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
