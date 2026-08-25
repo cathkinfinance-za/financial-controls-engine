@@ -1182,6 +1182,7 @@ def expenditure_expose():
         total_ytd_expenditure_budget=total_ytd_expenditure_budget,
         total_selected_month_spend=total_selected_month_spend,
         total_expenditure_overrun=total_expenditure_overrun,
+        total_expenditure_variance=total_expenditure_variance,  # <-- ADD THIS LINE
         selected_month=selected_month,
         allowed_months=ALLOWED_MONTHS,
         ai_analysis=ai_analysis,
