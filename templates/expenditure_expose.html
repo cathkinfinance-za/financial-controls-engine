@@ -359,7 +359,7 @@
         <div class="ai-card">
             <div class="ai-header">
                 <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>🤖 Gemini Financial Controller Commentary</span>
+                    <span>Gemini Financial Controller Commentary</span>
                     {% if is_cached %}
                         <span style="font-size: 11px; background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 12px; font-weight: 500;">Cached</span>
                     {% endif %}
@@ -462,45 +462,6 @@
         <!-- 3. Cashbook Compliance Audit Register (Priority View) -->
         <div class="section-title">Cashbook Compliance Audit Register (Priority View)</div>
 
-        <style>
-            /* Disclosure Accordion Styling */
-            details.audit-group {
-                background: var(--card-bg);
-                border: 1px solid var(--border-color);
-                border-radius: 8px;
-                margin-bottom: 16px;
-                overflow: hidden;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-            }
-            details.audit-group summary {
-                padding: 14px 18px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                list-style: none;
-                display: flex;
-                align-items: center;
-                justify-content: space-between;
-                user-select: none;
-                background-color: #ffffff;
-                transition: background-color 0.15s ease;
-            }
-            details.audit-group summary::-webkit-details-marker { display: none; }
-            details.audit-group summary:hover { background-color: #f8fafc; }
-            details.audit-group[open] summary { border-bottom: 1px solid var(--border-color); }
-            
-            .toggle-icon {
-                font-size: 16px;
-                font-weight: bold;
-                margin-right: 10px;
-                color: var(--accent-blue);
-                display: inline-block;
-                width: 14px;
-            }
-            details.audit-group[open] .toggle-icon::before { content: "−"; }
-            details.audit-group:not([open]) .toggle-icon::before { content: "+"; }
-        </style>
-
         {% for category, items in grouped_audit.items() %}
         <details class="audit-group" {% if 'NON-COMPLIANT' in category or 'FLAGGED' in category %}open{% endif %}>
             <summary>
@@ -596,42 +557,6 @@
             </table>
         </div>
         {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </details>
-        {% else %}
-        <div class="table-container">
-            <table>
-                <tbody>
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            No cashbook audit records found for this period.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="table-container">
-            <table>
-                <tbody>
-                    <tr>
-                        <td colspan="8" class="empty-state">
-                            No cashbook audit records found for this period.
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        {% endfor %}
-                </tbody>
-            </table>
-        </div>
     </div>
 </body>
 </html>
