@@ -43,7 +43,7 @@ def fetch_and_sync_cashbook_allocations():
         print("Waiting for #payment-cashbook container...")
         page.wait_for_selector("#payment-cashbook", timeout=30000)
 
-        # Scroll to ensure the entire cashbook block has rendered into memory
+        # Scroll into view so all pay-info divs render
         page.eval_on_selector("#payment-cashbook", "el => el.scrollIntoView()")
         page.wait_for_timeout(3000)
 
@@ -52,36 +52,37 @@ def fetch_and_sync_cashbook_allocations():
 
     soup = BeautifulSoup(html_content, 'html.parser')
     
-    # Target the payment-cashbook container directly
     cashbook_container = soup.find(id="payment-cashbook")
-    
     if not cashbook_container:
-        print("❌ Error: #payment-cashbook div element not found in DOM.")
+        print("❌ Error: #payment-cashbook element not found in DOM.")
         return
 
-    # Look for parent section or adjacent wrapper table
-    target_section = cashbook_container.parent if cashbook_container.parent else cashbook_container
+    # Target parent section to ensure we catch box-info wrapper
+    parent_section = cashbook_container.parent if cashbook_container.parent else cashbook_container
 
     allocations_data = []
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
     supplier_pattern = re.compile(r'^(?:SUPPLIER|DEBTOR)\s+([A-Z0-9]+):', re.IGNORECASE)
 
-    # Search for all table rows within or immediately following the cashbook container
-    for tr in target_section.find_all('tr'):
-        cells = [td.text.strip() for td in tr.find_all(['td', 'th'])]
+    # Search for all div elements with class "pay-info"
+    rows = parent_section.find_all('div', class_='pay-info')
+
+    for row in rows:
+        # Extract immediate child divs (Date, Transaction, Amount, Allocation)
+        cols = [div.text.strip() for div in row.find_all('div', recursive=False)]
         
-        # Expecting at least 3 cells (Date, Transaction, Amount)
-        if len(cells) < 3:
+        if len(cols) < 3:
             continue
-            
-        trans_date = parse_date(cells[0])
+
+        trans_date = parse_date(cols[0])
         if not trans_date:
-            continue  # Filters out table headers or invalid date rows
+            continue  # Filters out the header row "Date | Transaction | Amount | Allocation"
 
-        transaction_text = cells[1]
-        amount = clean_amount(cells[2])
-        allocation_raw = cells[3] if len(cells) > 3 else ""
+        transaction_text = cols[1]
+        amount = clean_amount(cols[2])
+        allocation_raw = cols[3] if len(cols) > 3 else ""
 
+        # Skip non-transaction opening balances
         if transaction_text.lower() == "opening balance":
             continue
 
@@ -101,7 +102,7 @@ def fetch_and_sync_cashbook_allocations():
 
     df = pd.DataFrame(allocations_data)
     if df.empty:
-        print("⚠️ Warning: 0 cashbook rows parsed from #payment-cashbook.")
+        print("⚠️ Warning: 0 cashbook rows parsed from div.pay-info.")
         return
 
     df = df.drop_duplicates(subset=["transaction_date", "transaction_text", "amount"])
