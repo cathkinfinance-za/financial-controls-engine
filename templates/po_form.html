@@ -623,7 +623,7 @@
         }
     }
 
-    // 4. Dynamic calculation engine for SYSTEM STATUS
+    // 4. Dynamic calculation engine for SYSTEM STATUS (Aligned with Authority Matrix)
     function calculateSystemStatus() {
         const submissionStatus = document.querySelector('[name="submission_status"]')?.value || '';
         const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value || '';
@@ -636,27 +636,32 @@
         const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
         const remainingBudget = totalBudget - ytdActual;
 
+        // Determine required quotes per matrix
+        let requiredQuotes = 0;
+        if (expenseType === 'Capital' || expenseType === 'Maintenance' || isBudgeted === 'No') {
+            requiredQuotes = 3;
+        } else if (isBudgeted === 'Yes') {
+            if (estimatedCost > 50000) requiredQuotes = 3;
+            else if (estimatedCost >= 10001) requiredQuotes = 2;
+            else requiredQuotes = 0; // Low Value Operational: N/A
+        }
+
         let status = '';
 
         if (submissionStatus === 'Approved') {
             status = '✅ APPROVED: Compliance Process Complete';
-        } else if (submissionStatus === 'Finance Review') {
+        } else if (submissionStatus === 'Submit for Finance Review') {
             status = '🔍 FINANCE REVIEW: Awaiting Committee Sign-off';    
         } else if (submissionStatus === 'Sent') {
             status = '📬 SENT: Approval Request Dispatched via Email'; 
-        }    else if (submissionStatus === 'Rejected') {
+        } else if (submissionStatus === 'Rejected') {
             status = '🛑 REJECTED: Final Authorisation Declined';
         } else if (isBudgeted === 'Yes' && !glCode) {
             status = '⚠️ ACTION REQUIRED: Select a valid GL description';
         } else if (!expenseType) {
             status = '⚠️ ACTION REQUIRED: Select Expense Type If Not Approved';
-        } else if (
-            (estimatedCost <= 10000 && quotesProvided < 1) ||
-            (estimatedCost >= 10001 && estimatedCost <= 50000 && quotesProvided < 2) ||
-            (estimatedCost > 50000 && quotesProvided < 3) ||
-            (expenseType === 'Capital' && quotesProvided < 3)
-        ) {
-            status = '❌ BLOCKED: Insufficient Quotes Provided for this Threshold';
+        } else if (quotesProvided < requiredQuotes) {
+            status = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
         } else if (isBudgeted === 'Yes' && totalBudget > 0 && estimatedCost > remainingBudget) {
             status = '❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget';
         } else if (isBudgeted === 'Yes' && totalBudget > 0 && (remainingBudget - estimatedCost) < (totalBudget / 6.0)) {
@@ -664,23 +669,23 @@
         } else if (expenseType === 'Capital') {
             status = '🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)';
         } else if (expenseType === 'Maintenance') {
-            status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Dual Signatures)';
+            status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Directors)';
         } else if (isBudgeted === 'Yes') {
             if (estimatedCost <= 10000) {
-                status = '🟢 Routine Operational: Within Budget (No Approval Required)';
+                status = '🟢 Low-Value Operational: Within Budget (Requires Estate Manager Sign-off)';
             } else if (estimatedCost <= 50000) {
-                status = '🟡 Portfolio Operational: Within Budget (Requires Chairman Sign-off)';
+                status = '🟡 Mid-Value Operational: Within Budget (Requires Chair + Board Member)';
             } else {
-                status = '🟠 High-Value Operational: Within Budget (Requires 2 Board Members)';
+                status = '🟠 High-Value Operational: Within Budget (Requires Chair + 2 Board Members)';
             }
         } else if (isBudgeted === 'No' && expenseType === 'Emergency') {
             status = estimatedCost <= 30000 
-                ? '⚡ Emergency Expenditure: Unbudgeted (Requires Ops & Board Chair Ratification)' 
+                ? '⚡ Emergency Expenditure: Unbudgeted (Requires Chair + 1 Board Member)' 
                 : '❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)';
         } else if (isBudgeted === 'No' && expenseType === 'Operational') {
             status = estimatedCost <= 30000 
-                ? '🔵 Extraordinary / Unbudgeted: (Requires Full Board Written Motivation)' 
-                : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires AGM Ratification)';
+                ? '🔵 Extraordinary / Unbudgeted: (Requires Full Board of Directors)' 
+                : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires Full Board + Homeowner Approval)';
         }
 
         const systemStatusInput = document.getElementById('system_status') || document.querySelector('[name="system_status"]');

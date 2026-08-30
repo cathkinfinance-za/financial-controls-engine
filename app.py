@@ -2,11 +2,13 @@ import os
 import io
 import json
 from datetime import date
+from datetime import datetime
 import psycopg2
 import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 import vercel_blob
-from flask import Flask, render_template, request, redirect, url_for, jsonify, flash
+import requests
+from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, g
 from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
@@ -88,6 +90,30 @@ def get_all_projects_summary(cursor):
     cursor.execute("SELECT id, project_reference, name FROM projects ORDER BY id DESC;")
     return cursor.fetchall()
 
+
+def trigger_github_workflow():
+    github_token = os.environ.get("GITHUB_TOKEN")
+    repo = "cathkinfinance-za/financial-controls-engine" 
+
+    if not github_token:
+        print("GITHUB_TOKEN missing; skipping instant dispatch.")
+        return
+
+    url = f"https://api.github.com/repos/{repo}/dispatches"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    payload = {"event_type": "trigger-po-email"}
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 204:
+            print("Successfully triggered GitHub approval workflow.")
+        else:
+            print(f"Failed to trigger GitHub Action: {response.status_code}")
+    except Exception as e:
+        print(f"Error triggering GitHub Action: {e}")
 
 # --- DASHBOARD & GENERAL ROUTES ---
 @app.route("/")
@@ -173,7 +199,6 @@ def po_form():
         recommended_vendor = request.form.get("recommended_vendor", "").strip()
         justification_notes = request.form.get("justification_notes", "").strip()
         submission_status = request.form.get("submission_status")
-
         actioned_date = request.form.get("actioned_date") or None
         actioned_by = request.form.get("actioned_by", "").strip()
         approval_notes = request.form.get("approval_notes", "").strip()
@@ -258,14 +283,16 @@ def po_form():
                                 recommended_vendor = %s, justification_notes = %s, submission_status = %s,
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
-                                quote_filepath = %s
+                                quote_filepath = %s,
+                                chair_requested_at = CASE WHEN %s IN ('Submit for Approval', 'Sent') THEN NOW() ELSE chair_requested_at END,
+                                chair_escalated = CASE WHEN %s IN ('Submit for Approval', 'Sent') THEN FALSE ELSE chair_escalated END
                             WHERE po_number = %s;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
                             actioned_by, approval_notes, ai_recommendation_summary, 
-                            combined_quote_filepath, original_po
+                            combined_quote_filepath, submission_status, submission_status, original_po
                         ))
                     else:
                         cur.execute("""
@@ -302,6 +329,9 @@ def po_form():
                         ))
                     
                     conn.commit()
+
+                    if submission_status in ["Submit for Approval", "Sent"]:
+                        trigger_github_workflow()
 
                 return redirect(url_for('po_form', po_number=new_po))
 
@@ -1291,6 +1321,83 @@ def refresh_expenditure_ai(month):
         except Exception as e:
             flash(f"Error clearing cache: {str(e)}", "danger")
     return redirect(url_for('expenditure_expose', month=month))
+
+from datetime import datetime
+
+
+def check_and_dispatch_chair_escalations(db_connection):
+    cursor = db_connection.cursor()
+
+    # 1. Query POs pending Chair action for more than 6 hours
+    escalation_query = """
+        SELECT id, po_number, description, estimated_cost, recommended_vendor, chair_requested_at
+        FROM public.po_log
+        WHERE submission_status IN ('Submit for Approval', 'Sent')
+          AND chair_escalated = FALSE
+          AND chair_requested_at <= NOW() - INTERVAL '6 hours';
+    """
+    cursor.execute(escalation_query)
+    overdue_pos = cursor.fetchall()
+
+    for po in overdue_pos:
+        po_id = po['id']
+        po_num = po['po_number']
+        requested_at = po['chair_requested_at']
+
+        # 2. Dispatch Email / Notification Logic
+        trigger_github_workflow()
+
+        # 3. Mark as escalated so duplicate notifications are suppressed
+        cursor.execute(
+            """
+            UPDATE public.po_log
+            SET chair_escalated = TRUE
+            WHERE id = %s;
+        """,
+            (po_id,),
+        )
+
+        # 4. Record escalation in workflow_control_log
+        cursor.execute(
+            """
+            INSERT INTO public.workflow_control_log (po_number, log_entry, timestamp)
+            VALUES (%s, %s, NOW());
+        """,
+            (
+                po_num,
+                f"Automated 6-Hour Escalation dispatched to Board Members. Requested at: {requested_at}",
+            ),
+        )
+
+    db_connection.commit()
+
+def get_board_escalation_recipients(conn):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT DISTINCT TRIM(email) 
+            FROM public.approvers 
+            WHERE approval_permission LIKE '%Approval Authority%' 
+               OR approval_permission LIKE '%Chair%';
+        """)
+        return [row['email'] for row in cursor.fetchall() if row.get('email')]
+
+
+@app.route("/api/cron/check-escalations", methods=["GET", "POST"])
+def cron_check_escalations():
+    # Enforce basic security header if running on Vercel
+    # auth_header = request.headers.get("Authorization")
+    # if auth_header != f"Bearer {os.environ.get('CRON_SECRET')}":
+    #     return {"error": "Unauthorized"}, 401
+
+    conn = get_db_connection()
+    try:
+        check_and_dispatch_chair_escalations(conn)
+        return {"status": "success", "message": "Escalation check completed"}, 200
+    except Exception as e:
+        return {"status": "error", "message": str(e)}, 500
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
