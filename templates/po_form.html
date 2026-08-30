@@ -486,8 +486,16 @@
                 </div>
 
                 <div class="form-row">
-                    <label class="form-label">AI Recommendation Summary</label>
-                    <textarea name="ai_recommendation_summary" class="form-control">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <label class="form-label">AI Recommendation Summary</label>
+                        {% if selected_po and selected_po.ai_recommendation_summary %}
+                            <button type="button" id="btn-clear-ai" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;">Clear Analysis</button>
+                        {% endif %}
+                    </div>
+                    <div style="width: 100%;">
+                        <textarea id="ai_recommendation_summary" name="ai_recommendation_summary" class="form-control" readonly style="background-color: #f8f9fa;">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                        <input type="hidden" id="clear_ai_flag" name="clear_ai_flag" value="0">
+                    </div>
                 </div>
 
                 <!-- Vendor Selection & Rationale -->
@@ -508,6 +516,7 @@
                     <select name="submission_status" class="form-control" style="width: 240px;">
                         <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
                         <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                        <option value="Run AI Analysis" {% if selected_po and selected_po.submission_status == "Run AI Analysis" %}selected{% endif %}>Run AI Analysis</option>
                         <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
                         <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
@@ -651,6 +660,8 @@
 
         if (submissionStatus === 'Approved') {
             status = '✅ APPROVED: Compliance Process Complete';
+        } else if (submissionStatus === 'Run AI Analysis') {
+            status = '🤖 AI ANALYSIS: Reviewing Compliance & Quotes';
         } else if (submissionStatus === 'Submit for Finance Review') {
             status = '🔍 FINANCE REVIEW: Awaiting Committee Sign-off';    
         } else if (submissionStatus === 'Sent') {
@@ -715,6 +726,43 @@
 
         calculateSystemStatus();
     });
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const aiTextarea = document.getElementById('ai_recommendation_summary');
+    const clearFlag = document.getElementById('clear_ai_flag');
+    const clearBtn = document.getElementById('btn-clear-ai');
+
+    function clearAiAnalysis() {
+        if (aiTextarea) aiTextarea.value = '';
+        if (clearFlag) clearFlag.value = '1';
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+
+    // Clear AI analysis when 'Clear Analysis' button is clicked
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAiAnalysis);
+    }
+
+    // Inputs that trigger clearing of AI Analysis when modified
+    const monitoredFields = [
+        'po_number', 'description', 'po_date', 'is_budgeted', 
+        'gl_code', 'expense_type', 'estimated_cost', 
+        'recommended_vendor', 'justification_notes', 'attach_quotes'
+    ];
+
+    monitoredFields.forEach(fieldName => {
+        const inputEl = document.querySelector(`[name="${fieldName}"]`);
+        if (inputEl) {
+            inputEl.addEventListener('change', clearAiAnalysis);
+            if (inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA') {
+                inputEl.addEventListener('input', clearAiAnalysis);
+            }
+        }
+    });
+
+   });
+
 </script>
 
 </body>

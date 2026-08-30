@@ -226,6 +226,10 @@ def po_form():
         approval_notes = request.form.get("approval_notes", "").strip()
         ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
         system_status = request.form.get("system_status", "").strip()
+        clear_ai_flag = request.form.get("clear_ai_flag", "0")
+
+        if clear_ai_flag == "1":
+            ai_recommendation_summary = ""
 
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
@@ -351,6 +355,13 @@ def po_form():
                         ))
                     
                     conn.commit()
+
+                    # Run AI Analysis if explicitly selected or if new files were uploaded
+                    if submission_status == "Run AI Analysis" or gemini_file_payloads:
+                        # Build payload from form data if files aren't explicitly re-uploaded
+                        ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
+                        if ai_summary:
+                            ai_recommendation_summary = ai_summary
 
                     if submission_status in ["Submit for Finance Review", "Submit for Approval", "Sent"]:
                         trigger_github_workflow()
