@@ -1,4 +1,4 @@
-google-genai>=1.0.0
+google-genai>=2.20.0
 vercel-blob
 playwright
 openpyxl
@@ -8,3 +8,4 @@ werkzeug
 duckduckgo-search>=6.0.0
 python-dotenv
 requests
+psycopg2-binary
