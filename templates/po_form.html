@@ -367,6 +367,34 @@
                     <input type="number" step="0.01" name="estimated_cost" class="form-control" value="{{ selected_po.estimated_cost if selected_po else '' }}" style="width: 200px;">
                 </div>
 
+                <!-- Financial Summary (Read Only) -->
+                <div class="section-header">Financial Summary</div>
+
+                <div class="form-row">
+                    <label class="form-label">YTD Actual</label>
+                    <input type="text" id="fin-ytd-actual" class="form-control" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Total Annual Budget</label>
+                    <input type="text" id="fin-total-budget" class="form-control" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Budget YTD</label>
+                    <input type="text" id="fin-budget-ytd" class="form-control" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">2M Buffer Pool</label>
+                    <input type="text" id="fin-buffer-pool" class="form-control" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Variance</label>
+                    <input type="text" id="fin-variance" class="form-control" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="width: 240px;">
+                </div>
+
                 <!-- Vendor Selection & Rationale -->
                 <div class="section-header">Vendor Selection & Rationale</div>
 
@@ -396,34 +424,6 @@
                 <div class="form-row">
                     <label class="form-label">Latest AI Status</label>
                     <input type="text" name="latest_ai_status" class="form-control" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly>
-                </div>
-
-                <!-- Financial Summary (Read Only) -->
-                <div class="section-header">Financial Summary</div>
-
-                <div class="form-row">
-                    <label class="form-label">YTD Actual</label>
-                    <input type="text" id="fin-ytd-actual" class="form-control" value="{{ financial_summary.ytd_actual if financial_summary and financial_summary.ytd_actual is not none else '' }}" readonly style="width: 240px;">
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Total Annual Budget</label>
-                    <input type="text" id="fin-total-budget" class="form-control" value="{{ financial_summary.total_annual_budget if financial_summary and financial_summary.total_annual_budget is not none else '' }}" readonly style="width: 240px;">
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Budget YTD</label>
-                    <input type="text" id="fin-budget-ytd" class="form-control" value="{{ financial_summary.budget_ytd if financial_summary and financial_summary.budget_ytd is not none else '' }}" readonly style="width: 240px;">
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">2M Buffer Pool</label>
-                    <input type="text" id="fin-buffer-pool" class="form-control" value="{{ financial_summary.buffer_pool if financial_summary and financial_summary.buffer_pool is not none else '' }}" readonly style="width: 240px;">
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Variance</label>
-                    <input type="text" id="fin-variance" class="form-control" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="width: 240px;">
                 </div>
 
                 <!-- Approvals Fieldset -->
@@ -688,9 +688,6 @@
             systemStatusInput.value = status;
         }
     }
-
-
-    
 
     // 5. Attach live listeners to form elements
     document.addEventListener('DOMContentLoaded', function() {
