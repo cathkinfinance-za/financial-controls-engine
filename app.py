@@ -18,7 +18,7 @@ from collections import defaultdict
 
 try:
     import google.generativeai as genai
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    #genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
     GEMINI_AVAILABLE = True
 except ModuleNotFoundError:
     genai = None
@@ -40,6 +40,10 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
     """Sends uploaded files to Gemini with retry logic and model fallbacks for 503 errors."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
         return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
+
+    # Dynamically configure the API key at runtime for serverless environments
+    api_key = os.getenv("GEMINI_API_KEY")
+    genai.configure(api_key=api_key)
 
     gemini_file_objects = []
     
