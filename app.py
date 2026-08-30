@@ -509,11 +509,24 @@ def handle_prompts_api():
                 process_name = data.get('process')
                 prompt_template = data.get('prompt_template')
                 is_active = data.get('is_active', True)
-                model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
-                model = genai.GenerativeModel(model_name)
                               
                 if not process_name or prompt_template is None:
                     return jsonify({'error': 'Missing required fields.'}), 400
+
+                # 1. Prioritize model selected in frontend payload
+                model_name = data.get('selected_model')
+
+                # 2. Fall back to existing database value if payload didn't provide one
+                if not model_name:
+                    cursor.execute(
+                        "SELECT selected_model FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
+                        (process_name,)
+                    )
+                    row = cursor.fetchone()
+                    model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
+
+                # Validate model via SDK instantiation
+                model = genai.GenerativeModel(model_name)
 
                 cursor.execute("""
                     UPDATE system_prompts 
@@ -522,7 +535,7 @@ def handle_prompts_api():
                         selected_model = %s,
                         updated_at = CURRENT_TIMESTAMP 
                     WHERE LOWER(process) = LOWER(%s);
-                """, (prompt_template, is_active, model, process_name))
+                """, (prompt_template, is_active, model_name, process_name))
                 conn.commit()
 
                 return jsonify({'status': 'success', 'message': 'Prompt updated successfully.'}), 200
