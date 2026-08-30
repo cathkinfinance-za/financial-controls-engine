@@ -17,8 +17,9 @@ from flask import request
 from collections import defaultdict
 
 try:
-    import google.generativeai as genai
+    from google import genai
     #genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
     GEMINI_AVAILABLE = True
 except ModuleNotFoundError:
     genai = None
