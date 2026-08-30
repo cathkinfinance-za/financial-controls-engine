@@ -69,10 +69,13 @@ At the absolute end of your response, output exactly these two lines:
 AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
 
 
-def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data, custom_prompt=None):
+def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, custom_prompt=None):
     """Sends uploaded files and financial context to Gemini using the database system prompt or fallback template."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
         return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
+
+    # Fallback to empty dict if financial_data wasn't passed
+    financial_data = financial_data or {}
 
     # 1. Fetch active prompt and model configuration from system_prompts table
     conn = None
@@ -127,10 +130,10 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data, custo
             "desc_val": form_data.get('description', 'N/A'),
             "expense_type": form_data.get('expense_type', 'N/A'),
             "gl_code_val": form_data.get('gl_code', 'N/A'),
-            "cost": float(form_data.get('estimated_cost', 0.0)),
-            "total_annual_budget": float(financial_data.get('total_annual_budget', 0.0)),
-            "ytd_actual": float(financial_data.get('ytd_actual', 0.0)),
-            "remaining_ytd_budget": float(financial_data.get('remaining_ytd_budget', 0.0)),
+            "cost": float(form_data.get('estimated_cost', 0.0) or 0.0),
+            "total_annual_budget": float(financial_data.get('total_annual_budget', 0.0) or 0.0),
+            "ytd_actual": float(financial_data.get('ytd_actual', 0.0) or 0.0),
+            "remaining_ytd_budget": float(financial_data.get('remaining_ytd_budget', 0.0) or 0.0),
             "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
             "user_justification": form_data.get('justification_notes', 'N/A'),
             "coi_details": form_data.get('coi_details', 'None declared')
