@@ -395,37 +395,6 @@
                     <input type="text" id="fin-variance" class="form-control" value="{{ financial_summary.variance if financial_summary and financial_summary.variance is not none else '' }}" readonly style="width: 240px;">
                 </div>
 
-                <!-- Vendor Selection & Rationale -->
-                <div class="section-header">Vendor Selection & Rationale</div>
-
-                <div class="form-row">
-                    <label class="form-label">Suggested Vendor</label>
-                    <input type="text" name="recommended_vendor" class="form-control" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Justification Notes</label>
-                    <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Submission Status</label>
-                    <select name="submission_status" class="form-control" style="width: 240px;">
-                        <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
-                        <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
-                        <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
-                        <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
-                        <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
-                        <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
-                        <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
-                    </select>
-                </div>
-
-                <div class="form-row">
-                    <label class="form-label">Latest AI Status</label>
-                    <input type="text" name="latest_ai_status" class="form-control" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly>
-                </div>
-
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
@@ -518,6 +487,37 @@
                 <div class="form-row">
                     <label class="form-label">AI Recommendation Summary</label>
                     <textarea name="ai_recommendation_summary" class="form-control">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                </div>
+
+                <!-- Vendor Selection & Rationale -->
+                <div class="section-header">Vendor Selection & Rationale</div>
+
+                <div class="form-row">
+                    <label class="form-label">Suggested Vendor</label>
+                    <input type="text" name="recommended_vendor" class="form-control" value="{{ selected_po.recommended_vendor if selected_po and selected_po.recommended_vendor else '' }}">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Justification Notes</label>
+                    <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Submission Status</label>
+                    <select name="submission_status" class="form-control" style="width: 240px;">
+                        <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
+                        <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
+                        <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
+                        <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                        <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
+                        <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
+                        <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Latest AI Status</label>
+                    <input type="text" name="latest_ai_status" class="form-control" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly>
                 </div>
 
                 <div style="margin-top: 30px; text-align: right;">
