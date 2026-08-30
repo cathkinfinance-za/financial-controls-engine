@@ -234,13 +234,18 @@ def po_form():
             ai_recommendation_summary = request.form.get('ai_recommendation_summary')
 
         # Update database record
-        cur.execute("""
-            UPDATE purchase_orders
-            SET 
-                ai_recommendation_summary = %s,
-                -- other fields --
-            WHERE po_number = %s
-        """, (ai_recommendation_summary, po_number))
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE purchase_orders
+                    SET 
+                        ai_recommendation_summary = %s
+                    WHERE po_number = %s
+                """, (ai_recommendation_summary, new_po))
+                conn.commit()
+        except Exception as e:
+            conn.rollback()
+            print(f"Error updating purchase order: {e}")
 
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
