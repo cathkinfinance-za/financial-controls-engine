@@ -237,7 +237,7 @@ def po_form():
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    UPDATE purchase_orders
+                    UPDATE po_log
                     SET 
                         ai_recommendation_summary = %s
                     WHERE po_number = %s
@@ -504,7 +504,8 @@ def handle_prompts_api():
                 process_name = data.get('process')
                 prompt_template = data.get('prompt_template')
                 is_active = data.get('is_active', True)
-                selected_model = data.get('selected_model', 'gemini-2.5-flash')
+                raw_model = data.get('selected_model', 'gemini-2.5-flash')
+                selected_model = raw_model if raw_model.startswith('models/') else f"models/{raw_model}"
 
                 if not process_name or prompt_template is None:
                     return jsonify({'error': 'Missing required fields.'}), 400
@@ -1414,9 +1415,6 @@ def refresh_expenditure_ai(month):
         except Exception as e:
             flash(f"Error clearing cache: {str(e)}", "danger")
     return redirect(url_for('expenditure_expose', month=month))
-
-from datetime import datetime
-
 
 def check_and_dispatch_chair_escalations(db_connection):
     cursor = db_connection.cursor()
