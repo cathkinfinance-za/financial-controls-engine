@@ -252,7 +252,7 @@
                 document.getElementById("promptTemplate").value = data.prompt_template || "";
                 document.getElementById("promptDescription").value = data.description || "";
                 document.getElementById("isActiveToggle").checked = data.is_active ?? true;
-                document.getElementById("modelSelect").value = data.selected_model || "gemini-3.5-flash";
+                document.getElementById("selected_model").value = data.selected_model || "gemini-3.5-flash";
                 updateBadgeState();
             } else {
                 showAlert(data.error || "Failed to load prompt.", "error");
@@ -268,7 +268,7 @@
         const process = document.getElementById("processSelect").value;
         const promptTemplate = document.getElementById("promptTemplate").value;
         const isActive = document.getElementById("isActiveToggle").checked;
-        const selectedModel = document.getElementById("modelSelect").value;
+        const selectedModel = document.getElementById("selected_model").value;
 
         try {
             const response = await fetch("/api/prompts", {
