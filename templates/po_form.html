@@ -402,25 +402,70 @@
                 <!-- Hidden input to track deleted filenames for backend processing -->
                 <input type="hidden" id="deleted_files" name="deleted_files" value="">
 
-                <!-- Render Existing Uploaded Attachments -->
-                {% if selected_po and selected_po.attached_files %}
+                <!-- Upload New Attachments Row -->
                 <div class="form-row">
-                    <label class="form-label">Existing Quotes</label>
-                    <div style="width: 100%;">
-                        <ul id="quote-file-list" style="list-style: none; padding-left: 0; margin-top: 0;">
-                            {% for file in selected_po.attached_files %}
-                            {% set fname = file.filename if file is mapping and file.filename else file %}
-                            <li id="file-row-{{ loop.index }}" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 6px 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px;">
-                                <span class="file-name" style="font-size: 13px; color: #333;">📎 {{ fname }}</span>
-                                <button type="button" class="btn-delete-file" onclick="removeAttachment('{{ fname }}', 'file-row-{{ loop.index }}')" style="padding: 2px 8px; font-size: 12px; color: #dc3545; border: 1px solid #dc3545; background: none; border-radius: 3px; cursor: pointer;">
-                                    🗑️ Delete
-                                </button>
-                            </li>
-                            {% endfor %}
-                        </ul>
+                    <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
+                    <div>
+                        <div class="file-upload-wrapper">
+                            <input 
+                                type="file" 
+                                id="attach_quotes" 
+                                name="attach_quotes" 
+                                accept=".pdf, image/*" 
+                                multiple 
+                                onchange="updateQuotesCount(this)"
+                                class="hidden-file-input"
+                            >
+                            
+                            <label for="attach_quotes" class="custom-file-upload-btn">
+                                📁 Choose Files
+                            </label>
+                            <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
+                        </div>
+
+                        <div id="quotes_count_display" class="upload-feedback"></div>
                     </div>
                 </div>
-                {% endif %}
+
+                <!-- Document Grid with Inline Delete Buttons -->
+                <div class="form-row">
+                    <label class="form-label">Attached Documents</label>
+                    <div class="attachments-card-container" style="width: 100%;">
+                        <span class="attachments-label">ATTACHED DOCUMENTS</span>
+                        <div id="attachments_list" class="doc-grid">
+                            {% if selected_po and selected_po.quote_urls %}
+                                {% for url in selected_po.quote_urls %}
+                                    {% set fname = url.split('/')[-1].split('?')[0] %}
+                                    <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
+                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
+                                            <span class="doc-icon">📄</span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                        <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
+                                            ✖
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% elif selected_po and selected_po.quote_filepath %}
+                                {% for url in selected_po.quote_filepath.split(',') %}
+                                    {% set clean_url = url.strip() %}
+                                    {% set fname = clean_url.split('/')[-1].split('?')[0] %}
+                                    <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
+                                        <a href="{{ clean_url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
+                                            <span class="doc-icon">📄</span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                        <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
+                                            ✖
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No documents attached yet.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Upload New Attachments Row -->
                 <div class="form-row">
@@ -444,7 +489,7 @@
                         </div>
 
                         <div id="quotes_count_display" class="upload-feedback"></div>
-                        
+
                         <!-- Document Grid -->
                         <div class="attachments-card-container">
                             <span class="attachments-label">Attached Documents</span>
