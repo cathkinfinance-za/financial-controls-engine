@@ -635,8 +635,9 @@
 
     // 4. Dynamic calculation engine for SYSTEM STATUS (Aligned with Authority Matrix)
     function calculateSystemStatus() {
-        const submissionStatus = document.querySelector('[name="submission_status"]')?.value || '';
-        const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value || '';
+        const submissionStatusSelect = document.querySelector('[name="submission_status"]');
+        const submissionStatus = submissionStatusSelect?.value || '';
+        const isBudgetedSelect = document.querySelector('[name="is_budgeted"]');
         const glCode = document.querySelector('[name="gl_code"]')?.value || '';
         const expenseType = document.querySelector('[name="expense_type"]')?.value || '';
         const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
@@ -644,16 +645,46 @@
         
         const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
         const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
-        const remainingBudget = totalBudget - ytdActual;
+        
+        // Calculate total remaining annual budget
+        const remainingAnnualBudget = totalBudget - ytdActual;
+        const isOverAnnualBudget = totalBudget > 0 && estimatedCost > remainingAnnualBudget;
+
+        // 1. HARD COMPLIANCE LOCK: Over Annual Budget forces Unbudgeted Workflow
+        if (isOverAnnualBudget && isBudgetedSelect) {
+            if (isBudgetedSelect.value !== 'No') {
+                isBudgetedSelect.value = 'No';
+                // Show alert to user explaining the mandatory workflow shift
+                alert("⚠️ BUDGET EXCEEDED: The requested amount exceeds the remaining Total Annual Budget. This transaction has been automatically reclassified as 'Unbudgeted' and requires Extraordinary Board/HOA approval.");
+            }
+        }
+
+        // 2. DISABLE/ENABLE SUBMISSION OPTIONS BASED ON BUDGET OVERRUN
+        if (submissionStatusSelect) {
+            Array.from(submissionStatusSelect.options).forEach(option => {
+                if (option.value === 'Submit for Approval' || option.value === 'Sent') {
+                    if (isOverAnnualBudget || isBudgetedSelect?.value === 'No') {
+                        option.disabled = true;
+                        if (option.selected) {
+                            submissionStatusSelect.value = 'Submit for Finance Review';
+                        }
+                    } else {
+                        option.disabled = false;
+                    }
+                }
+            });
+        }
+
+        const currentIsBudgeted = isBudgetedSelect?.value || '';
 
         // Determine required quotes per matrix
         let requiredQuotes = 0;
-        if (expenseType === 'Capital' || expenseType === 'Maintenance' || isBudgeted === 'No') {
+        if (expenseType === 'Capital' || expenseType === 'Maintenance' || currentIsBudgeted === 'No') {
             requiredQuotes = 3;
-        } else if (isBudgeted === 'Yes') {
+        } else if (currentIsBudgeted === 'Yes') {
             if (estimatedCost > 50000) requiredQuotes = 3;
             else if (estimatedCost >= 10001) requiredQuotes = 2;
-            else requiredQuotes = 0; // Low Value Operational: N/A
+            else requiredQuotes = 0;
         }
 
         let status = '';
@@ -661,28 +692,32 @@
         if (submissionStatus === 'Approved') {
             status = '✅ APPROVED: Compliance Process Complete';
         } else if (submissionStatus === 'Run AI Analysis') {
-            status = '🤖 AI ANALYSIS: Reviewing Compliance & Quotes';
+            status = '🤖 AI ANALYSIS: Reviewing Compliance & Budget Impact';
         } else if (submissionStatus === 'Submit for Finance Review') {
-            status = '🔍 FINANCE REVIEW: Awaiting Committee Sign-off';    
+            status = '🔍 FINANCE REVIEW: Awaiting Finance Committee Sign-off';    
         } else if (submissionStatus === 'Sent') {
             status = '📬 SENT: Approval Request Dispatched via Email'; 
         } else if (submissionStatus === 'Rejected') {
             status = '🛑 REJECTED: Final Authorisation Declined';
-        } else if (isBudgeted === 'Yes' && !glCode) {
+        } else if (isOverAnnualBudget || currentIsBudgeted === 'No') {
+            if (quotesProvided < 3) {
+                status = `❌ UNBUDGETED BLOCKED: Insufficient Quotes (${quotesProvided}/3 Required for Unbudgeted Spend)`;
+            } else if (estimatedCost <= 30000) {
+                status = '⚡ UNBUDGETED OVERRIDE: Unbudgeted Spend ≤ R30k (Requires Board Resolution)';
+            } else {
+                status = '❌ UNBUDGETED EXCEEDS R30,000: (Requires Full Board + Homeowner/AGM Ratification)';
+            }
+        } else if (currentIsBudgeted === 'Yes' && !glCode) {
             status = '⚠️ ACTION REQUIRED: Select a valid GL description';
         } else if (!expenseType) {
-            status = '⚠️ ACTION REQUIRED: Select Expense Type If Not Approved';
+            status = '⚠️ ACTION REQUIRED: Select Expense Type';
         } else if (quotesProvided < requiredQuotes) {
             status = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
-        } else if (isBudgeted === 'Yes' && totalBudget > 0 && estimatedCost > remainingBudget) {
-            status = '❌ OVER-EXPENDITURE: Transaction Exceeds True Remaining Annual Budget';
-        } else if (isBudgeted === 'Yes' && totalBudget > 0 && (remainingBudget - estimatedCost) < (totalBudget / 6.0)) {
-            status = '⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool';
         } else if (expenseType === 'Capital') {
-            status = '🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)';
+            status = '🏦 Capital Expenditure: Reserve Allocation (Requires Board & AGM Ratification)';
         } else if (expenseType === 'Service Contract' || expenseType === 'Maintenance') {
-            status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Directors)';
-        } else if (isBudgeted === 'Yes') {
+            status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Sign-off)';
+        } else if (currentIsBudgeted === 'Yes') {
             if (estimatedCost <= 10000) {
                 status = '🟢 Low-Value Operational: Within Budget (Requires Estate Manager Sign-off)';
             } else if (estimatedCost <= 50000) {
@@ -690,14 +725,6 @@
             } else {
                 status = '🟠 High-Value Operational: Within Budget (Requires Chair + 2 Board Members)';
             }
-        } else if (isBudgeted === 'No' && expenseType === 'Emergency') {
-            status = estimatedCost <= 30000 
-                ? '⚡ Emergency Expenditure: Unbudgeted (Requires Chair + 1 Board Member)' 
-                : '❌ EMERGENCY CRITICAL: Exceeds R30,000 Limit (Requires Urgent Board Resolution)';
-        } else if (isBudgeted === 'No' && expenseType === 'Operational') {
-            status = estimatedCost <= 30000 
-                ? '🔵 Extraordinary / Unbudgeted: (Requires Full Board of Directors)' 
-                : '❌ UNBUDGETED BLOCKED: Exceeds R30,000 Limit (Requires Full Board + Homeowner Approval)';
         }
 
         const systemStatusInput = document.getElementById('system_status') || document.querySelector('[name="system_status"]');
@@ -707,28 +734,26 @@
     }
 
     // 5. Attach live listeners to form elements
-    document.addEventListener('DOMContentLoaded', function() {
-        const formInputs = [
-            'submission_status', 
-            'is_budgeted', 
-            'gl_code', 
-            'expense_type', 
-            'estimated_cost'
-        ];
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- A. CALCULATE SYSTEM STATUS LISTENERS ---
+    const statusInputs = [
+        'submission_status', 
+        'is_budgeted', 
+        'gl_code', 
+        'expense_type', 
+        'estimated_cost'
+    ];
 
-        formInputs.forEach(fieldName => {
-            const el = document.querySelector(`[name="${fieldName}"]`);
-            if (el) {
-                el.addEventListener('change', calculateSystemStatus);
-                el.addEventListener('input', calculateSystemStatus);
-            }
-        });
-
-        calculateSystemStatus();
+    statusInputs.forEach(fieldName => {
+        const el = document.querySelector(`[name="${fieldName}"]`);
+        if (el) {
+            el.addEventListener('change', calculateSystemStatus);
+            el.addEventListener('input', calculateSystemStatus);
+        }
     });
 
-
-    document.addEventListener('DOMContentLoaded', function() {
+    // --- B. CLEAR AI RECOMMENDATION LOGIC ---
     const aiTextarea = document.getElementById('ai_recommendation_summary');
     const clearFlag = document.getElementById('clear_ai_flag');
     const clearBtn = document.getElementById('btn-clear-ai');
@@ -739,12 +764,10 @@
         if (clearBtn) clearBtn.style.display = 'none';
     }
 
-    // Clear AI analysis when 'Clear Analysis' button is clicked
     if (clearBtn) {
         clearBtn.addEventListener('click', clearAiAnalysis);
     }
 
-    // Inputs that trigger clearing of AI Analysis when modified
     const monitoredFields = [
         'po_number', 'description', 'po_date', 'is_budgeted', 
         'gl_code', 'expense_type', 'estimated_cost', 
@@ -760,6 +783,25 @@
             }
         }
     });
+
+    // --- C. FORM SUBMIT UNBUDGETED GUARD ---
+    document.querySelector('form')?.addEventListener('submit', function(e) {
+        const submissionStatus = document.querySelector('[name="submission_status"]')?.value;
+        const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value;
+        const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
+        const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
+        const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+
+        if ((totalBudget > 0 && estimatedCost > (totalBudget - ytdActual)) || isBudgeted === 'No') {
+            if (submissionStatus === 'Submit for Approval' || submissionStatus === 'Sent') {
+                e.preventDefault();
+                alert("❌ CANNOT SUBMIT FOR APPROVAL: Unbudgeted transactions must be routed through 'Submit for Finance Review' first.");
+            }
+        }
+    });
+
+    // --- D. INITIALIZE STATUS ON PAGE LOAD ---
+    calculateSystemStatus();
 
    });
 
