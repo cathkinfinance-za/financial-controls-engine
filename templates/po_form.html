@@ -399,6 +399,30 @@
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
+                <!-- Hidden input to track deleted filenames for backend processing -->
+                <input type="hidden" id="deleted_files" name="deleted_files" value="">
+
+                <!-- Render Existing Uploaded Attachments -->
+                {% if selected_po and selected_po.attached_files %}
+                <div class="form-row">
+                    <label class="form-label">Existing Quotes</label>
+                    <div style="width: 100%;">
+                        <ul id="quote-file-list" style="list-style: none; padding-left: 0; margin-top: 0;">
+                            {% for file in selected_po.attached_files %}
+                            {% set fname = file.filename if file is mapping and file.filename else file %}
+                            <li id="file-row-{{ loop.index }}" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; padding: 6px 10px; background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px;">
+                                <span class="file-name" style="font-size: 13px; color: #333;">📎 {{ fname }}</span>
+                                <button type="button" class="btn-delete-file" onclick="removeAttachment('{{ fname }}', 'file-row-{{ loop.index }}')" style="padding: 2px 8px; font-size: 12px; color: #dc3545; border: 1px solid #dc3545; background: none; border-radius: 3px; cursor: pointer;">
+                                    🗑️ Delete
+                                </button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Upload New Attachments Row -->
                 <div class="form-row">
                     <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
                     <div>
@@ -420,7 +444,7 @@
                         </div>
 
                         <div id="quotes_count_display" class="upload-feedback"></div>
-
+                        
                         <!-- Document Grid -->
                         <div class="attachments-card-container">
                             <span class="attachments-label">Attached Documents</span>
@@ -804,6 +828,24 @@ document.addEventListener('DOMContentLoaded', function() {
     calculateSystemStatus();
 
    });
+
+   let deletedFileTracker = [];
+
+    function removeAttachment(filename, elementId) {
+        if (confirm(`Are you sure you want to remove "${filename}"?`)) {
+            // 1. Append filename to tracking list
+            deletedFileTracker.push(filename);
+            document.getElementById('deleted_files').value = JSON.stringify(deletedFileTracker);
+
+            // 2. Remove element row from DOM
+            const row = document.getElementById(elementId);
+            if (row) row.remove();
+
+            // 3. Clear stale AI Analysis and update quote counters
+            if (typeof clearAiAnalysis === 'function') clearAiAnalysis();
+            if (typeof calculateSystemStatus === 'function') calculateSystemStatus();
+        }
+    }
 
 </script>
 
