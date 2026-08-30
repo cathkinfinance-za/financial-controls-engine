@@ -43,9 +43,13 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
 
     gemini_file_objects = []
     
-    # Priority list of models to try if high demand occurs
-    candidate_models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
-
+    # Priority list updated to latest 3.x Flash models
+    candidate_models = [
+        "gemini-3.6-flash", 
+        "gemini-3.5-flash", 
+        "gemini-3.5-flash-lite"
+    ]
+    
     try:
         # 1. Upload files first
         for file_bytes, filename, mime_type in uploaded_files_data:
@@ -495,6 +499,7 @@ def handle_prompts_api():
                     (process_name,)
                 )
                 row = cursor.fetchone()
+
                 if row:
                     return jsonify(dict(row)), 200
                 return jsonify({'error': 'Prompt process not found.'}), 404
@@ -504,9 +509,9 @@ def handle_prompts_api():
                 process_name = data.get('process')
                 prompt_template = data.get('prompt_template')
                 is_active = data.get('is_active', True)
-                raw_model = data.get('selected_model', 'gemini-2.5-flash')
-                selected_model = raw_model if raw_model.startswith('models/') else f"models/{raw_model}"
-
+                model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
+                model = genai.GenerativeModel(model_name)
+                              
                 if not process_name or prompt_template is None:
                     return jsonify({'error': 'Missing required fields.'}), 400
 
@@ -517,7 +522,7 @@ def handle_prompts_api():
                         selected_model = %s,
                         updated_at = CURRENT_TIMESTAMP 
                     WHERE LOWER(process) = LOWER(%s);
-                """, (prompt_template, is_active, selected_model, process_name))
+                """, (prompt_template, is_active, model, process_name))
                 conn.commit()
 
                 return jsonify({'status': 'success', 'message': 'Prompt updated successfully.'}), 200
@@ -911,7 +916,7 @@ Project Objectives: {project.get('project_objective', '')}
 {formatted_task_prompt}
 """
 
-            model_name = (rec_row.get('selected_model') if rec_row else None) or 'gemini-2.5-flash'
+            model_name = (rec_row.get('selected_model') if rec_row else None) or 'gemini-3.6-flash'
             model = genai.GenerativeModel(model_name)
             
             response = model.generate_content(full_prompt)
@@ -1357,7 +1362,7 @@ def expenditure_expose():
                 )
 
                 # Dynamically instantiate the model chosen in the frontend
-                model_name = prompt_row.get('selected_model') or 'gemini-2.5-flash'
+                model_name = prompt_row.get('selected_model') or 'gemini-3.6-flash'
                 model = genai.GenerativeModel(model_name)
                 response = model.generate_content(formatted_prompt)
                 ai_analysis = response.text
