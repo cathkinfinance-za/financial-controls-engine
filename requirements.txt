@@ -1,14 +1,10 @@
-psycopg2-binary
-requests
-google-genai
+google-genai>=1.0.0
 vercel-blob
 playwright
 openpyxl
 pandas
 Flask
-google-generativeai>=0.8.6
 werkzeug
-duckduckgo-search
 duckduckgo-search>=6.0.0
 python-dotenv
 requests
