@@ -37,14 +37,18 @@ def get_db_connection():
         raise ValueError("DATABASE_URL environment variable is missing.")
     return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
-def analyze_po_with_gemini(uploaded_files_data, form_data):
-    """Sends uploaded files to Gemini with retry logic and model fallbacks for 503 errors."""
+def analyze_po_with_gemini(uploaded_files_data, form_data, custom_prompt=None):
+    """Sends uploaded files to Gemini using the modern client with retry logic, model fallbacks, and dynamic frontend prompt support."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
         return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
 
-    # Dynamically configure the API key at runtime for serverless environments
     api_key = os.getenv("GEMINI_API_KEY")
-    genai.configure(api_key=api_key)
+    
+    try:
+        # Initialize the modern client directly with the runtime API key
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        return f"Client initialization failed: {str(e)}"
 
     gemini_file_objects = []
     
@@ -56,41 +60,48 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
     ]
     
     try:
-        # 1. Upload files first
+        # 1. Upload files first using the files client API
         for file_bytes, filename, mime_type in uploaded_files_data:
             bio = io.BytesIO(file_bytes)
             bio.name = filename
             
-            uploaded_gemini_file = genai.upload_file(
-                bio, 
-                mime_type=mime_type or "application/pdf"
+            uploaded_gemini_file = client.files.upload(
+                file=bio, 
+                config={"mime_type": mime_type or "application/pdf"}
             )
             gemini_file_objects.append(uploaded_gemini_file)
 
-        prompt = f"""
-        Analyze the attached purchase order documents and quote attachments for vendor compliance.
-        
-        Form Details:
-        - PO Number: {form_data.get('po_number')}
-        - Description: {form_data.get('description')}
-        - Estimated Cost: R{form_data.get('estimated_cost')}
-        - Suggested Vendor: {form_data.get('recommended_vendor')}
-        - Justification: {form_data.get('justification_notes')}
-        
-        Tasks:
-        1. Extract and summarize key line items, total amounts, and vendor details from attached documents.
-        2. Highlight any discrepancies between quotes and the submitted form data.
-        3. Provide a 2-3 sentence executive recommendation.
-        """
+        # Use front-end driven custom prompt if provided, otherwise default to compliance extraction
+        if custom_prompt:
+            prompt = custom_prompt
+        else:
+            prompt = f"""
+            Analyze the attached purchase order documents and quote attachments for vendor compliance.
+            
+            Form Details:
+            - PO Number: {form_data.get('po_number')}
+            - Description: {form_data.get('description')}
+            - Estimated Cost: R{form_data.get('estimated_cost')}
+            - Suggested Vendor: {form_data.get('recommended_vendor')}
+            - Justification: {form_data.get('justification_notes')}
+            
+            Tasks:
+            1. Extract and summarize key line items, total amounts, and vendor details from attached documents.
+            2. Highlight any discrepancies between quotes and the submitted form data.
+            3. Provide a 2-3 sentence executive recommendation.
+            """
 
         # 2. Attempt generation across models with exponential backoff
+        response = None
         for model_name in candidate_models:
             print(f"Attempting analysis with model: {model_name}...", flush=True)
-            model = genai.GenerativeModel(model_name)
             
             for attempt in range(3):  # Retry up to 3 times per model
                 try:
-                    response = model.generate_content([*gemini_file_objects, prompt])
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=[*gemini_file_objects, prompt]
+                    )
                     if response and response.text:
                         return response.text.strip()
                 except Exception as err:
@@ -109,9 +120,10 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
         return f"AI Analysis failed: {str(err)}"
         
     finally:
+        # Cleanup uploaded files from Google servers
         for file_obj in gemini_file_objects:
             try:
-                genai.delete_file(file_obj.name)
+                client.files.delete(name=file_obj.name)
             except Exception as e:
                 print(f"Gemini File Cleanup Error: {e}", flush=True)
 
