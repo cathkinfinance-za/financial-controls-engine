@@ -359,6 +359,7 @@
                         <option value="Capital" {% if selected_po and selected_po.expense_type == "Capital" %}selected{% endif %}>Capital</option>
                         <option value="Maintenance" {% if selected_po and selected_po.expense_type == "Maintenance" %}selected{% endif %}>Maintenance</option>
                         <option value="Emergency" {% if selected_po and selected_po.expense_type == "Emergency" %}selected{% endif %}>Emergency</option>
+                        <option value="Service Contract" {% if selected_po and selected_po.expense_type == "Service Contract" %}selected{% endif %}>Service Provider Contract</option>
                     </select>
                 </div>
 
@@ -668,7 +669,7 @@
             status = '⚠️ LIQUIDITY ALERT: Post-purchase runway drops below required 2-Month Buffer Pool';
         } else if (expenseType === 'Capital') {
             status = '🏦 Capital Expenditure: Reserve Allocation (Requires Full Board & AGM Ratification)';
-        } else if (expenseType === 'Maintenance') {
+        } else if (expenseType === 'Service Contract' || expenseType === 'Maintenance') {
             status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Directors)';
         } else if (isBudgeted === 'Yes') {
             if (estimatedCost <= 10000) {

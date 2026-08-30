@@ -284,8 +284,8 @@ def po_form():
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
                                 quote_filepath = %s,
-                                chair_requested_at = CASE WHEN %s IN ('Submit for Approval', 'Sent') THEN NOW() ELSE chair_requested_at END,
-                                chair_escalated = CASE WHEN %s IN ('Submit for Approval', 'Sent') THEN FALSE ELSE chair_escalated END
+                                chair_requested_at = CASE WHEN %s IN ('Submit for Finance Review','Submit for Approval', 'Sent') THEN NOW() ELSE chair_requested_at END,
+                                chair_escalated = CASE WHEN %s IN ('Submit for Finance Review','Submit for Approval', 'Sent') THEN FALSE ELSE chair_escalated END
                             WHERE po_number = %s;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
@@ -330,7 +330,7 @@ def po_form():
                     
                     conn.commit()
 
-                    if submission_status in ["Submit for Approval", "Sent"]:
+                    if submission_status in ["Submit for Finance Review", "Submit for Approval", "Sent"]:
                         trigger_github_workflow()
 
                 return redirect(url_for('po_form', po_number=new_po))
