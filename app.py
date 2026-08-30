@@ -366,13 +366,36 @@ def po_form():
                     conn.commit()
 
                     # Run AI Analysis if explicitly selected or if new files were uploaded
-                    if submission_status == "Run AI Analysis" or gemini_file_payloads:
-                        # Build payload from form data if files aren't explicitly re-uploaded
-                        ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
-                        if ai_summary:
-                            ai_recommendation_summary = ai_summary
+                    if submission_status == "Run AI Analysis":
+                        # If no new files were uploaded during this submit, fetch existing attached files from Blob storage
+                        if not gemini_file_payloads and combined_quote_filepath:
+                            for file_url in combined_quote_filepath.split(','):
+                                clean_url = file_url.strip()
+                                if clean_url:
+                                    try:
+                                        resp = requests.get(clean_url, timeout=10)
+                                        if resp.status_code == 200:
+                                            filename = clean_url.split('/')[-1].split('?')[0]
+                                            content_type = resp.headers.get('Content-Type', 'application/pdf')
+                                            gemini_file_payloads.append((resp.content, filename, content_type))
+                                    except Exception as fetch_err:
+                                        print(f"Error fetching existing attachment for AI analysis: {fetch_err}")
 
-                    if submission_status in ["Submit for Finance Review", "Submit for Approval", "Sent"]:
+                        # Trigger Gemini analysis if files are present
+                        if gemini_file_payloads:
+                            ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
+                            if ai_summary:
+                                ai_recommendation_summary = ai_summary
+                                # Persist the newly generated AI summary to the database
+                                cur.execute("""
+                                    UPDATE po_log 
+                                    SET ai_recommendation_summary = %s 
+                                    WHERE po_number = %s;
+                                """, (ai_recommendation_summary, new_po))
+                                conn.commit()
+
+                    # Trigger GitHub Action dispatch if required
+                    if submission_status in ["Run AI Analysis", "Submit for Finance Review", "Submit for Approval", "Sent"]:
                         trigger_github_workflow()
 
                 return redirect(url_for('po_form', po_number=new_po))
