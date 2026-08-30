@@ -44,7 +44,7 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
     gemini_file_objects = []
     
     # Priority list of models to try if high demand occurs
-    candidate_models = ["gemini-3.5-flash", "gemini-2.5-flash"]
+    candidate_models = ["gemini-3.5-flash", "gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]
 
     try:
         # 1. Upload files first
