@@ -5,8 +5,10 @@ vercel-blob
 playwright
 openpyxl
 pandas
-flask
-google-generativeai
+Flask
+google-generativeai>=0.8.6
 werkzeug
 duckduckgo-search
 duckduckgo-search>=6.0.0
+python-dotenv
+requests
