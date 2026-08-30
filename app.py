@@ -8,6 +8,7 @@ import psycopg2.extras
 from psycopg2.extras import RealDictCursor
 import vercel_blob
 import requests
+import time
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, g
 from werkzeug.utils import secure_filename
 from ai_matrix_drafter_postgres import execute_phase1
@@ -36,14 +37,17 @@ def get_db_connection():
     return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
 def analyze_po_with_gemini(uploaded_files_data, form_data):
-    """Sends uploaded file streams to Gemini Flash for extraction & compliance checking."""
+    """Sends uploaded files to Gemini with retry logic and model fallbacks for 503 errors."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
         return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
 
     gemini_file_objects = []
+    
+    # Priority list of models to try if high demand occurs
+    candidate_models = ["gemini-3.5-flash", "gemini-2.5-flash"]
+
     try:
-        model = genai.GenerativeModel('gemini-3.5-flash')
-        
+        # 1. Upload files first
         for file_bytes, filename, mime_type in uploaded_files_data:
             bio = io.BytesIO(file_bytes)
             bio.name = filename
@@ -70,11 +74,29 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
         3. Provide a 2-3 sentence executive recommendation.
         """
 
-        response = model.generate_content([*gemini_file_objects, prompt])
-        return response.text.strip() if response and response.text else "AI analysis produced no text."
+        # 2. Attempt generation across models with exponential backoff
+        for model_name in candidate_models:
+            print(f"Attempting analysis with model: {model_name}...", flush=True)
+            model = genai.GenerativeModel(model_name)
+            
+            for attempt in range(3):  # Retry up to 3 times per model
+                try:
+                    response = model.generate_content([*gemini_file_objects, prompt])
+                    if response and response.text:
+                        return response.text.strip()
+                except Exception as err:
+                    if "503" in str(err) or "UNAVAILABLE" in str(err):
+                        wait_time = (attempt + 1) * 2
+                        print(f"503 High Demand on {model_name}. Retrying in {wait_time}s...", flush=True)
+                        time.sleep(wait_time)
+                    else:
+                        print(f"Gemini error on {model_name}: {err}", flush=True)
+                        break  # Non-503 error, switch model
+
+        return "AI Analysis temporarily unavailable due to high Google API demand. Please resubmit shortly."
 
     except Exception as err:
-        print(f"Gemini Processing Error: {err}")
+        print(f"Gemini Processing Error: {err}", flush=True)
         return f"AI Analysis failed: {str(err)}"
         
     finally:
@@ -82,7 +104,7 @@ def analyze_po_with_gemini(uploaded_files_data, form_data):
             try:
                 genai.delete_file(file_obj.name)
             except Exception as e:
-                print(f"Gemini File Cleanup Error: {e}")
+                print(f"Gemini File Cleanup Error: {e}", flush=True)
 
 
 # Helper to fetch all projects for the sidebar
@@ -410,7 +432,7 @@ def handle_prompts_api():
                     return jsonify(processes), 200
 
                 cursor.execute(
-                    "SELECT process, prompt_template, description, is_active FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
+                    "SELECT process, prompt_template, description, is_active, selected_model FROM system_prompts WHERE LOWER(process) = LOWER(%s);", 
                     (process_name,)
                 )
                 row = cursor.fetchone()
@@ -423,6 +445,7 @@ def handle_prompts_api():
                 process_name = data.get('process')
                 prompt_template = data.get('prompt_template')
                 is_active = data.get('is_active', True)
+                selected_model = data.get('selected_model', 'gemini-2.5-flash')
 
                 if not process_name or prompt_template is None:
                     return jsonify({'error': 'Missing required fields.'}), 400
@@ -431,9 +454,10 @@ def handle_prompts_api():
                     UPDATE system_prompts 
                     SET prompt_template = %s, 
                         is_active = %s,
+                        selected_model = %s,
                         updated_at = CURRENT_TIMESTAMP 
                     WHERE LOWER(process) = LOWER(%s);
-                """, (prompt_template, is_active, process_name))
+                """, (prompt_template, is_active, selected_model, process_name))
                 conn.commit()
 
                 return jsonify({'status': 'success', 'message': 'Prompt updated successfully.'}), 200
@@ -776,7 +800,11 @@ def generate_recommendation(project_id):
                 flash('Cannot generate recommendation without vendor options.')
                 return redirect(url_for('projects_page', project_id=project_id))
 
-            cursor.execute("SELECT prompt_template FROM system_prompts WHERE process = 'executive_recommendation' AND is_active = TRUE;")
+            cursor.execute("""
+                SELECT prompt_template, selected_model 
+                FROM system_prompts 
+                WHERE process = 'executive_recommendation' AND is_active = TRUE;
+            """)
             rec_row = cursor.fetchone()
             
             cursor.execute("SELECT prompt_template FROM system_prompts WHERE process = 'Company assessment' AND is_active = TRUE;")
@@ -823,7 +851,9 @@ Project Objectives: {project.get('project_objective', '')}
 {formatted_task_prompt}
 """
 
-            model = genai.GenerativeModel('gemini-3.5-flash')
+            model_name = (rec_row.get('selected_model') if rec_row else None) or 'gemini-2.5-flash'
+            model = genai.GenerativeModel(model_name)
+            
             response = model.generate_content(full_prompt)
             generated_text = response.text if response and response.text else "No content generated."
 
@@ -1222,20 +1252,22 @@ def expenditure_expose():
     month_label = ALLOWED_MONTHS[selected_month]
 
     # 3. Handle AI Analysis generation or use cached version
+    # 3. Handle AI Analysis generation or use cached version
     if cached_analysis:
         ai_analysis = cached_analysis
     elif GEMINI_AVAILABLE and all_items:
+        conn_ai = None
         try:
-            conn = get_db_connection()
-            cur = conn.cursor()
+            conn_ai = get_db_connection()
+            cur_ai = conn_ai.cursor()
 
-            # Query template from database
-            cur.execute("""
-                SELECT prompt_template 
+            # Query template and selected model from database
+            cur_ai.execute("""
+                SELECT prompt_template, selected_model 
                 FROM public.system_prompts 
                 WHERE LOWER(process) = LOWER('expenditure_expose') AND is_active = TRUE;
             """)
-            prompt_row = cur.fetchone()
+            prompt_row = cur_ai.fetchone()
 
             if not prompt_row or not prompt_row.get('prompt_template'):
                 ai_analysis = "AI analysis is currently disabled or template is missing in system_prompts."
@@ -1264,27 +1296,29 @@ def expenditure_expose():
                     expenditure_summary=expenditure_summary
                 )
 
-                model = genai.GenerativeModel('gemini-3.5-flash')
+                # Dynamically instantiate the model chosen in the frontend
+                model_name = prompt_row.get('selected_model') or 'gemini-2.5-flash'
+                model = genai.GenerativeModel(model_name)
                 response = model.generate_content(formatted_prompt)
                 ai_analysis = response.text
 
                 # Save generated response to cache database
-                cur.execute("""
+                cur_ai.execute("""
                     INSERT INTO public.expenditure_ai_cache (month_code, analysis_text)
                     VALUES (%s, %s)
                     ON CONFLICT (month_code) 
                     DO UPDATE SET analysis_text = EXCLUDED.analysis_text, created_at = CURRENT_TIMESTAMP;
                 """, (selected_month, ai_analysis))
-                conn.commit()
-
-            cur.close()
-            conn.close()
+                conn_ai.commit()
 
         except Exception as e:
             ai_analysis = f"AI Analysis temporarily unavailable: {str(e)}"
+        finally:
+            if conn_ai:
+                conn_ai.close()
     else:
         ai_analysis = "AI analysis is currently disabled or unavailable."
-
+    
     return render_template(
         'expenditure_expose.html',
         income_items=income_items,
