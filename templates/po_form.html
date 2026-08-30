@@ -878,9 +878,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function removeAttachment(filename, elementId) {
         if (confirm(`Are you sure you want to remove "${filename}"?`)) {
-            // 1. Append filename to tracking list
+            // 1. Append filename to tracking list as a comma-separated string
             deletedFileTracker.push(filename);
-            document.getElementById('deleted_files').value = JSON.stringify(deletedFileTracker);
+            const deletedInput = document.getElementById('deleted_files');
+            if (deletedInput) {
+                deletedInput.value = deletedFileTracker.join(',');
+            }
 
             // 2. Remove element row from DOM
             const row = document.getElementById(elementId);

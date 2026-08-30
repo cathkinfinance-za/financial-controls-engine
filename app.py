@@ -237,7 +237,8 @@ def po_form():
             estimated_cost = 0.0
 
         existing_filepath_str = request.form.get("existing_quote_filepath", "").strip()
-
+        deleted_files_raw = request.form.get("deleted_files", "").strip()
+        
         if not existing_filepath_str and (original_po or new_po):
             try:
                 with conn.cursor() as cur:
@@ -250,6 +251,14 @@ def po_form():
                 print(f"Error fetching existing PO filepath: {e}")
 
         existing_urls = [u.strip() for u in existing_filepath_str.split(",") if u.strip()]
+
+        # Filter out any files marked for deletion from JavaScript
+        if deleted_files_raw:
+            deleted_list = [df.strip() for df in deleted_files_raw.split(",") if df.strip()]
+            existing_urls = [
+                url for url in existing_urls 
+                if not any(df in url for df in deleted_list)
+            ]
 
         raw_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
         new_urls = []
