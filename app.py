@@ -228,8 +228,19 @@ def po_form():
         system_status = request.form.get("system_status", "").strip()
         clear_ai_flag = request.form.get("clear_ai_flag", "0")
 
-        if clear_ai_flag == "1":
-            ai_recommendation_summary = ""
+        if clear_ai_flag == '1':
+            ai_recommendation_summary = None
+        else:
+            ai_recommendation_summary = request.form.get('ai_recommendation_summary')
+
+        # Update database record
+        cur.execute("""
+            UPDATE purchase_orders
+            SET 
+                ai_recommendation_summary = %s,
+                -- other fields --
+            WHERE po_number = %s
+        """, (ai_recommendation_summary, po_number))
 
         try:
             estimated_cost = float(request.form.get("estimated_cost") or 0.0)
@@ -366,7 +377,7 @@ def po_form():
                     conn.commit()
 
                     # Run AI Analysis if explicitly selected or if new files were uploaded
-                    if submission_status == "Run AI Analysis":
+                    if submission_status == "Run AI Analysis" or gemini_file_payloads:
                         # If no new files were uploaded during this submit, fetch existing attached files from Blob storage
                         if not gemini_file_payloads and combined_quote_filepath:
                             for file_url in combined_quote_filepath.split(','):

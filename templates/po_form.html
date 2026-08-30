@@ -895,6 +895,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function clearAiAnalysis() {
+        const aiTextarea = document.getElementById('ai_recommendation_summary');
+        const clearFlag = document.getElementById('clear_ai_flag');
+        
+        if (aiTextarea) {
+            aiTextarea.value = '';
+        }
+        if (clearFlag) {
+            clearFlag.value = '1';
+        }
+    }
+
+    document.getElementById('po-form').addEventListener('submit', function() {
+        // If the user modified inputs or explicitly requested a clear, set flag to 1
+        if (document.getElementById('ai_recommendation_summary').dataset.needsReset === 'true') {
+            clearAiAnalysis();
+        }
+    });
+
 </script>
 
 </body>
