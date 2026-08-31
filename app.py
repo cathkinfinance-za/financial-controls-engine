@@ -604,13 +604,7 @@ def handle_prompts_api():
                     row = cursor.fetchone()
                     model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
 
-                # Validate model via SDK instantiation
-                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[*gemini_file_objects, formatted_prompt]
-                )
-
+                # 3. Update database with new prompt configuration
                 cursor.execute("""
                     UPDATE system_prompts 
                     SET prompt_template = %s, 
