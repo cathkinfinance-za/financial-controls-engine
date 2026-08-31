@@ -37,145 +37,6 @@ def get_db_connection():
         raise ValueError("DATABASE_URL environment variable is missing.")
     return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
 
-FALLBACK_QUOTE_PROMPT = """Examine the attached quote documentation for Purchase Order {po_num}.
-
-System & Financial Context:
-- PO Number: {po_num}
-- Description: {desc_val}
-- Expense Type: {expense_type}
-- GL Account: {gl_code_val}
-- Estimated Cost: R{cost:,.2f}
-- Total Annual Budget: R{total_annual_budget:,.2f}
-- YTD Actual Spend: R{ytd_actual:,.2f}
-- Remaining YTD Budget: R{remaining_ytd_budget:,.2f}
-- Recommended Vendor: {user_recommended_vendor}
-- Justification: "{user_justification}"
-- Conflict of Interest Declared: {coi_details}
-
-Tasks:
-1. Document Cross-Verification: Read the attached quote files, cross-verify line item pricing, and confirm whether the attached quotes match the proposed estimated cost of R{cost:,.2f}.
-
-2. Financial & Budget Impact Analysis: Analyze how this proposed purchase impacts the GL account. Explicitly evaluate the post-purchase budget position (calculating the net remaining budget after deducting R{cost:,.2f}), and flag whether this causes an over-expenditure, worsens a deficit, or breaches required buffer thresholds.
-
-3. Vendor Choice Evaluation: Provide a 2-sentence summary comparing vendor choices and identifying the most cost-effective option.
-
-4. Justification & Operational Audit: Evaluate the choice of "{user_recommended_vendor}" against the provided justification ("{user_justification}"). Cross-reference the attached quotes to confirm whether operational claims (such as specific inclusions, scope, or terms) are factually accurate.
-
-5. Risk Audit: Flag any potential compliance risks, mathematical errors, missing line items, or hidden costs across all bids.
-
-6. Final Recommendation: Provide an explicit compliance recommendation confirming or challenging whether the user's justification warrants the cost variance and budget impact.
-
-At the absolute end of your response, output exactly these two lines:
-AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
-
-
-def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, custom_prompt=None):
-    """Sends uploaded files and financial context to Gemini using the database system prompt or fallback template."""
-    if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
-        return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
-
-    # Fallback to empty dict if financial_data wasn't passed
-    financial_data = financial_data or {}
-
-    # 1. Fetch active prompt and model configuration from system_prompts table
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT prompt_template, selected_model, is_active 
-                FROM system_prompts 
-                WHERE LOWER(process) = LOWER('Quote evaluation');
-            """)
-            prompt_row = cur.fetchone()
-    except Exception as e:
-        print(f"Database error fetching quote evaluation prompt: {e}", flush=True)
-        prompt_row = None
-    finally:
-        if conn:
-            conn.close()
-
-    # 2. Extract configuration or use defaults/fallback
-    is_active = prompt_row.get('is_active', True) if prompt_row else True
-    if not is_active:
-        return "AI Quote Evaluation is currently inactive in system prompts."
-
-    prompt_template = (prompt_row.get('prompt_template') if prompt_row else None) or FALLBACK_QUOTE_PROMPT
-    model_name = (prompt_row.get('selected_model') if prompt_row else None) or "gemini-2.5-flash"
-
-    api_key = os.getenv("GEMINI_API_KEY")
-    
-    try:
-        client = genai.Client(api_key=api_key)
-    except Exception as e:
-        return f"Client initialization failed: {str(e)}"
-
-    gemini_file_objects = []
-    
-    try:
-        # 3. Upload files using the files client API
-        for file_bytes, filename, mime_type in uploaded_files_data:
-            bio = io.BytesIO(file_bytes)
-            bio.name = filename
-            
-            uploaded_gemini_file = client.files.upload(
-                file=bio, 
-                config={"mime_type": mime_type or "application/pdf"}
-            )
-            gemini_file_objects.append(uploaded_gemini_file)
-
-        # 4. Format prompt template with comprehensive form and financial context variables
-        prompt_context = {
-            "po_num": form_data.get('po_number', 'N/A'),
-            "desc_val": form_data.get('description', 'N/A'),
-            "expense_type": form_data.get('expense_type', 'N/A'),
-            "gl_code_val": form_data.get('gl_code', 'N/A'),
-            "cost": float(form_data.get('estimated_cost', 0.0) or 0.0),
-            "total_annual_budget": float(financial_data.get('total_annual_budget', 0.0) or 0.0),
-            "ytd_actual": float(financial_data.get('ytd_actual', 0.0) or 0.0),
-            "remaining_ytd_budget": float(financial_data.get('remaining_ytd_budget', 0.0) or 0.0),
-            "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
-            "user_justification": form_data.get('justification_notes', 'N/A'),
-            "coi_details": form_data.get('coi_details', 'None declared')
-        }
-        
-        formatted_prompt = prompt_template.format(**prompt_context)
-
-        # 5. Execute generation using the selected model
-        print(f"Attempting analysis with model: {model_name}...", flush=True)
-        
-        response = None
-        for attempt in range(3):  # Retry up to 3 times for temporary 503 high demand
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=[*gemini_file_objects, formatted_prompt]
-                )
-                if response and response.text:
-                    return response.text.strip()
-            except Exception as err:
-                if "503" in str(err) or "UNAVAILABLE" in str(err):
-                    wait_time = (attempt + 1) * 2
-                    print(f"503 High Demand on {model_name}. Retrying in {wait_time}s...", flush=True)
-                    time.sleep(wait_time)
-                else:
-                    print(f"Gemini error on {model_name}: {err}", flush=True)
-                    break
-
-        return "AI Analysis temporarily unavailable due to high Google API demand. Please resubmit shortly."
-
-    except Exception as err:
-        print(f"Gemini Processing Error: {err}", flush=True)
-        return f"AI Analysis failed: {str(err)}"
-        
-    finally:
-        # Cleanup uploaded files from Google servers
-        for file_obj in gemini_file_objects:
-            try:
-                client.files.delete(name=file_obj.name)
-            except Exception as e:
-                print(f"Gemini File Cleanup Error: {e}", flush=True)
-
 # Helper to fetch all projects for the sidebar
 def get_all_projects_summary(cursor):
     cursor.execute("SELECT id, project_reference, name FROM projects ORDER BY id DESC;")
@@ -241,13 +102,9 @@ def legal_framework():
     return render_template('legal_framework.html')
 
 
-# --- PURCHASE ORDERS ---
-@app.route("/api/budget-details")
-def budget_details():
-    """API endpoint for live JS fetching of budget summary metrics on GL Code change."""
-    gl_code = request.args.get("gl_code")
+def fetch_budget_summary(gl_code):
     if not gl_code:
-        return jsonify({})
+        return {}
 
     conn = get_db_connection()
     try:
@@ -256,7 +113,7 @@ def budget_details():
                 SELECT 
                     COALESCE(ytd, 0.00) AS ytd_actual, 
                     COALESCE(total_budget, 0.00) AS total_annual_budget, 
-                    COALESCE(budget_ytd, 0.00) AS budget_ytd, 
+                    COALESCE(budget_ytd, 0.00) AS budget_ytd,
                     LEAST(
                         ROUND(COALESCE(total_budget, 0.00) / 6.0, 2),
                         GREATEST(0.00, COALESCE(total_budget, 0.00) - COALESCE(ytd, 0.00))
@@ -266,9 +123,15 @@ def budget_details():
                 WHERE gl_code = %s;
             """, (gl_code,))
             row = cur.fetchone()
-            return jsonify(row if row else {})
+            return dict(row) if row else {}
     finally:
         conn.close()
+
+# --- PURCHASE ORDERS ---
+@app.route("/api/budget-details")
+def budget_details():
+    gl_code = request.args.get("gl_code")
+    return jsonify(fetch_budget_summary(gl_code))
 
 
 @app.route("/po_form", methods=["GET", "POST"])
@@ -539,6 +402,157 @@ def po_form():
     )
 
 
+FALLBACK_QUOTE_PROMPT = """Examine the attached quote documentation for Purchase Order {po_num}.
+
+System & Financial Context:
+- PO Number: {po_num}
+- Description: {desc_val}
+- Expense Type: {expense_type}
+- GL Account: {gl_code_val}
+- Estimated Cost: R{cost:,.2f}
+- Total Annual Budget: R{total_annual_budget:,.2f}
+- YTD Actual Spend: R{ytd_actual:,.2f}
+- YTD Budget: R{budget_ytd:,.2f}
+- Remaining Budget (After Quote Amount): R{remaining_budget:,.2f}
+- Recommended Vendor: {user_recommended_vendor}
+- Justification: "{user_justification}"
+- Conflict of Interest Declared: {coi_details}
+
+Tasks:
+1. Document Cross-Verification: Read the attached quote files, cross-verify line item pricing, and confirm whether the attached quotes match the proposed estimated cost of R{cost:,.2f}.
+
+2. Financial & Budget Impact Analysis: Analyze how this proposed purchase impacts the GL account, ie. the impact on the remaining budget (over-expenditure, worsens a deficit, or breaches required buffer thresholds).
+
+3. Vendor Choice Evaluation: Provide a 2-sentence summary comparing vendor choices and identifying the most cost-effective option.
+
+4. Justification & Operational Audit: Evaluate the choice of "{user_recommended_vendor}" against the provided justification ("{user_justification}"). Cross-reference the attached quotes to confirm whether operational claims (such as specific inclusions, scope, or terms) are factually accurate.
+
+5. Risk Audit: Flag any potential compliance risks, mathematical errors, missing line items, or hidden costs across all bids.
+
+6. Final Recommendation: Provide an explicit compliance recommendation confirming or challenging whether the user's justification warrants the cost variance and budget impact.
+
+At the absolute end of your response, output exactly these two lines:
+AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
+
+
+def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, custom_prompt=None):
+    """Sends uploaded files and financial context to Gemini using the database system prompt or fallback template."""
+    if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
+        return "Gemini AI SDK is not installed or GEMINI_API_KEY is missing."
+
+    # 1. Fetch active prompt and model configuration from system_prompts table
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT prompt_template, selected_model, is_active 
+                FROM system_prompts 
+                WHERE LOWER(process) = LOWER('Quote evaluation');
+            """)
+            prompt_row = cur.fetchone()
+    except Exception as e:
+        print(f"Database error fetching quote evaluation prompt: {e}", flush=True)
+        prompt_row = None
+    finally:
+        if conn:
+            conn.close()
+
+    # 2. Extract configuration or use defaults/fallback
+    is_active = prompt_row.get('is_active', True) if prompt_row else True
+    if not is_active:
+        return "AI Quote Evaluation is currently inactive in system prompts."
+
+    prompt_template = (prompt_row.get('prompt_template') if prompt_row else None) or FALLBACK_QUOTE_PROMPT
+    model_name = (prompt_row.get('selected_model') if prompt_row else None) or "gemini-2.5-flash"
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    
+    try:
+        client = genai.Client(api_key=api_key)
+    except Exception as e:
+        return f"Client initialization failed: {str(e)}"
+
+    gemini_file_objects = []
+    
+    # Fallback or auto-fetch financial data using the helper function if not provided
+    if not financial_data:
+        gl_code = form_data.get('gl_code')
+        financial_data = fetch_budget_summary(gl_code) if gl_code else {}
+
+    # Extract variance and estimated cost
+    variance = float(financial_data.get('variance', 0.0) or 0.0)
+    estimated_cost = float(form_data.get('estimated_cost', 0.0) or 0.0)
+
+    # Calculate remaining YTD budget as variance minus estimated cost
+    remaining_budget = variance - estimated_cost
+    
+    try:
+        # 3. Upload files using the files client API
+        for file_bytes, filename, mime_type in uploaded_files_data:
+            bio = io.BytesIO(file_bytes)
+            bio.name = filename
+            
+            uploaded_gemini_file = client.files.upload(
+                file=bio, 
+                config={"mime_type": mime_type or "application/pdf"}
+            )
+            gemini_file_objects.append(uploaded_gemini_file)
+
+        # 4. Format prompt template with comprehensive form and financial context variables
+        prompt_context = {
+            "po_num": form_data.get('po_number', 'N/A'),
+            "desc_val": form_data.get('description', 'N/A'),
+            "expense_type": form_data.get('expense_type', 'N/A'),
+            "gl_code_val": form_data.get('gl_code', 'N/A'),
+            "cost": float(form_data.get('estimated_cost', 0.0) or 0.0),
+            "total_annual_budget": float(financial_data.get('total_annual_budget', 0.0) or 0.0),
+            "ytd_actual": float(financial_data.get('ytd_actual', 0.0) or 0.0),
+            "budget_ytd": float(financial_data.get('budget_ytd', 0.0) or 0.0),
+            "remaining_budget": remaining_budget,
+            "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
+            "user_justification": form_data.get('justification_notes', 'N/A'),
+            "coi_details": form_data.get('coi_details', 'None declared')
+        }
+        
+        formatted_prompt = prompt_template.format(**prompt_context)
+
+        # 5. Execute generation using the selected model
+        print(f"Attempting analysis with model: {model_name}...", flush=True)
+        
+        response = None
+        for attempt in range(3):  # Retry up to 3 times for temporary 503 high demand
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[*gemini_file_objects, formatted_prompt]
+                )
+                if response and response.text:
+                    return response.text.strip()
+            except Exception as err:
+                if "503" in str(err) or "UNAVAILABLE" in str(err):
+                    wait_time = (attempt + 1) * 2
+                    print(f"503 High Demand on {model_name}. Retrying in {wait_time}s...", flush=True)
+                    time.sleep(wait_time)
+                else:
+                    print(f"Gemini error on {model_name}: {err}", flush=True)
+                    break
+
+        return "AI Analysis temporarily unavailable due to high Google API demand. Please resubmit shortly."
+
+    except Exception as err:
+        print(f"Gemini Processing Error: {err}", flush=True)
+        return f"AI Analysis failed: {str(err)}"
+        
+    finally:
+        # Cleanup uploaded files from Google servers
+        for file_obj in gemini_file_objects:
+            try:
+                client.files.delete(name=file_obj.name)
+            except Exception as e:
+                print(f"Gemini File Cleanup Error: {e}", flush=True)
+
+
 # --- SYSTEM PROMPTS & AUDIT ---
 @app.route('/prompts')
 def render_prompts_page():
@@ -591,7 +605,11 @@ def handle_prompts_api():
                     model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
 
                 # Validate model via SDK instantiation
-                model = genai.GenerativeModel(model_name)
+                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=[*gemini_file_objects, formatted_prompt]
+                )
 
                 cursor.execute("""
                     UPDATE system_prompts 
