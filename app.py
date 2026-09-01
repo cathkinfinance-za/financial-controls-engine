@@ -157,9 +157,11 @@ def po_form():
         actioned_by = request.form.get("actioned_by", "").strip()
         approval_notes = request.form.get("approval_notes", "").strip()
         ai_recommendation_summary = request.form.get("ai_recommendation_summary", "").strip()
+        approval_requirement = request.form.get('approval_requirement')
         system_status = request.form.get("system_status", "").strip()
         clear_ai_flag = request.form.get("clear_ai_flag", "0")
-
+              
+        
         if clear_ai_flag == '1':
             ai_recommendation_summary = None
         else:
@@ -478,7 +480,9 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, 
             "remaining_budget": remaining_budget,
             "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
             "user_justification": form_data.get('justification_notes', 'N/A'),
-            "coi_details": form_data.get('coi_details', 'None declared')
+            "coi_details": form_data.get('coi_details', 'None declared'),
+            "approval_requirement": form_data.get('approval_requirement'),
+            "system_status": form_data.get('system_status')
         }
         
         formatted_prompt = prompt_template.format(**prompt_context)
