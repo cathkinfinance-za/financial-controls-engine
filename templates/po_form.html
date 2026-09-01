@@ -697,21 +697,21 @@
         let approvalRequirement = '';
         if (isOverAnnualBudget || currentIsBudgeted === 'No') {
             if (estimatedCost <= 30000) {
-                approvalRequirement = 'Unbudgeted Spend ≤ R30k (Requires Board Resolution)';
+                approvalRequirement = `Unbudgeted Spend ≤ R30k (${requiredQuotes} Quotes Required - Requires Board Resolution)`;
             } else {
-                approvalRequirement = 'Unbudgeted Exceeds R30,000 (Requires Full Board + Homeowner/AGM Ratification)';
+                approvalRequirement = `Unbudgeted Exceeds R30,000 (${requiredQuotes} Quotes Required - Requires Full Board + Homeowner/AGM Ratification)`;
             }
         } else if (expenseType === 'Capital') {
-            approvalRequirement = 'Capital Expenditure Reserve Allocation (Requires Board & AGM Ratification)';
+            approvalRequirement = `Capital Expenditure Reserve Allocation (${requiredQuotes} Quotes Required - Requires Board & AGM Ratification)`;
         } else if (expenseType === 'Service Contract' || expenseType === 'Maintenance') {
-            approvalRequirement = 'Service Provider Contract SLA (Requires Full Board Sign-off)';
+            approvalRequirement = `Service Provider Contract SLA (${requiredQuotes} Quotes Required - Requires Full Board Sign-off)`;
         } else if (currentIsBudgeted === 'Yes') {
             if (estimatedCost <= 10000) {
-                approvalRequirement = 'Low-Value Operational (Requires Estate Manager Sign-off)';
+                approvalRequirement = `Low-Value Operational (${requiredQuotes} Quotes Required - Requires Estate Manager Sign-off)`;
             } else if (estimatedCost <= 50000) {
-                approvalRequirement = 'Mid-Value Operational (Requires Chair + Board Member)';
+                approvalRequirement = `Mid-Value Operational (${requiredQuotes} Quotes Required - Requires Chair + Board Member)`;
             } else {
-                approvalRequirement = 'High-Value Operational (Requires Chair + 2 Board Members)';
+                approvalRequirement = `High-Value Operational (${requiredQuotes} Quotes Required - Requires Chair + 2 Board Members)`;
             }
         } else {
             approvalRequirement = 'Pending Context Classification';
