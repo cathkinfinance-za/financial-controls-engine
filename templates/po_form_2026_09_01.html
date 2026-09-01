@@ -28,6 +28,7 @@
             min-height: 100vh;
         }
 
+        /* Sidebar Styles matching project.html */
         .sidebar {
             width: 280px;
             background: #ffffff;
@@ -85,6 +86,7 @@
             border-color: #74c0fc;
         }
 
+        /* Main Content Workspace */
         .main-content {
             flex-grow: 1;
             padding: 32px;
@@ -141,6 +143,16 @@
             margin-bottom: 20px;
         }
 
+        .form-row.two-col {
+            grid-template-columns: 240px 1fr 1fr;
+            gap: 16px;
+        }
+
+        .form-row.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
         .form-label {
             font-weight: 600;
             font-size: 14px;
@@ -173,6 +185,7 @@
             margin-bottom: 20px;
         }
 
+        /* File Upload & Document Grid Styling */
         .file-upload-wrapper {
             display: flex;
             align-items: center;
@@ -292,13 +305,15 @@
                 </div>
             {% endif %}
 
-            <!-- CHANGE 1: Added id="po-form" so JS event listeners and submit guards bind correctly -->
             <form id="po-form" action="/po_form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
                 <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
-                <input type="hidden" id="deleted_files" name="deleted_files" value="">
-                <input type="hidden" id="clear_ai_flag" name="clear_ai_flag" value="0">
-                
+                <!-- Hidden or visible input for Approval Governance Routing -->
+                <input type="hidden" id="approval_requirement" name="approval_requirement">
+
+                <!-- Status input/display for Lifecycle and Compliance State -->
+                <input type="text" id="system_status" name="system_status" readonly>
+
                 <!-- Purchase Order Details -->
                 <div class="section-header" style="margin-top: 0;">Purchase Order Details</div>
 
@@ -389,7 +404,75 @@
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
-                <!-- CHANGE 2: Consolidated duplicate upload sections into a single unified row with inline deletes -->
+                <!-- Hidden input to track deleted filenames for backend processing -->
+                <input type="hidden" id="deleted_files" name="deleted_files" value="">
+
+                <!-- Upload New Attachments Row -->
+                <div class="form-row">
+                    <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
+                    <div>
+                        <div class="file-upload-wrapper">
+                            <input 
+                                type="file" 
+                                id="attach_quotes" 
+                                name="attach_quotes" 
+                                accept=".pdf, image/*" 
+                                multiple 
+                                onchange="updateQuotesCount(this)"
+                                class="hidden-file-input"
+                            >
+                            
+                            <label for="attach_quotes" class="custom-file-upload-btn">
+                                📁 Choose Files
+                            </label>
+                            <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
+                        </div>
+
+                        <div id="quotes_count_display" class="upload-feedback"></div>
+                    </div>
+                </div>
+
+                <!-- Document Grid with Inline Delete Buttons -->
+                <div class="form-row">
+                    <label class="form-label">Attached Documents</label>
+                    <div class="attachments-card-container" style="width: 100%;">
+                        <span class="attachments-label">ATTACHED DOCUMENTS</span>
+                        <div id="attachments_list" class="doc-grid">
+                            {% if selected_po and selected_po.quote_urls %}
+                                {% for url in selected_po.quote_urls %}
+                                    {% set fname = url.split('/')[-1].split('?')[0] %}
+                                    <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
+                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
+                                            <span class="doc-icon">📄</span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                        <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
+                                            ✖
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% elif selected_po and selected_po.quote_filepath %}
+                                {% for url in selected_po.quote_filepath.split(',') %}
+                                    {% set clean_url = url.strip() %}
+                                    {% set fname = clean_url.split('/')[-1].split('?')[0] %}
+                                    <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
+                                        <a href="{{ clean_url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
+                                            <span class="doc-icon">📄</span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
+                                        <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
+                                            ✖
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            {% else %}
+                                <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No documents attached yet.</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Upload New Attachments Row -->
                 <div class="form-row">
                     <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
                     <div>
@@ -412,38 +495,29 @@
 
                         <div id="quotes_count_display" class="upload-feedback"></div>
 
-                        <!-- Document Grid with Inline Delete Buttons -->
+                        <!-- Document Grid -->
                         <div class="attachments-card-container">
                             <span class="attachments-label">Attached Documents</span>
                             <div id="attachments_list" class="doc-grid">
                                 {% if selected_po and selected_po.quote_urls %}
                                     {% for url in selected_po.quote_urls %}
-                                        {% set fname = url.split('/')[-1].split('?')[0] %}
-                                        {% set ext = fname.split('.')[-1]|lower %}
-                                        <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
-                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
-                                                <span class="doc-icon">{% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}</span>
-                                                <span class="doc-name">Quote {{ loop.index }}</span>
-                                            </a>
-                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
-                                                ✖
-                                            </button>
-                                        </div>
+                                        {% set ext = url.split('.')[-1].split('?')[0]|lower %}
+                                        <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                                            <span class="doc-icon">
+                                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                                            </span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
                                     {% endfor %}
                                 {% elif selected_po and selected_po.quote_filepath %}
                                     {% for url in selected_po.quote_filepath.split(',') %}
-                                        {% set clean_url = url.strip() %}
-                                        {% set fname = clean_url.split('/')[-1].split('?')[0] %}
-                                        {% set ext = fname.split('.')[-1]|lower %}
-                                        <div id="doc-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
-                                            <a href="{{ clean_url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
-                                                <span class="doc-icon">{% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}</span>
-                                                <span class="doc-name">Quote {{ loop.index }}</span>
-                                            </a>
-                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
-                                                ✖
-                                            </button>
-                                        </div>
+                                        {% set ext = url.strip().split('.')[-1].split('?')[0]|lower %}
+                                        <a href="{{ url.strip() }}" target="_blank" rel="noopener noreferrer" class="doc-badge">
+                                            <span class="doc-icon">
+                                                {% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}
+                                            </span>
+                                            <span class="doc-name">Quote {{ loop.index }}</span>
+                                        </a>
                                     {% endfor %}
                                 {% else %}
                                     <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No documents attached yet.</span>
@@ -467,6 +541,20 @@
                     <label class="form-label">Actioned By</label>
                     <input type="text" name="actioned_by" class="form-control" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}" style="width: 240px;">
                 </div>
+
+                <!-- CHANGES 2 and 3 replace this
+                <div class="form-row">
+                    <label class="form-label">System Compliance Status</label>
+                    <input 
+                        type="text" 
+                        id="system_status" 
+                        name="system_status" 
+                        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+                        readonly 
+                        class="form-control status-banner"
+                    >
+                </div>
+                <-->
 
                 <!-- CHANGE 3: Dedicated input field for Governance Sign-off Tier -->
                 <div class="form-row">
@@ -508,6 +596,7 @@
                     </div>
                     <div style="width: 100%;">
                         <textarea id="ai_recommendation_summary" name="ai_recommendation_summary" class="form-control" readonly style="background-color: #f8f9fa;">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
+                        <input type="hidden" id="clear_ai_flag" name="clear_ai_flag" value="0">
                     </div>
                 </div>
 
@@ -538,6 +627,11 @@
                     </select>
                 </div>
 
+                <div class="form-row">
+                    <label class="form-label">Latest AI Status</label>
+                    <input type="text" name="latest_ai_status" class="form-control" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly>
+                </div>
+
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">Save Purchase Order</button>
                 </div>
@@ -547,7 +641,7 @@
 </div>
 
 <script>
-    // Live filter JS for GL code dropdown search input
+    // 1. Live filter JS for GL code dropdown search input
     const searchInput = document.getElementById('gl-search-input');
     const selectElement = document.getElementById('gl-code-select');
 
@@ -567,7 +661,7 @@
         });
     }
 
-    // Auto-fetch financial metrics when GL Code selection changes
+    // 2. Auto-fetch financial metrics when GL Code selection changes
     document.getElementById('gl-code-select')?.addEventListener('change', function() {
         const glCode = this.value;
         if (!glCode) return;
@@ -587,7 +681,7 @@
             .catch(err => console.error('Error fetching budget details:', err));
     }); 
 
-    // Single consolidated function for handling file uploads & quote count
+    // 3. Single consolidated function for handling file uploads & quote count
     function updateQuotesCount(input) {
         const display = document.getElementById('quotes_count_display');
         const quotesField = document.getElementById('quotes_provided');
@@ -641,7 +735,7 @@
         }
     }
 
-    // CHANGE 5: Independent Governance Tier & Compliance Status Engine (Your updated calculation function)
+    // New separation between approval requirement and system status calculation
     function calculateSystemStatus() {
         const submissionStatusSelect = document.querySelector('[name="submission_status"]');
         const submissionStatus = submissionStatusSelect?.value || '';
@@ -753,95 +847,218 @@
         }
     }
 
-    // Global Clear AI Analysis Helper
-    function clearAiAnalysis() {
-        const aiTextarea = document.getElementById('ai_recommendation_summary');
-        const clearFlag = document.getElementById('clear_ai_flag');
-        const clearBtn = document.getElementById('btn-clear-ai');
+    // 4. Dynamic calculation engine for SYSTEM STATUS (Aligned with Authority Matrix)
+    function calculateSystemStatus_consolidated() {
+        const submissionStatusSelect = document.querySelector('[name="submission_status"]');
+        const submissionStatus = submissionStatusSelect?.value || '';
+        const isBudgetedSelect = document.querySelector('[name="is_budgeted"]');
+        const glCode = document.querySelector('[name="gl_code"]')?.value || '';
+        const expenseType = document.querySelector('[name="expense_type"]')?.value || '';
+        const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+        const quotesProvided = parseInt(document.getElementById('quotes_provided')?.value) || 0;
         
-        if (aiTextarea) aiTextarea.value = '';
-        if (clearFlag) clearFlag.value = '1';
-        if (clearBtn) clearBtn.style.display = 'none';
-    }
+        const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
+        const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
+        
+        // Calculate total remaining annual budget
+        const remainingAnnualBudget = totalBudget - ytdActual;
+        const isOverAnnualBudget = totalBudget > 0 && estimatedCost > remainingAnnualBudget;
 
-    // Event Listeners & Initialization on DOM Load
-    document.addEventListener('DOMContentLoaded', function() {
-        const statusInputs = [
-            'submission_status', 
-            'is_budgeted', 
-            'gl_code', 
-            'expense_type', 
-            'estimated_cost'
-        ];
-
-        statusInputs.forEach(fieldName => {
-            const el = document.querySelector(`[name="${fieldName}"]`);
-            if (el) {
-                el.addEventListener('change', calculateSystemStatus);
-                el.addEventListener('input', calculateSystemStatus);
+        // 1. HARD COMPLIANCE LOCK: Over Annual Budget forces Unbudgeted Workflow
+        if (isOverAnnualBudget && isBudgetedSelect) {
+            if (isBudgetedSelect.value !== 'No') {
+                isBudgetedSelect.value = 'No';
+                // Show alert to user explaining the mandatory workflow shift
+                alert("⚠️ BUDGET EXCEEDED: The requested amount exceeds the remaining Total Annual Budget. This transaction has been automatically reclassified as 'Unbudgeted' and requires Extraordinary Board/HOA approval.");
             }
-        });
-
-        const clearBtn = document.getElementById('btn-clear-ai');
-        if (clearBtn) {
-            clearBtn.addEventListener('click', clearAiAnalysis);
         }
 
-        const monitoredFields = [
-            'po_number', 'description', 'po_date', 'is_budgeted', 
-            'gl_code', 'expense_type', 'estimated_cost', 
-            'recommended_vendor', 'justification_notes', 'attach_quotes'
-        ];
-
-        monitoredFields.forEach(fieldName => {
-            const inputEl = document.querySelector(`[name="${fieldName}"]`);
-            if (inputEl) {
-                inputEl.addEventListener('change', clearAiAnalysis);
-                if (inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA') {
-                    inputEl.addEventListener('input', clearAiAnalysis);
-                }
-            }
-        });
-
-        // Form Submit Unbudgeted Guard
-        const formEl = document.getElementById('po-form');
-        if (formEl) {
-            formEl.addEventListener('submit', function(e) {
-                const submissionStatus = document.querySelector('[name="submission_status"]')?.value;
-                const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value;
-                const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
-                const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
-                const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
-
-                if ((totalBudget > 0 && estimatedCost > (totalBudget - ytdActual)) || isBudgeted === 'No') {
-                    if (submissionStatus === 'Submit for Approval' || submissionStatus === 'Sent') {
-                        e.preventDefault();
-                        alert("❌ CANNOT SUBMIT FOR APPROVAL: Unbudgeted transactions must be routed through 'Submit for Finance Review' first.");
+        // 2. DISABLE/ENABLE SUBMISSION OPTIONS BASED ON BUDGET OVERRUN
+        if (submissionStatusSelect) {
+            Array.from(submissionStatusSelect.options).forEach(option => {
+                if (option.value === 'Submit for Approval' || option.value === 'Sent') {
+                    if (isOverAnnualBudget || isBudgetedSelect?.value === 'No') {
+                        option.disabled = true;
+                        if (option.selected) {
+                            submissionStatusSelect.value = 'Submit for Finance Review';
+                        }
+                    } else {
+                        option.disabled = false;
                     }
                 }
             });
         }
 
-        calculateSystemStatus();
+        const currentIsBudgeted = isBudgetedSelect?.value || '';
+
+        // Determine required quotes per matrix
+        let requiredQuotes = 0;
+        if (expenseType === 'Capital' || expenseType === 'Maintenance' || currentIsBudgeted === 'No') {
+            requiredQuotes = 3;
+        } else if (currentIsBudgeted === 'Yes') {
+            if (estimatedCost > 50000) requiredQuotes = 3;
+            else if (estimatedCost >= 10001) requiredQuotes = 2;
+            else requiredQuotes = 0;
+        }
+
+        let status = '';
+
+        if (submissionStatus === 'Approved') {
+            status = '✅ APPROVED: Compliance Process Complete';
+        } else if (submissionStatus === 'Run AI Analysis') {
+            status = '🤖 AI ANALYSIS: Reviewing Compliance & Budget Impact';
+        } else if (submissionStatus === 'Submit for Finance Review') {
+            status = '🔍 FINANCE REVIEW: Awaiting Finance Committee Sign-off';    
+        } else if (submissionStatus === 'Sent') {
+            status = '📬 SENT: Approval Request Dispatched via Email'; 
+        } else if (submissionStatus === 'Rejected') {
+            status = '🛑 REJECTED: Final Authorisation Declined';
+        } else if (isOverAnnualBudget || currentIsBudgeted === 'No') {
+            if (quotesProvided < 3) {
+                status = `❌ UNBUDGETED BLOCKED: Insufficient Quotes (${quotesProvided}/3 Required for Unbudgeted Spend)`;
+            } else if (estimatedCost <= 30000) {
+                status = '⚡ UNBUDGETED OVERRIDE: Unbudgeted Spend ≤ R30k (Requires Board Resolution)';
+            } else {
+                status = '❌ UNBUDGETED EXCEEDS R30,000: (Requires Full Board + Homeowner/AGM Ratification)';
+            }
+        } else if (currentIsBudgeted === 'Yes' && !glCode) {
+            status = '⚠️ ACTION REQUIRED: Select a valid GL description';
+        } else if (!expenseType) {
+            status = '⚠️ ACTION REQUIRED: Select Expense Type';
+        } else if (quotesProvided < requiredQuotes) {
+            status = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
+        } else if (expenseType === 'Capital') {
+            status = '🏦 Capital Expenditure: Reserve Allocation (Requires Board & AGM Ratification)';
+        } else if (expenseType === 'Service Contract' || expenseType === 'Maintenance') {
+            status = '📝 Service Provider Contract: SLA Appointment (Requires Full Board Sign-off)';
+        } else if (currentIsBudgeted === 'Yes') {
+            if (estimatedCost <= 10000) {
+                status = '🟢 Low-Value Operational: Within Budget (Requires Estate Manager Sign-off)';
+            } else if (estimatedCost <= 50000) {
+                status = '🟡 Mid-Value Operational: Within Budget (Requires Chair + Board Member)';
+            } else {
+                status = '🟠 High-Value Operational: Within Budget (Requires Chair + 2 Board Members)';
+            }
+        }
+
+        const systemStatusInput = document.getElementById('system_status') || document.querySelector('[name="system_status"]');
+        if (systemStatusInput) {
+            systemStatusInput.value = status;
+        }
+    }
+
+    // 5. Attach live listeners to form elements
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // --- A. CALCULATE SYSTEM STATUS LISTENERS ---
+    const statusInputs = [
+        'submission_status', 
+        'is_budgeted', 
+        'gl_code', 
+        'expense_type', 
+        'estimated_cost'
+    ];
+
+    statusInputs.forEach(fieldName => {
+        const el = document.querySelector(`[name="${fieldName}"]`);
+        if (el) {
+            el.addEventListener('change', calculateSystemStatus);
+            el.addEventListener('input', calculateSystemStatus);
+        }
     });
 
-    let deletedFileTracker = [];
+    // --- B. CLEAR AI RECOMMENDATION LOGIC ---
+    const aiTextarea = document.getElementById('ai_recommendation_summary');
+    const clearFlag = document.getElementById('clear_ai_flag');
+    const clearBtn = document.getElementById('btn-clear-ai');
+
+    function clearAiAnalysis() {
+        if (aiTextarea) aiTextarea.value = '';
+        if (clearFlag) clearFlag.value = '1';
+        if (clearBtn) clearBtn.style.display = 'none';
+    }
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAiAnalysis);
+    }
+
+    const monitoredFields = [
+        'po_number', 'description', 'po_date', 'is_budgeted', 
+        'gl_code', 'expense_type', 'estimated_cost', 
+        'recommended_vendor', 'justification_notes', 'attach_quotes'
+    ];
+
+    monitoredFields.forEach(fieldName => {
+        const inputEl = document.querySelector(`[name="${fieldName}"]`);
+        if (inputEl) {
+            inputEl.addEventListener('change', clearAiAnalysis);
+            if (inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA') {
+                inputEl.addEventListener('input', clearAiAnalysis);
+            }
+        }
+    });
+
+    // --- C. FORM SUBMIT UNBUDGETED GUARD ---
+    document.querySelector('form')?.addEventListener('submit', function(e) {
+        const submissionStatus = document.querySelector('[name="submission_status"]')?.value;
+        const isBudgeted = document.querySelector('[name="is_budgeted"]')?.value;
+        const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
+        const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
+        const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+
+        if ((totalBudget > 0 && estimatedCost > (totalBudget - ytdActual)) || isBudgeted === 'No') {
+            if (submissionStatus === 'Submit for Approval' || submissionStatus === 'Sent') {
+                e.preventDefault();
+                alert("❌ CANNOT SUBMIT FOR APPROVAL: Unbudgeted transactions must be routed through 'Submit for Finance Review' first.");
+            }
+        }
+    });
+
+    // --- D. INITIALIZE STATUS ON PAGE LOAD ---
+    calculateSystemStatus();
+
+   });
+
+   let deletedFileTracker = [];
 
     function removeAttachment(filename, elementId) {
         if (confirm(`Are you sure you want to remove "${filename}"?`)) {
+            // 1. Append filename to tracking list as a comma-separated string
             deletedFileTracker.push(filename);
             const deletedInput = document.getElementById('deleted_files');
             if (deletedInput) {
                 deletedInput.value = deletedFileTracker.join(',');
             }
 
+            // 2. Remove element row from DOM
             const row = document.getElementById(elementId);
             if (row) row.remove();
 
+            // 3. Clear stale AI Analysis and update quote counters
             if (typeof clearAiAnalysis === 'function') clearAiAnalysis();
             if (typeof calculateSystemStatus === 'function') calculateSystemStatus();
         }
     }
+
+    function clearAiAnalysis() {
+        const aiTextarea = document.getElementById('ai_recommendation_summary');
+        const clearFlag = document.getElementById('clear_ai_flag');
+        
+        if (aiTextarea) {
+            aiTextarea.value = '';
+        }
+        if (clearFlag) {
+            clearFlag.value = '1';
+        }
+    }
+
+    document.getElementById('po-form').addEventListener('submit', function() {
+        // If the user modified inputs or explicitly requested a clear, set flag to 1
+        if (document.getElementById('ai_recommendation_summary').dataset.needsReset === 'true') {
+            clearAiAnalysis();
+        }
+    });
+
 </script>
 
 </body>
