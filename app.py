@@ -401,40 +401,6 @@ def po_form():
         message=message
     )
 
-
-FALLBACK_QUOTE_PROMPT = """Examine the attached quote documentation for Purchase Order {po_num}.
-
-System & Financial Context:
-- PO Number: {po_num}
-- Description: {desc_val}
-- Expense Type: {expense_type}
-- GL Account: {gl_code_val}
-- Estimated Cost: R{cost:,.2f}
-- Total Annual Budget: R{total_annual_budget:,.2f}
-- YTD Actual Spend: R{ytd_actual:,.2f}
-- YTD Budget: R{budget_ytd:,.2f}
-- Remaining Budget (After Quote Amount): R{remaining_budget:,.2f}
-- Recommended Vendor: {user_recommended_vendor}
-- Justification: "{user_justification}"
-- Conflict of Interest Declared: {coi_details}
-
-Tasks:
-1. Document Cross-Verification: Read the attached quote files, cross-verify line item pricing, and confirm whether the attached quotes match the proposed estimated cost of R{cost:,.2f}.
-
-2. Financial & Budget Impact Analysis: Analyze how this proposed purchase impacts the GL account, ie. the impact on the remaining budget (over-expenditure, worsens a deficit, or breaches required buffer thresholds).
-
-3. Vendor Choice Evaluation: Provide a 2-sentence summary comparing vendor choices and identifying the most cost-effective option.
-
-4. Justification & Operational Audit: Evaluate the choice of "{user_recommended_vendor}" against the provided justification ("{user_justification}"). Cross-reference the attached quotes to confirm whether operational claims (such as specific inclusions, scope, or terms) are factually accurate.
-
-5. Risk Audit: Flag any potential compliance risks, mathematical errors, missing line items, or hidden costs across all bids.
-
-6. Final Recommendation: Provide an explicit compliance recommendation confirming or challenging whether the user's justification warrants the cost variance and budget impact.
-
-At the absolute end of your response, output exactly these two lines:
-AI_RECOMMENDATION_LINE: [Your 1-sentence verdict]"""
-
-
 def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, custom_prompt=None):
     """Sends uploaded files and financial context to Gemini using the database system prompt or fallback template."""
     if not GEMINI_AVAILABLE or not os.getenv("GEMINI_API_KEY"):
@@ -463,8 +429,8 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None, 
     if not is_active:
         return "AI Quote Evaluation is currently inactive in system prompts."
 
-    prompt_template = (prompt_row.get('prompt_template') if prompt_row else None) or FALLBACK_QUOTE_PROMPT
-    model_name = (prompt_row.get('selected_model') if prompt_row else None) or "gemini-2.5-flash"
+    prompt_template = (prompt_row.get('prompt_template') if prompt_row else None)
+    model_name = (prompt_row.get('selected_model') if prompt_row else None) or "gemini-3.5-flash"
 
     api_key = os.getenv("GEMINI_API_KEY")
     
