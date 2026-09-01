@@ -305,9 +305,14 @@
                 </div>
             {% endif %}
 
-            <form action="/po_form" method="POST" enctype="multipart/form-data">
+            <form id="po-form" action="/po_form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
                 <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
+                <!-- Hidden or visible input for Approval Governance Routing -->
+                <input type="hidden" id="approval_requirement" name="approval_requirement">
+
+                <!-- Status input/display for Lifecycle and Compliance State -->
+                <input type="text" id="system_status" name="system_status" readonly>
 
                 <!-- Purchase Order Details -->
                 <div class="section-header" style="margin-top: 0;">Purchase Order Details</div>
@@ -537,6 +542,34 @@
                     <input type="text" name="actioned_by" class="form-control" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}" style="width: 240px;">
                 </div>
 
+                <!-- CHANGES 2 and 3 replace this
+                <div class="form-row">
+                    <label class="form-label">System Compliance Status</label>
+                    <input 
+                        type="text" 
+                        id="system_status" 
+                        name="system_status" 
+                        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
+                        readonly 
+                        class="form-control status-banner"
+                    >
+                </div>
+                <-->
+
+                <!-- CHANGE 3: Dedicated input field for Governance Sign-off Tier -->
+                <div class="form-row">
+                    <label class="form-label">Governance Sign-off Tier</label>
+                    <input 
+                        type="text" 
+                        id="approval_requirement" 
+                        name="approval_requirement" 
+                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
+                        readonly 
+                        class="form-control"
+                    >
+                </div>
+
+                <!-- CHANGE 4: Dedicated input field for System Compliance Status -->
                 <div class="form-row">
                     <label class="form-label">System Compliance Status</label>
                     <input 
@@ -702,8 +735,120 @@
         }
     }
 
-    // 4. Dynamic calculation engine for SYSTEM STATUS (Aligned with Authority Matrix)
+    // New separation between approval requirement and system status calculation
     function calculateSystemStatus() {
+        const submissionStatusSelect = document.querySelector('[name="submission_status"]');
+        const submissionStatus = submissionStatusSelect?.value || '';
+        const isBudgetedSelect = document.querySelector('[name="is_budgeted"]');
+        const glCode = document.querySelector('[name="gl_code"]')?.value || '';
+        const expenseType = document.querySelector('[name="expense_type"]')?.value || '';
+        const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
+        const quotesProvided = parseInt(document.getElementById('quotes_provided')?.value) || 0;
+        
+        const totalBudget = parseFloat(document.getElementById('fin-total-budget')?.value) || 0;
+        const ytdActual = parseFloat(document.getElementById('fin-ytd-actual')?.value) || 0;
+        
+        const remainingAnnualBudget = totalBudget - ytdActual;
+        const isOverAnnualBudget = totalBudget > 0 && estimatedCost > remainingAnnualBudget;
+
+        // 1. HARD COMPLIANCE LOCK: Over Annual Budget forces Unbudgeted Workflow
+        if (isOverAnnualBudget && isBudgetedSelect) {
+            if (isBudgetedSelect.value !== 'No') {
+                isBudgetedSelect.value = 'No';
+                alert("⚠️ BUDGET EXCEEDED: The requested amount exceeds the remaining Total Annual Budget. This transaction has been automatically reclassified as 'Unbudgeted' and requires Extraordinary Board/HOA approval.");
+            }
+        }
+
+        // 2. DISABLE/ENABLE SUBMISSION OPTIONS BASED ON BUDGET OVERRUN
+        if (submissionStatusSelect) {
+            Array.from(submissionStatusSelect.options).forEach(option => {
+                if (option.value === 'Submit for Approval' || option.value === 'Sent') {
+                    if (isOverAnnualBudget || isBudgetedSelect?.value === 'No') {
+                        option.disabled = true;
+                        if (option.selected) {
+                            submissionStatusSelect.value = 'Submit for Finance Review';
+                        }
+                    } else {
+                        option.disabled = false;
+                    }
+                }
+            });
+        }
+
+        const currentIsBudgeted = isBudgetedSelect?.value || '';
+
+        // Determine required quotes per matrix
+        let requiredQuotes = 0;
+        if (expenseType === 'Capital' || expenseType === 'Maintenance' || currentIsBudgeted === 'No') {
+            requiredQuotes = 3;
+        } else if (currentIsBudgeted === 'Yes') {
+            if (estimatedCost > 50000) requiredQuotes = 3;
+            else if (estimatedCost >= 10001) requiredQuotes = 2;
+            else requiredQuotes = 0;
+        }
+
+        // --- PART A: CALCULATE APPROVAL REQUIREMENT (Governance & Delegation) ---
+        let approvalRequirement = '';
+        if (isOverAnnualBudget || currentIsBudgeted === 'No') {
+            if (estimatedCost <= 30000) {
+                approvalRequirement = 'Unbudgeted Spend ≤ R30k (Requires Board Resolution)';
+            } else {
+                approvalRequirement = 'Unbudgeted Exceeds R30,000 (Requires Full Board + Homeowner/AGM Ratification)';
+            }
+        } else if (expenseType === 'Capital') {
+            approvalRequirement = 'Capital Expenditure Reserve Allocation (Requires Board & AGM Ratification)';
+        } else if (expenseType === 'Service Contract' || expenseType === 'Maintenance') {
+            approvalRequirement = 'Service Provider Contract SLA (Requires Full Board Sign-off)';
+        } else if (currentIsBudgeted === 'Yes') {
+            if (estimatedCost <= 10000) {
+                approvalRequirement = 'Low-Value Operational (Requires Estate Manager Sign-off)';
+            } else if (estimatedCost <= 50000) {
+                approvalRequirement = 'Mid-Value Operational (Requires Chair + Board Member)';
+            } else {
+                approvalRequirement = 'High-Value Operational (Requires Chair + 2 Board Members)';
+            }
+        } else {
+            approvalRequirement = 'Pending Context Classification';
+        }
+
+        // --- PART B: CALCULATE SYSTEM STATUS (Lifecycle & Compliance Blocks) ---
+        let systemStatus = '';
+        if (submissionStatus === 'Approved') {
+            systemStatus = '✅ APPROVED: Compliance Process Complete';
+        } else if (submissionStatus === 'Run AI Analysis') {
+            systemStatus = '🤖 AI ANALYSIS: Reviewing Compliance & Budget Impact';
+        } else if (submissionStatus === 'Submit for Finance Review') {
+            systemStatus = '🔍 FINANCE REVIEW: Awaiting Finance Committee Sign-off';    
+        } else if (submissionStatus === 'Sent') {
+            systemStatus = '📬 SENT: Approval Request Dispatched via Email'; 
+        } else if (submissionStatus === 'Rejected') {
+            systemStatus = '🛑 REJECTED: Final Authorisation Declined';
+        } else if ((isOverAnnualBudget || currentIsBudgeted === 'No') && quotesProvided < 3) {
+            systemStatus = `❌ UNBUDGETED BLOCKED: Insufficient Quotes (${quotesProvided}/3 Required)`;
+        } else if (currentIsBudgeted === 'Yes' && !glCode) {
+            systemStatus = '⚠️ ACTION REQUIRED: Select a valid GL description';
+        } else if (!expenseType) {
+            systemStatus = '⚠️ ACTION REQUIRED: Select Expense Type';
+        } else if (quotesProvided < requiredQuotes) {
+            systemStatus = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
+        } else {
+            systemStatus = '🟢 READY: Compliance Met, Ready for Routing';
+        }
+
+        // Update Form Inputs / Outputs
+        const systemStatusInput = document.getElementById('system_status') || document.querySelector('[name="system_status"]');
+        if (systemStatusInput) {
+            systemStatusInput.value = systemStatus;
+        }
+
+        const approvalRequirementInput = document.getElementById('approval_requirement') || document.querySelector('[name="approval_requirement"]');
+        if (approvalRequirementInput) {
+            approvalRequirementInput.value = approvalRequirement;
+        }
+    }
+
+    // 4. Dynamic calculation engine for SYSTEM STATUS (Aligned with Authority Matrix)
+    function calculateSystemStatus_consolidated() {
         const submissionStatusSelect = document.querySelector('[name="submission_status"]');
         const submissionStatus = submissionStatusSelect?.value || '';
         const isBudgetedSelect = document.querySelector('[name="is_budgeted"]');
