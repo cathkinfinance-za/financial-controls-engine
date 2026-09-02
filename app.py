@@ -375,6 +375,9 @@ def po_form():
                 conn.rollback()
                 message = f"Error saving purchase order: {e}"
 
+    selected_po_num = request.args.get("po_number")
+    audit_logs = []
+
     try:
         with conn.cursor() as cur:
             cur.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code ASC;")
@@ -382,8 +385,7 @@ def po_form():
 
             cur.execute("SELECT po_number, description FROM po_log ORDER BY created_at DESC;")
             saved_pos = cur.fetchall()
-
-            selected_po_num = request.args.get("po_number")
+            
             if selected_po_num:
                 cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
@@ -393,6 +395,23 @@ def po_form():
                     selected_po['quote_urls'] = [
                         u.strip() for u in raw_filepath.split(',') if u.strip()
                     ]
+
+
+                    # Fetch audit trail history for this PO
+                    try:
+                        cur.execute(
+                            """
+                            SELECT action_timestamp, actor_email, action_type, notes 
+                            FROM workflow_control_log 
+                            WHERE po_id = %s OR po_number = %s 
+                            ORDER BY action_timestamp DESC
+                            """,
+                            (selected_po.get('id'), selected_po.get('po_number'))
+                        )
+                        audit_logs = cur.fetchall()
+                    except Exception as audit_err:
+                        print(f"Error fetching audit logs: {audit_err}")
+                        audit_logs = []
 
                     if selected_po.get('gl_code'):
                         try:

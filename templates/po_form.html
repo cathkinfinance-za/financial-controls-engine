@@ -545,13 +545,48 @@
                     </select>
                 </div>
 
+
+                <div class="section-header">Procurement & Audit History Log</div>
+                    <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
+                        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f8f9fa; border-bottom: 1px solid var(--border-color); text-align: left;">
+                                    <th style="padding: 8px;">Timestamp</th>
+                                    <th style="padding: 8px;">Actor</th>
+                                    <th style="padding: 8px;">Action / Status</th>
+                                    <th style="padding: 8px;">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if audit_logs %}
+                                    {% for log in audit_logs %}
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
+                                        <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                        <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
+                                        <td style="padding: 8px;">{{ log.notes or '-' }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="4" style="padding: 12px; text-align: center; color: var(--text-muted);">No audit events recorded for this purchase order yet.</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">Save Purchase Order</button>
                 </div>
             </form>
         </div>
+
+
     </div>
 </div>
+
+
 
 <script>
     // Live filter JS for GL code dropdown search input
