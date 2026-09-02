@@ -531,10 +531,17 @@
                         <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
                         <option value="Run AI Analysis" {% if selected_po and selected_po.submission_status == "Run AI Analysis" %}selected{% endif %}>Run AI Analysis</option>
                         <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
+                        
+                        <!-- System/Committee controlled statuses (disabled for manual selection) -->
+                        <option value="Finance Recommended" {% if selected_po and selected_po.submission_status == "Finance Recommended" %}selected{% endif %} disabled>Finance Recommended (System)</option>
+                        <option value="Finance Rejected" {% if selected_po and selected_po.submission_status == "Finance Rejected" %}selected{% endif %} disabled>Finance Rejected (System)</option>
+                        
                         <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
-                        <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %}>Approved</option>
-                        <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %}>Rejected</option>
+                        
+                        <!-- Final approval statuses (disabled for manual selection) -->
+                        <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %} disabled>Approved (System)</option>
+                        <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %} disabled>Rejected (System)</option>
                     </select>
                 </div>
 
