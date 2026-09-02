@@ -158,6 +158,23 @@ def fetch_approval_replies():
         log(f"IMAP Processing Error: {e}", "ERROR")
         return {}, {}, {}, {}
 
+def verify_approver_authority(cursor, sender_email, required_permission):
+    cursor.execute(
+        "SELECT approval_permission FROM approvers WHERE LOWER(email) = LOWER(%s);",
+        (sender_email,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return False
+    
+    user_permission = row.get('approval_permission')
+    if required_permission == 'Approval Authority' and user_permission == 'Approval Authority':
+        return True
+    if required_permission == 'Finance Review' and user_permission in ['Finance Review', 'Approval Authority']:
+        return True
+        
+    return False
+
 def process_replies():
     log("Starting Inbox Reply Processor...")
     recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
@@ -240,16 +257,21 @@ def process_replies():
 
                 record = po_id_map.get(po_id)
                 if record:
-                    cursor.execute("""
-                        UPDATE po_log 
-                        SET submission_status = 'Approved',
-                            actioned_by = %s,
-                            actioned_date = %s
-                        WHERE id = %s;
-                    """, (meta.get("sender"), current_timestamp, record['id']))
-                    conn.commit()
-                    write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
-                    log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
+                    # ---> AUTHORIZATION CHECK <---
+                    if verify_approver_authority(cursor, meta["sender"], 'Approval Authority'):
+                        cursor.execute("""
+                            UPDATE po_log 
+                            SET submission_status = 'Approved',
+                                actioned_by = %s,
+                                actioned_date = %s
+                            WHERE id = %s;
+                        """, (meta.get("sender"), current_timestamp, record['id']))
+                        conn.commit()
+                        write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
+                        log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
+                    else:
+                        log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {record['po_number']}", "WARNING")
+                        write_control_log(conn, record['po_number'], "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
 
             for raw_po_id, meta in final_rejections.items():
                 try:
@@ -276,6 +298,8 @@ def process_replies():
         if 'conn' in locals() and conn:
             conn.close()
             log("PostgreSQL connection closed.")
+
+
 
 if __name__ == "__main__":
     process_replies()
