@@ -444,6 +444,7 @@ def po_form():
         saved_pos=saved_pos,
         selected_po=selected_po,
         financial_summary=financial_summary,
+        audit_logs=audit_logs,
         message=message
     )
 
