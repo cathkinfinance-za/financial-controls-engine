@@ -95,7 +95,7 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    po_match = re.search(r'\[([A-Za-z0-9_-]+)\]', decoded_subject)
+                    po_match = re.search(r'\[([A-Za-z0-9_ \-]+)\]', decoded_subject)
                     if not po_match:
                         continue
 
