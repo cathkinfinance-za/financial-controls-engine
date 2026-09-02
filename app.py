@@ -396,19 +396,22 @@ def po_form():
                         u.strip() for u in raw_filepath.split(',') if u.strip()
                     ]
 
-
                    # Fetch audit trail history for this PO
                     try:
+                        target_po = str(selected_po.get('po_number', '')).strip()
+                        print(f"DEBUG -> Querying audit logs for trimmed PO number: '{target_po}'")
+                        
                         cur.execute(
                             """
                             SELECT timestamp AS action_timestamp, actor_email, action_type, system_notes AS notes 
                             FROM workflow_control_log 
-                            WHERE po_number = %s 
+                            WHERE TRIM(po_number) ILIKE TRIM(%s) 
                             ORDER BY timestamp DESC
                             """,
-                            (selected_po.get('po_number'),)
+                            (target_po,)
                         )
                         audit_logs = cur.fetchall()
+                        print(f"DEBUG -> Successfully fetched {len(audit_logs)} audit log entries.")
                     except Exception as audit_err:
                         print(f"Error fetching audit logs: {audit_err}")
                         audit_logs = []
