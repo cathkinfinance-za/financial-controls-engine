@@ -245,6 +245,10 @@ def po_form():
         combined_quote_filepath = ",".join(all_urls) if all_urls else None
         quotes_provided = len(all_urls)
 
+        print(f"DEBUG -> Existing String: {existing_filepath_str}")
+        print(f"DEBUG -> New URLs: {new_urls}")
+        print(f"DEBUG -> Combined Filepath to Save: {combined_quote_filepath}")
+
         # Run AI Analysis if explicitly selected or if new files were uploaded
         if submission_status == "Run AI Analysis" or gemini_file_payloads:
             if not gemini_file_payloads and combined_quote_filepath:
@@ -264,6 +268,7 @@ def po_form():
                 ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
                 if ai_summary:
                     ai_recommendation_summary = ai_summary
+                    
 
         if new_po:
             try:
