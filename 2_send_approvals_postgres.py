@@ -316,7 +316,8 @@ def process_postgres_approvals():
 
             for idx, record in enumerate(records, start=1):
                 po_num = str(record.get('po_number', '')).strip()
-                log(f"--- Processing Record {idx}/{len(records)}: PO #{po_num} ---")
+                po_id = str(record.get('id', '')).strip()
+                log(f"--- Processing Record {idx}/{len(records)}: PO #{po_num} (ID: {po_id}) ---")
 
                 if not po_num:
                     log("Skipping record: Missing PO number.", "WARNING")
@@ -378,12 +379,13 @@ def process_postgres_approvals():
                 else:
                     attachments_section = "\nAttached Quote Documents:\n  No documents attached.\n"
 
-                email_subject = f"[{po_num}] Approval Required: {desc_val}"
+                email_subject = f"[{po_num}] - Approval Required: {desc_val} - PO-ID: {po_id}]"
                 email_body = f"""Hello,
 
 An expenditure item has been submitted for approval.
 
 Item Details:
+- PO ID: {po_id}
 - PO Number: {po_num}
 - Description: {desc_val}
 - Expense Type: {expense_type}

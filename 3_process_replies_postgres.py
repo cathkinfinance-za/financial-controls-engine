@@ -43,6 +43,14 @@ def write_control_log(conn, po_number, action_type, user_email, notes=""):
     except Exception as e:
         log(f"Failed to write control log: {e}", "WARNING")
 
+def extract_po_id(subject, body):
+    # Search for [PO-ID: 123] pattern in subject first, then body
+    pattern = r"\[PO-ID:\s*(\d+)\]"
+    match = re.search(pattern, subject or "")
+    if not match:
+        match = re.search(pattern, body or "")
+    return int(match.group(1)) if match else None
+
 def fetch_approval_replies():
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
@@ -172,12 +180,18 @@ def process_replies():
             )
             records = cursor.fetchall()
             po_map = {str(row['po_number']).strip().lower(): row for row in records if row.get('po_number')}
+            po_id_map = {row['id']: row for row in records if row.get('id')}
 
             current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
             # 3. PROCESS FINANCE REVIEW RECOMMENDATIONS
-            for po_num, meta in recommendations_approval.items():
-                record = po_map.get(po_num.lower())
+            for raw_po_id, meta in recommendations_approval.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
                         UPDATE po_log 
@@ -188,10 +202,15 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), "Finance Committee recommended for approval.")
-                    log(f"✅ PO '{record['po_number']}' updated to FINANCE RECOMMENDED.")
+                    log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE RECOMMENDED.")
 
-            for po_num, meta in recommendations_rejection.items():
-                record = po_map.get(po_num.lower())
+            for raw_po_id, meta in recommendations_rejection.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
                         UPDATE po_log 
@@ -201,12 +220,18 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
+
                     write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), "Finance Committee recommended for rejection.")
-                    log(f"❌ PO '{record['po_number']}' updated to FINANCE REJECTED.")
+                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE REJECTED.")
 
             # 4. PROCESS FINAL APPROVALS & REJECTIONS
-            for po_num, meta in final_approvals.items():
-                record = po_map.get(po_num.lower())
+            for raw_po_id, meta in final_approvals.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_map.get(po_id)
                 if record:
                     cursor.execute("""
                         UPDATE po_log 
@@ -219,8 +244,13 @@ def process_replies():
                     write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
                     log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
 
-            for po_num, meta in final_rejections.items():
-                record = po_map.get(po_num.lower())
+            for raw_po_id, meta in final_rejections.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id.get(po_id)
                 if record:
                     cursor.execute("""
                         UPDATE po_log 
@@ -230,8 +260,8 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), "Marked as rejected via email reply.")
-                    log(f"❌ PO '{record['po_number']}' updated to REJECTED.")
+                    write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
+                    log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to APPROVED.")
 
     except Exception as db_err:
         log(f"Database sync error: {db_err}", "CRITICAL")
