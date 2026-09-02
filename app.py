@@ -437,8 +437,6 @@ def po_form():
     finally:
         conn.close()
 
-    print(f"DEBUG RENDER -> audit_logs type: {type(audit_logs)}, content: {audit_logs}")
-
     return render_template(
         "po_form.html", 
         gl_records=gl_records,

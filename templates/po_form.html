@@ -561,10 +561,10 @@
                                 {% if audit_logs %}
                                     {% for log in audit_logs %}
                                     <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 8px; color: var(--text-muted);">{{ log[0] }}</td>
-                                        <td style="padding: 8px; font-weight: 500;">{{ log[1] }}</td>
-                                        <td style="padding: 8px;"><span class="status-badge">{{ log[2] }}</span></td>
-                                        <td style="padding: 8px;">{{ log[3] or '-' }}</td>
+                                        <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
+                                        <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                        <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
+                                        <td style="padding: 8px;">{{ log.notes or '-' }}</td>
                                     </tr>
                                     {% endfor %}
                                 {% else %}
