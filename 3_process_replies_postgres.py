@@ -75,7 +75,8 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        status, messages = mail.search(None, 'SUBJECT "Approval Required"')
+        # Pull the latest emails and let your Python logic filter them:
+        status, messages = mail.search(None, 'ALL')
         if status != "OK" or not messages or messages == [b'']:
             log("No matching approval emails found in inbox.")
             mail.logout()
