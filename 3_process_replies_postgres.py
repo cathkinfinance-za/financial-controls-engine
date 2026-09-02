@@ -279,7 +279,7 @@ def process_replies():
                 except (ValueError, TypeError):
                     continue
 
-                record = po_id.get(po_id)
+                record = po_id_map.get(po_id)
                 if record:
                     cursor.execute("""
                         UPDATE po_log 
