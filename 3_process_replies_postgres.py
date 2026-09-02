@@ -112,10 +112,6 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    po_id = extract_po_id(decoded_subject, body)
-                    if not po_id:
-                        continue
-
                     body = ""
                     if msg.is_multipart():
                         for part in msg.walk():
@@ -128,6 +124,10 @@ def fetch_approval_replies():
                         payload = msg.get_payload(decode=True)
                         if isinstance(payload, bytes):
                             body = payload.decode(errors='ignore')
+                    
+                    po_id = extract_po_id(decoded_subject, body)
+                    if not po_id:
+                        continue
 
                     top_reply = body.strip()
                     reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
