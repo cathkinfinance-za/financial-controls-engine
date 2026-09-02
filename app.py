@@ -202,7 +202,7 @@ def po_form():
 
         existing_urls = [u.strip() for u in existing_filepath_str.split(",") if u.strip()]
 
-        # Filter out any files marked for deletion from JavaScript
+        # Filter out any files marked for deletion from the frontend UI
         if deleted_files_raw:
             deleted_list = [df.strip() for df in deleted_files_raw.split(",") if df.strip()]
             existing_urls = [
@@ -245,10 +245,25 @@ def po_form():
         combined_quote_filepath = ",".join(all_urls) if all_urls else None
         quotes_provided = len(all_urls)
 
-        if gemini_file_payloads:
-            ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
-            if ai_summary:
-                ai_recommendation_summary = ai_summary
+        # Run AI Analysis if explicitly selected or if new files were uploaded
+        if submission_status == "Run AI Analysis" or gemini_file_payloads:
+            if not gemini_file_payloads and combined_quote_filepath:
+                for file_url in combined_quote_filepath.split(','):
+                    clean_url = file_url.strip()
+                    if clean_url:
+                        try:
+                            resp = requests.get(clean_url, timeout=10)
+                            if resp.status_code == 200:
+                                filename = clean_url.split('/')[-1].split('?')[0]
+                                content_type = resp.headers.get('Content-Type', 'application/pdf')
+                                gemini_file_payloads.append((resp.content, filename, content_type))
+                        except Exception as fetch_err:
+                            print(f"Error fetching existing attachment for AI analysis: {fetch_err}")
+
+            if gemini_file_payloads:
+                ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
+                if ai_summary:
+                    ai_recommendation_summary = ai_summary
 
         if new_po:
             try:
