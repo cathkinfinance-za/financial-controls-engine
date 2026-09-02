@@ -375,7 +375,8 @@ def po_form():
                 conn.rollback()
                 message = f"Error saving purchase order: {e}"
 
-    selected_po_num = request.args.get("po_number")
+    # Check URL args first, then fall back to form data if it's a POST request
+    selected_po_num = request.args.get("po_number") or request.form.get("po_number")
     audit_logs = []
 
     try:
