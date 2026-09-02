@@ -44,11 +44,9 @@ def write_control_log(conn, po_number, action_type, user_email, notes=""):
         log(f"Failed to write control log: {e}", "WARNING")
 
 def extract_po_id(subject, body):
-    # Search for [PO-ID: 123] pattern in subject first, then body
-    pattern = r"\[PO-ID:\s*(\d+)\]"
-    match = re.search(pattern, subject or "")
-    if not match:
-        match = re.search(pattern, body or "")
+    # Combine subject and body and match PO-ID: followed by digits flexibly
+    text_to_search = f"{subject or ''} {body or ''}"
+    match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
