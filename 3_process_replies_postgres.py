@@ -51,6 +51,15 @@ def extract_po_id(subject, body):
         match = re.search(pattern, body or "")
     return int(match.group(1)) if match else None
 
+
+def parse_incoming_reply(email_subject, email_body):
+    text_to_search = f"{email_subject} {email_body}"
+    # Match [PO-ID: 3] or PO-ID: 3
+    match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return None
+
 def fetch_approval_replies():
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
@@ -103,11 +112,9 @@ def fetch_approval_replies():
                             else:
                                 decoded_subject += str(text)
 
-                    po_match = re.search(r'\[([A-Za-z0-9_ \-]+)\]', decoded_subject)
-                    if not po_match:
+                    po_id = extract_po_id(decoded_subject, body)
+                    if not po_id:
                         continue
-
-                    po_number = po_match.group(1).strip()
 
                     body = ""
                     if msg.is_multipart():
@@ -136,13 +143,13 @@ def fetch_approval_replies():
 
                     # 3. Categorize reply
                     if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
-                        recommendations_rejection[po_number] = {"sender": sender_clean}
+                        recommendations_rejection[po_id] = {"sender": sender_clean}
                     elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
-                        recommendations_approval[po_number] = {"sender": sender_clean}
+                        recommendations_approval[po_id] = {"sender": sender_clean}
                     elif "REJECTED" in full_payload or "REJECT" in full_payload:
-                        final_rejections[po_number] = {"sender": sender_clean}
+                        final_rejections[po_id] = {"sender": sender_clean}
                     elif "APPROVED" in full_payload or "APPROVE" in full_payload:
-                        final_approvals[po_number] = {"sender": sender_clean}
+                        final_approvals[po_id] = {"sender": sender_clean}
 
         mail.logout()
         return recommendations_approval, recommendations_rejection, final_approvals, final_rejections
@@ -165,18 +172,18 @@ def process_replies():
         ensure_audit_log_table(conn)
         
         # 2. Combine all unique PO numbers across all categories
-        all_po_numbers = list(set(
+        all_po_ids = list(set(
             list(recommendations_approval.keys()) + 
             list(recommendations_rejection.keys()) + 
             list(final_approvals.keys()) + 
             list(final_rejections.keys())
         ))
-        log(f"Found replies for PO numbers: {all_po_numbers}")
+        log(f"Found replies for PO IDs: {all_po_ids}")
 
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM po_log WHERE LOWER(po_number) = ANY(%s);",
-                ([p.lower() for p in all_po_numbers],)
+                "SELECT * FROM po_log WHERE id = ANY(%s);",
+                (all_po_ids,)
             )
             records = cursor.fetchall()
             po_map = {str(row['po_number']).strip().lower(): row for row in records if row.get('po_number')}
@@ -210,7 +217,7 @@ def process_replies():
                 except (ValueError, TypeError):
                     continue
 
-                record = po_id.get(po_id)
+                record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
                         UPDATE po_log 
@@ -231,7 +238,7 @@ def process_replies():
                 except (ValueError, TypeError):
                     continue
 
-                record = po_map.get(po_id)
+                record = po_id_map.get(po_id)
                 if record:
                     cursor.execute("""
                         UPDATE po_log 
@@ -260,8 +267,8 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-                    write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
-                    log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to APPROVED.")
+                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), "Marked as rejected via email reply.")
+                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to REJECTED.")
 
     except Exception as db_err:
         log(f"Database sync error: {db_err}", "CRITICAL")
