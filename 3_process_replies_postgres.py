@@ -127,6 +127,7 @@ def fetch_approval_replies():
                             body = payload.decode(errors='ignore')
                     
                     po_id = extract_po_id(decoded_subject, body)
+                    log(f"Inspecting Subject: '{decoded_subject}' | Extracted PO-ID: {po_id}")
                     if not po_id:
                         continue
 
