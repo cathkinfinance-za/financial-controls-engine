@@ -397,16 +397,16 @@ def po_form():
                     ]
 
 
-                    # Fetch audit trail history for this PO
+                   # Fetch audit trail history for this PO
                     try:
                         cur.execute(
                             """
-                            SELECT action_timestamp, actor_email, action_type, notes 
+                            SELECT timestamp AS action_timestamp, actor_email, action_type, system_notes AS notes 
                             FROM workflow_control_log 
-                            WHERE po_id = %s OR po_number = %s 
-                            ORDER BY action_timestamp DESC
+                            WHERE po_number = %s 
+                            ORDER BY timestamp DESC
                             """,
-                            (selected_po.get('id'), selected_po.get('po_number'))
+                            (selected_po.get('po_number'),)
                         )
                         audit_logs = cur.fetchall()
                     except Exception as audit_err:
