@@ -321,10 +321,10 @@
                     {% if project %}Project Definitions{% else %}Create New Project{% endif %}
                 </div>
 
-                <div class="form-row">
-                    <label class="form-label">Project Reference</label>
-                    <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '2026_02' }}" style="width: 200px;">
-                </div>
+             <div class="form-row">
+                <label class="form-label">Project Reference</label>
+                <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '' }}" style="width: 200px;">
+            </div>
 
                 <div class="form-row">
                     <label class="form-label">Name</label>
@@ -349,10 +349,10 @@
                 <div class="form-row">
                     <label class="form-label">GL Code</label>
                     <div class="gl-inline-group">
-                        <input type="text" name="gl_code" class="form-control" value="{{ project.gl_code if project else '2400/040' }}">
+                        <input type="text" name="gl_code" class="form-control" value="{{ project.gl_code if project else '' }}">
                         <div>
-                            <input type="text" name="gl_title" class="form-control" value="{{ project.gl_title if project else 'Operations' }}" placeholder="Title" style="margin-bottom: 4px;">
-                            <input type="text" name="gl_sub" class="form-control" value="{{ project.gl_sub if project else 'Security Bit 20/12 subscription' }}" placeholder="Sub Description">
+                            <input type="text" name="gl_title" class="form-control" value="{{ project.gl_title if project else '' }}" placeholder="Title" style="margin-bottom: 4px;">
+                            <input type="text" name="gl_sub" class="form-control" value="{{ project.gl_sub if project else '' }}" placeholder="Sub Description">
                         </div>
                     </div>
                 </div>
