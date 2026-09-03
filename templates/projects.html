@@ -316,7 +316,7 @@
             </div>
 
             <form action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
-                
+                <input type="hidden" name="project_id" value="{{ project.id if project and project.id is not string else '' }}">
                 <div class="section-header">
                     {% if project %}Project Definitions{% else %}Create New Project{% endif %}
                 </div>
