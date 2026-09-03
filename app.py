@@ -650,6 +650,7 @@ def view_audit_log():
 
 # --- PROJECTS & PROCUREMENT ---
 @app.route("/projects", methods=["GET"])
+@app.route("/projects/", methods=["GET"])
 @app.route("/projects/<int:project_id>", methods=["GET"])
 def projects_page(project_id=None):
     conn = get_db_connection()
