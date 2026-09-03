@@ -328,7 +328,7 @@
 
                 <div class="form-row">
                     <label class="form-label">Name</label>
-                    <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Security System Replacement - 2">
+                    <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Name">
                 </div>
 
                 <div class="form-row">
@@ -567,14 +567,13 @@
                     <label class="form-label">Executive Sourcing Recommendation</label>
                     <textarea name="executive_sourcing_recommendation" class="form-control" style="min-height: 140px;">{{ project.executive_sourcing_recommendation if project else '' }}</textarea>
                 </div>
+                {% endif %}
 
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">
                         {% if project %}Save Project Definitions{% else %}Create Project{% endif %}
                     </button>
                 </div>
-
-                {% endif %}
 
             </form>
         </div>
