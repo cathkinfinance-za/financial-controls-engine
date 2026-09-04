@@ -888,7 +888,7 @@ def update_project(project_id):
                     SET amount = %s 
                     WHERE id = %s;
                 """, (amount_val, item_id))
-                
+
             elif key.startswith("pricing_category_"):
                 item_id = key.replace("pricing_category_", "")
                 cursor.execute("""
@@ -1068,12 +1068,24 @@ def finance_minutes():
             """, (m['id'],))
             m['action_items'] = cursor.fetchall()
 
+        # Attach action items to each meeting card (include action_notes)
+        for m in meetings:
+            cursor.execute("""
+                SELECT id, action_description, responsible_person, target_date, status, action_notes 
+                FROM meeting_action_items 
+                WHERE meeting_id = %s ORDER BY id ASC;
+            """, (m['id'],))
+            m['action_items'] = cursor.fetchall()
+
     conn.close()
     return render_template('minutes.html', meetings=meetings)
 
 @app.route('/update_action_item', methods=['POST'])
 def update_action_item():
     action_id = request.form.get('action_id')
+    action_description = request.form.get('action_description')
+    responsible_person = request.form.get('responsible_person')
+    target_date_val = request.form.get('target_date')
     status = request.form.get('status')
     action_notes = request.form.get('action_notes')
 
@@ -1081,10 +1093,13 @@ def update_action_item():
     with conn.cursor() as cursor:
         cursor.execute("""
             UPDATE meeting_action_items
-            SET status = %s,
+            SET action_description = %s,
+                responsible_person = %s,
+                target_date = %s,
+                status = %s,
                 action_notes = %s
             WHERE id = %s;
-        """, (status, action_notes, action_id))
+        """, (action_description, responsible_person, target_date_val, status, action_notes, action_id))
         conn.commit()
     conn.close()
 
