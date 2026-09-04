@@ -627,27 +627,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function calculateAll() {
         const vendorCosts = {};
-        const amountInputs = document.querySelectorAll('#lineItemsMatrix .item-amount');
-        const lineQtyInputs = document.querySelectorAll('#lineItemsMatrix .item-qty');
-        lineQtyInputs.forEach(input => input.addEventListener('input', calculateAll));
-        
-        amountInputs.forEach(input => {
-            const vendorId = input.getAttribute('data-vendor-id');
-            const row = input.closest('tr');
-            const categorySelect = row ? row.querySelector('.item-category') : null;
+        const rows = document.querySelectorAll('#lineItemsMatrix tbody tr');
 
-            if (!vendorCosts[vendorId]) {
-                vendorCosts[vendorId] = 0;
-            }
-
+        rows.forEach(row => {
+            const categorySelect = row.querySelector('.item-category');
             const category = categorySelect ? categorySelect.value : 'One-Off Cost';
-            const amount = parseFloat(input.value) || 0;
+            const multiplier = category === 'Annual Cost' ? 5 : 1;
 
-            if (category === 'Annual Cost') {
-                vendorCosts[vendorId] += amount * 5;
-            } else {
-                vendorCosts[vendorId] += amount;
-            }
+            const amountInputs = row.querySelectorAll('.item-amount');
+            amountInputs.zones?.forEach || amountInputs.forEach(input => {
+                const vendorId = input.getAttribute('data-vendor-id');
+                if (!vendorCosts[vendorId]) {
+                    vendorCosts[vendorId] = 0;
+                }
+                const amount = parseFloat(input.value) || 0;
+                vendorCosts[vendorId] += amount * multiplier;
+            });
         });
 
         let lowestCost = Infinity;
@@ -679,14 +674,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
+        // Re-calculate criteria composite score matrix
         const matrix = document.getElementById('criteriaMatrix');
         if (!matrix) return;
 
         let totalWeight = 0;
         const vendorTotals = {};
 
-        const weightInputs = matrix.querySelectorAll('.weight-input');
-        weightInputs.forEach(input => {
+        matrix.querySelectorAll('.weight-input').forEach(input => {
             totalWeight += parseFloat(input.value) || 0;
         });
 
@@ -696,13 +691,11 @@ document.addEventListener('DOMContentLoaded', function() {
             totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
         }
 
-        const rows = matrix.querySelectorAll('tbody tr');
-        rows.forEach(row => {
+        matrix.querySelectorAll('tbody tr').forEach(row => {
             const weightInput = row.querySelector('.weight-input');
             const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
 
-            const scores = row.querySelectorAll('.score-display');
-            scores.forEach(scoreSpan => {
+            row.querySelectorAll('.score-display').forEach(scoreSpan => {
                 const vendorId = scoreSpan.getAttribute('data-vendor-id');
                 const score = parseFloat(scoreSpan.getAttribute('data-score')) || 0;
 
