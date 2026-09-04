@@ -262,6 +262,13 @@
 </head>
 <body>
 
+    {% include 'navbar.html' %}
+
+    <div>
+        <a href="/" style="background: #f1f5f9; color: #1e293b; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500;">← Main Dashboard</a>
+    </div>
+    </nav>
+
 <div class="app-layout">
 
     <div class="sidebar">
@@ -283,11 +290,6 @@
 
     <div class="main-content">
         <div class="dashboard-container">
-            <div class="control-bar">
-                <h2 style="margin: 0; font-size: 20px;">Purchase Order Controls</h2>
-                <a href="/" class="btn btn-secondary">Back to Dashboard &gt;</a>
-            </div>
-
             {% with messages = get_flashed_messages() %}
               {% if messages %}
                 {% for message in messages %}
