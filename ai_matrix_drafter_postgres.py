@@ -279,7 +279,7 @@ def execute_phase1(project_id):
                 for v_name in vendor_names:
                     v_id = vendor_map.get(v_name)
                     v_score = float(scores_map.get(v_name, 5.0))
-                    v_justification = justifications_map.get(v_name, "")
+                    v_justification = justifications_map.get(v_name) or justifications_map.get(v_name.strip(), "")
                     line_item_id = f"NON_PRICE_{v_id}_{weighting_id}"
                     cursor.execute("""
                         INSERT INTO options_line_items_non_pricing 
