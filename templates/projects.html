@@ -346,7 +346,7 @@
 
                 <div class="form-row">
                     <label class="form-label" for="phase1_prompt_adjustments">Phase 1 AI Prompt Adjustments</label>
-                    <textarea class="form-control"  id="phase1_prompt_adjustments" name="phase1_prompt_adjustments" placeholder="Add custom instructions, focus areas, or constraints for Phase 1 matrix drafting..."></textarea>
+                    <textarea class="form-control" id="phase1_prompt_adjustments" name="phase1_prompt_adjustments" placeholder="Add custom instructions, focus areas, or constraints for Phase 1 matrix drafting...">{{ project.phase1_prompt_adjustments if project else '' }}</textarea>
                 </div>
 
                 <div class="form-row">

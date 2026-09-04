@@ -776,9 +776,9 @@ def create_project():
     cursor.execute("""
         INSERT INTO projects (
             project_reference, name, project_description, project_objective, 
-            ai_prompt_adjustments, gl_code, gl_title, gl_sub, price_weighting, 
+            ai_prompt_adjustments, phase1_prompt_adjustments, gl_code, gl_title, gl_sub, price_weighting, 
             executive_sourcing_recommendation
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING id;
     """, (
         request.form.get("project_reference", ""),
@@ -786,13 +786,14 @@ def create_project():
         request.form.get("project_description", ""),
         request.form.get("project_objective", ""),
         request.form.get("ai_prompt_adjustments", ""),
+        request.form.get("phase1_prompt_adjustments", ""),
         request.form.get("gl_code", ""),
         request.form.get("gl_title", ""),
         request.form.get("gl_sub", ""),
         price_weighting,
         request.form.get("executive_sourcing_recommendation", "")
     ))
-    
+
     new_id = cursor.fetchone()["id"]
     conn.commit()
     cursor.close()
@@ -930,6 +931,7 @@ def update_project(project_id):
     project_description = request.form.get("project_description", "")
     project_objective = request.form.get("project_objective", "")
     ai_prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
+    phase1_prompt_adjustments = request.form.get("phase1_prompt_adjustments", "")
     gl_code = request.form.get("gl_code", "")
     gl_title = request.form.get("gl_title", "")
     gl_sub = request.form.get("gl_sub", "")
@@ -949,6 +951,7 @@ def update_project(project_id):
                 project_description = %s,
                 project_objective = %s,
                 ai_prompt_adjustments = %s,
+                phase1_prompt_adjustments = %s,
                 gl_code = %s,
                 gl_title = %s,
                 gl_sub = %s,
@@ -957,7 +960,7 @@ def update_project(project_id):
             WHERE id = %s;
         """, (
             project_reference, name, project_description, project_objective, 
-            ai_prompt_adjustments, gl_code, gl_title, gl_sub, 
+            ai_prompt_adjustments, phase1_prompt_adjustments, gl_code, gl_title, gl_sub, 
             price_weighting, executive_sourcing_recommendation, project_id
         ))
 
