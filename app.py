@@ -50,11 +50,15 @@ def login():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Querying your exact columns from the approvers table
+        # Querying exact columns from the approvers table
         cur.execute(
-            "SELECT id, email, password_hash, role, Name, Surname FROM approvers WHERE email = %s", 
-            (email,)
-        )
+                """
+                SELECT id, email, password_hash, role, "Name", "Surname" 
+                FROM approvers 
+                WHERE email = %s
+                """,
+                (email,)
+            )
         user = cur.fetchone()
         cur.close()
         conn.close()
