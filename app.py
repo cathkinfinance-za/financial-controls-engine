@@ -994,14 +994,49 @@ def update_project(project_id):
                     WHERE id = %s;
                 """, (value, item_id))
 
-            elif key.startswith("non_pricing_score_"):
-                item_id = key.replace("non_pricing_score_", "")
-                score_val = float(value) if value else 0.0
+            elif key.startswith("weighting_"):
+                criteria_id = key.replace("weighting_", "")
+                weight_val = float(value) if value else 0.0
                 cursor.execute("""
-                    UPDATE options_line_items_non_pricing 
-                    SET score = %s 
+                    UPDATE criteria 
+                    SET weighting_percent = %s 
                     WHERE id = %s;
-                """, (score_val, item_id))
+                """, (weight_val, criteria_id))
+
+            elif key.startswith("score_"):
+                # Parses format: score_{criteria_id}_{vendor_id}
+                parts = key.split("_")
+                if len(parts) == 3:
+                    criteria_id = parts[1]
+                    vendor_id = parts[2]
+                    score_val = float(value) if value else 0.0
+
+                    # Fetch current criteria weight to calculate contribution matching your schema
+                    cursor.execute("SELECT weighting_percent FROM criteria WHERE id = %s;", (criteria_id,))
+                    res = cursor.fetchone()
+                    weight = float(res[0]) if res and res[0] is not None else 0.0
+                    weighted_contrib = score_val * (weight / 100.0)
+
+                    # Check if row exists in options_line_items_non_pricing
+                    cursor.execute("""
+                        SELECT id FROM options_line_items_non_pricing 
+                        WHERE weighting_id = %s AND procurement_option_id = %s;
+                    """, (criteria_id, vendor_id))
+                    row = cursor.fetchone()
+
+                    if row:
+                        cursor.execute("""
+                            UPDATE options_line_items_non_pricing 
+                            SET score = %s, weighted_score_contribution = %s 
+                            WHERE weighting_id = %s AND procurement_option_id = %s;
+                        """, (score_val, weighted_contrib, criteria_id, vendor_id))
+                    else:
+                        line_item_id = f"np_{criteria_id}_{vendor_id}"
+                        cursor.execute("""
+                            INSERT INTO options_line_items_non_pricing 
+                            (line_item_id, procurement_option_id, weighting_id, score, weighted_score_contribution)
+                            VALUES (%s, %s, %s, %s, %s);
+                        """, (line_item_id, vendor_id, criteria_id, score_val, weighted_contrib))
 
             elif key.startswith("option_quantity_"):
                 opt_id = key.replace("option_quantity_", "")
@@ -1029,37 +1064,7 @@ def update_project(project_id):
         cursor.close()
         conn.close()
 
-    return redirect(url_for("projects_page", project_id=project_id))   
-
-
-@app.route('/delete-vendor/<int:vendor_id>', methods=['POST'])
-def delete_vendor(vendor_id):
-    conn = get_db_connection()
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT project_id, vendor_name FROM procurement_options WHERE id = %s;", (vendor_id,))
-            vendor = cursor.fetchone()
-            
-            if not vendor:
-                flash("Vendor option not found.")
-                return redirect(url_for('projects_page'))
-
-            project_id = vendor['project_id']
-            vendor_name = vendor['vendor_name']
-
-            cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (vendor_id,))
-            cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (vendor_id,))
-            cursor.execute("DELETE FROM procurement_options WHERE id = %s;", (vendor_id,))
-            
-            conn.commit()
-            flash(f'Option "{vendor_name}" was successfully removed.')
-    except Exception as e:
-        conn.rollback()
-        flash(f'Error deleting vendor: {str(e)}')
-    finally:
-        conn.close()
-
-    return redirect(url_for('projects_page', project_id=project_id))
+    return redirect(url_for("projects_page", project_id=project_id))
 
 
 @app.route('/generate-recommendation/<int:project_id>', methods=['POST'])
