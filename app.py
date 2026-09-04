@@ -658,11 +658,23 @@ def projects_page(project_id=None):
 
     all_projects = get_all_projects_summary(cursor)
 
+    # Always fetch master budget GL records for the dropdown
+    cursor.execute("SELECT gl_code, description FROM master_budget ORDER BY gl_code")
+    gl_records = cursor.fetchall()
+
     if not project_id:
         cursor.close()
         conn.close()
-        return render_template("projects.html", project=None, vendors=[], criteria_list=[], scores_map={}, all_projects=all_projects)
-
+        return render_template(
+            "projects.html", 
+            project=None, 
+            vendors=[], 
+            criteria_list=[], 
+            scores_map={}, 
+            all_projects=all_projects,
+            gl_records=gl_records
+        )
+    
     cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
     project = cursor.fetchone()
 
@@ -1487,7 +1499,6 @@ def expenditure_expose():
 
     month_label = ALLOWED_MONTHS[selected_month]
 
-    # 3. Handle AI Analysis generation or use cached version
     # 3. Handle AI Analysis generation or use cached version
     if cached_analysis:
         ai_analysis = cached_analysis
