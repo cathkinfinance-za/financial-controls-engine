@@ -446,7 +446,12 @@
                         </tr>
                         {% for criteria in criteria_list %}
                         <tr class="criteria-row" data-criteria-id="{{ criteria.id }}">
-                            <td><strong>{{ criteria.criteria_name }}</strong></td>
+                            <td>
+                                <input type="text" name="criteria_name_{{ criteria.id }}" 
+                                    class="form-control form-control-sm criteria-name-input" 
+                                    value="{{ criteria.criteria_name }}" 
+                                    style="width: 100%; min-width: 150px;">
+                            </td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <input type="number" step="0.1" min="0" max="100" name="weighting_{{ criteria.id }}" class="form-control weight-input" 
@@ -845,6 +850,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function calculateFinalScores() {
         const vendorTotals = {};
         let totalWeight = 0;
+        const criteriaPayload = [];
 
         // Track total weight percentage
         document.querySelectorAll('.weight-input').forEach(input => {
@@ -857,9 +863,14 @@ document.addEventListener('DOMContentLoaded', function() {
             weightDisplay.textContent = totalWeight.toFixed(2) + '%';
         }
 
-        // Calculate composite score per vendor based on updated inputs
+        // Calculate composite score per vendor based and collect row metadata
         document.querySelectorAll('.criteria-row').forEach(row => {
-            const weight = parseFloat(row.querySelector('.weight-input').value) || 0;
+            const criteriaId = row.dataset.criteriaId;
+            const criteriaNameInput = row.querySelector('.criteria-name-input');
+            const criteriaName = criteriaNameInput ? criteriaNameInput.value : '';
+            
+            const weightInput = row.querySelector('.weight-input');
+            const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
             
             row.querySelectorAll('.score-input').forEach(scoreInput => {
                 const vendorId = scoreInput.dataset.vendorId;
