@@ -998,7 +998,7 @@ def update_project(project_id):
                 criteria_id = key.replace("weighting_", "")
                 weight_val = float(value) if value else 0.0
                 cursor.execute("""
-                    UPDATE criteria 
+                    UPDATE project_weightings 
                     SET weighting_percent = %s 
                     WHERE id = %s;
                 """, (weight_val, criteria_id))
@@ -1011,8 +1011,8 @@ def update_project(project_id):
                     vendor_id = parts[2]
                     score_val = float(value) if value else 0.0
 
-                    # Fetch current criteria weight to calculate contribution matching your schema
-                    cursor.execute("SELECT weighting_percent FROM criteria WHERE id = %s;", (criteria_id,))
+                    # Fetch current weighting percentage from project_weightings to calculate contribution
+                    cursor.execute("SELECT weighting_percent FROM project_weightings WHERE id = %s;", (criteria_id,))
                     res = cursor.fetchone()
                     weight = float(res[0]) if res and res[0] is not None else 0.0
                     weighted_contrib = score_val * (weight / 100.0)
