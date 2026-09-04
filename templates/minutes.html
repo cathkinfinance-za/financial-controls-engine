@@ -264,29 +264,34 @@
         }
 
 
-    @media print {
-            body {
-                background: white;
-                padding: 0;
+        @media print {
+                body {
+                    background: white;
+                    padding: 0;
+                }
+                .container {
+                    max-width: 100%;
+                    border: none;
+                    box-shadow: none;
+                    padding: 0;
+                }
+                /* Hide navigation, forms, dropdowns, and buttons when printing */
+                .back-link, form, select, .btn, hr {
+                    display: none !important;
+                }
+                /* Hide all cards by default during print */
+                .meeting-card {
+                    display: none !important;
+                    border: none;
+                    box-shadow: none;
+                    padding: 0;
+                    margin: 0;
+                }
+                /* Only show the specific active card being exported */
+                .meeting-card.active {
+                    display: block !important;
+                }
             }
-            .container {
-                max-width: 100%;
-                border: none;
-                box-shadow: none;
-                padding: 0;
-            }
-            /* Hide navigation, forms, dropdowns, and buttons when printing */
-            .back-link, form, select, .btn, hr {
-                display: none !important;
-            }
-            .meeting-card {
-                display: block !important;
-                border: none;
-                box-shadow: none;
-                padding: 0;
-                margin: 0;
-            }
-        }
     </style>
 </head>
 <body>
