@@ -297,51 +297,9 @@
 <body>
     <div class="container">
         <a href="/" class="back-link">← Back to Dashboard</a>
-        <h1>Finance Committee Meeting Minutes</h1>
 
-        <!-- MINUTES ENTRY FORM -->
-        <form method="POST" action="/minutes">
-            <div style="display: flex; gap: 15px;">
-                <div class="form-group" style="flex: 1;">
-                    <label>Meeting Date</label>
-                    <input type="date" name="meeting_date" required>
-                </div>
-                <div class="form-group" style="flex: 1;">
-                    <label>Chairperson</label>
-                    <input type="text" name="chairperson" placeholder="e.g. Finance Chair" required>
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label>Attendees</label>
-                <input type="text" name="attendees" placeholder="Comma-separated names" required>
-            </div>
-
-            <div class="form-group">
-                <label>Apologies</label>
-                <input type="text" name="apologies" placeholder="Absent members">
-            </div>
-
-            <div class="form-group">
-                <label>Agenda & Key Notes</label>
-                <textarea name="notes_summary" rows="4" required placeholder="  1. Eskom Recovery, 2. Review of Action Items & Matters Arising, 3. Over-Budget Expenditure "></textarea>
-            </div>
-
-            <h3>Action Items</h3>
-            <div id="action-items-container">
-                <div class="action-row">
-                    <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
-                    <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
-                    <input type="date" name="target_date[]" style="flex: 1;">
-                </div>
-            </div>
-            <button type="button" class="btn btn-secondary" onclick="addActionRow()">+ Add Action Item</button>
-
-            <div style="margin-top: 24px;">
-                <button type="submit" class="btn">Save Meeting Minutes</button>
-            </div>
-        </form>
-
+        <h1>Cathkin Estates HOA Finance Committee Meeting Minutes</h1>
+        
         <!-- HISTORICAL MINUTES DROPDOWN SEARCH -->
         <h2>Previous Meeting Records</h2>
         
@@ -535,6 +493,51 @@
         <p style="color: var(--text-muted); margin-top: 12px;">No meeting minutes recorded yet.</p>
         {% endif %}
     </div>
+
+    <h2>Capture New Meeting</h2>
+
+       <!-- MINUTES ENTRY FORM -->
+        <form method="POST" action="/minutes">
+            <div style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label>Meeting Date</label>
+                    <input type="date" name="meeting_date" required>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>Chairperson</label>
+                    <input type="text" name="chairperson" placeholder="e.g. Finance Chair" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Attendees</label>
+                <input type="text" name="attendees" placeholder="Comma-separated names" required>
+            </div>
+
+            <div class="form-group">
+                <label>Apologies</label>
+                <input type="text" name="apologies" placeholder="Absent members">
+            </div>
+
+            <div class="form-group">
+                <label>Agenda & Key Notes</label>
+                <textarea name="notes_summary" rows="4" required placeholder="  1. Eskom Recovery, 2. Review of Action Items & Matters Arising, 3. Over-Budget Expenditure "></textarea>
+            </div>
+
+            <h3>Action Items</h3>
+            <div id="action-items-container">
+                <div class="action-row">
+                    <input type="text" name="action_description[]" placeholder="Task Description" style="flex: 2;">
+                    <input type="text" name="responsible_person[]" placeholder="Responsible" style="flex: 1;">
+                    <input type="date" name="target_date[]" style="flex: 1;">
+                </div>
+            </div>
+            <button type="button" class="btn btn-secondary" onclick="addActionRow()">+ Add Action Item</button>
+
+            <div style="margin-top: 24px;">
+                <button type="submit" class="btn">Save Meeting Minutes</button>
+            </div>
+        </form>
 
     <script>
         function addActionRow() {
