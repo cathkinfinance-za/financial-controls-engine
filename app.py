@@ -68,7 +68,7 @@ def login():
             print(f"DEBUG -> Stored hash starts with: {user['password_hash'][:15] if user['password_hash'] else 'None'}")
         
         # Verify the password against the database hash
-        if user and check_password_hash(user['password_hash'], password):
+        if user and user['password_hash'] == password:
             session['user_id'] = user['id']
             return redirect(url_for('dashboard'))
         
