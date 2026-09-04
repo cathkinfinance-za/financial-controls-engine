@@ -34,9 +34,7 @@ class LineItem(BaseModel):
     cost_component_name: str = Field(description="Name or line description of charge item.")
     cost_type_category: str = Field(description="'One-Off Cost' or 'Annual Cost'.")
     amount: float = Field(description="Raw numeric amount.")
-    quantity: float = Field(default=1.0, description="Extracted numerical quantity (e.g., 810 for m2, 540 for meters).")
-    unit_of_measure: str = Field(default="", description="Unit of measure (e.g., 'm2', 'm', 'item').")
-
+    
 class PricingExtraction(BaseModel):
     line_items: List[LineItem]
     quote_total: float = Field(description="Final grand total stated on quote.")
@@ -58,6 +56,12 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             WHERE process = 'project matrix drafter' AND is_active = true;
         """)
         prompt_record = cursor.fetchone()
+
+    # Fetch valid units
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT unit_code, unit_name FROM units_of_measure;")
+        valid_units = cursor.fetchall()
+        uom_list_str = ", ".join([f"'{u['unit_code']}' ({u['unit_name']})" for u in valid_units])
 
 
     if not prompt_record:
