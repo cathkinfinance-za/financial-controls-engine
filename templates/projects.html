@@ -472,18 +472,27 @@
                         {% endfor %}
                     </tbody>
                     <tfoot>
-                        <tr class="total-row">
-                            <td>Total Composite Score</td>
-                            <td><span id="totalWeightDisplay">0.00%</span></td>
-                            {% for vendor in vendors %}
-                                <td>
-                                    <strong style="font-size: 16px; color: var(--primary-blue);" id="vendorTotal_{{ vendor.id }}">
-                                        {{ vendor.final_weighted_score_output or '0.00' }}
-                                    </strong>
-                                </td>
-                            {% endfor %}
-                        </tr>
-                    </tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">Total Effective Unit Rate</td>
+                                {% for vendor in vendors %}
+                                    <td style="border-left: 2px solid var(--border-color);">
+                                        <strong style="font-size: 14px; color: var(--primary-blue);" id="tableVendorUnitRate_{{ vendor.id }}">
+                                            ZAR 0.00
+                                        </strong>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                            <tr class="total-row">
+                                <td colspan="2">Projected 5-Year Total Cost</td>
+                                {% for vendor in vendors %}
+                                    <td style="border-left: 2px solid var(--border-color);">
+                                        <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
+                                            ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
+                                        </strong>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        </tfoot>
                 </table>
 
                 <!-- Consolidated Side-by-Side Detailed Line Items Table -->
@@ -626,99 +635,120 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function calculateAll() {
-        const vendorCosts = {};
-        const rows = document.querySelectorAll('#lineItemsMatrix tbody tr');
+    const vendorCosts = {};
+    const vendorQuantities = {};
+    const rows = document.querySelectorAll('#lineItemsMatrix tbody tr');
 
-        rows.forEach(row => {
-            const categorySelect = row.querySelector('.item-category');
-            const category = categorySelect ? categorySelect.value : 'One-Off Cost';
-            const multiplier = category === 'Annual Cost' ? 5 : 1;
+    // 1. Single pass to calculate total costs and quantities per vendor
+    rows.forEach(row => {
+        const categorySelect = row.querySelector('.item-category');
+        const category = categorySelect ? categorySelect.value : 'One-Off Cost';
+        const multiplier = category === 'Annual Cost' ? 5 : 1;
 
-            const amountInputs = row.querySelectorAll('.item-amount');
-            amountInputs.zones?.forEach || amountInputs.forEach(input => {
-                const vendorId = input.getAttribute('data-vendor-id');
-                if (!vendorCosts[vendorId]) {
-                    vendorCosts[vendorId] = 0;
-                }
-                const amount = parseFloat(input.value) || 0;
-                vendorCosts[vendorId] += amount * multiplier;
-            });
+        const amountInputs = row.querySelectorAll('.item-amount');
+        amountInputs.forEach(input => {
+            const vendorId = input.getAttribute('data-vendor-id');
+            const td = input.closest('td');
+            const qtyInput = td ? td.querySelector('.item-qty') : null;
+            
+            const amount = parseFloat(input.value) || 0;
+            const qty = qtyInput ? (parseFloat(qtyInput.value) || 0) : 0;
+
+            if (!vendorCosts[vendorId]) vendorCosts[vendorId] = 0;
+            if (!vendorQuantities[vendorId]) vendorQuantities[vendorId] = 0;
+
+            vendorCosts[vendorId] += amount * multiplier;
+            if (qty > 0) {
+                vendorQuantities[vendorId] += qty;
+            }
         });
+    });
 
-        let lowestCost = Infinity;
-        for (const [vId, total] of Object.entries(vendorCosts)) {
-            if (total > 0 && total < lowestCost) {
-                lowestCost = total;
-            }
-        }
-
-        for (const [vId, total] of Object.entries(vendorCosts)) {
-            let priceScore = 0;
-            if (lowestCost !== Infinity && total > 0) {
-                priceScore = (lowestCost / total) * 10;
-            }
-
-            const cardTotal = document.getElementById('cardTotal_' + vId);
-            if (cardTotal) cardTotal.innerText = formatCurrency(total);
-
-            const tableVendorTotal = document.getElementById('tableVendorTotal_' + vId);
-            if (tableVendorTotal) tableVendorTotal.innerText = formatCurrency(total);
-
-            const matrixCost = document.getElementById('matrixCostDisplay_' + vId);
-            if (matrixCost) matrixCost.innerText = formatCurrency(total);
-
-            const priceScoreElem = document.getElementById('priceScoreDisplay_' + vId);
-            if (priceScoreElem) {
-                priceScoreElem.innerText = priceScore.toFixed(2);
-                priceScoreElem.setAttribute('data-score', priceScore);
-            }
-        }
-
-        // Re-calculate criteria composite score matrix
-        const matrix = document.getElementById('criteriaMatrix');
-        if (!matrix) return;
-
-        let totalWeight = 0;
-        const vendorTotals = {};
-
-        matrix.querySelectorAll('.weight-input').forEach(input => {
-            totalWeight += parseFloat(input.value) || 0;
-        });
-
-        const totalWeightSpan = document.getElementById('totalWeightDisplay');
-        if (totalWeightSpan) {
-            totalWeightSpan.innerText = totalWeight.toFixed(2) + '%';
-            totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
-        }
-
-        matrix.querySelectorAll('tbody tr').forEach(row => {
-            const weightInput = row.querySelector('.weight-input');
-            const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
-
-            row.querySelectorAll('.score-display').forEach(scoreSpan => {
-                const vendorId = scoreSpan.getAttribute('data-vendor-id');
-                const score = parseFloat(scoreSpan.getAttribute('data-score')) || 0;
-
-                if (!vendorTotals[vendorId]) {
-                    vendorTotals[vendorId] = 0;
-                }
-                vendorTotals[vendorId] += score * (weight / 100);
-            });
-        });
-
-        for (const [vendorId, totalScore] of Object.entries(vendorTotals)) {
-            const displayElem = document.getElementById('vendorTotal_' + vendorId);
-            if (displayElem) {
-                displayElem.innerText = totalScore.toFixed(2);
-            }
+    // 2. Determine lowest cost benchmark for relative inverse pricing
+    let lowestCost = Infinity;
+    for (const total of Object.values(vendorCosts)) {
+        if (total > 0 && total < lowestCost) {
+            lowestCost = total;
         }
     }
+
+    // 3. Update vendor totals, effective unit rates, and pricing scores
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        let priceScore = 0;
+        if (lowestCost !== Infinity && total > 0) {
+            priceScore = (lowestCost / total) * 10;
+        }
+
+        const totalQty = vendorQuantities[vId] || 1;
+        const effectiveUnitRate = total / totalQty;
+
+        const rateElem = document.getElementById('tableVendorUnitRate_' + vId);
+        if (rateElem) rateElem.innerText = formatCurrency(effectiveUnitRate);
+
+        const cardTotal = document.getElementById('cardTotal_' + vId);
+        if (cardTotal) cardTotal.innerText = formatCurrency(total);
+
+        const tableVendorTotal = document.getElementById('tableVendorTotal_' + vId);
+        if (tableVendorTotal) tableVendorTotal.innerText = formatCurrency(total);
+
+        const matrixCost = document.getElementById('matrixCostDisplay_' + vId);
+        if (matrixCost) matrixCost.innerText = formatCurrency(total);
+
+        const priceScoreElem = document.getElementById('priceScoreDisplay_' + vId);
+        if (priceScoreElem) {
+            priceScoreElem.innerText = priceScore.toFixed(2);
+            priceScoreElem.setAttribute('data-score', priceScore);
+        }
+    }
+
+    // 4. Re-calculate criteria composite score matrix
+    const matrix = document.getElementById('criteriaMatrix');
+    if (!matrix) return;
+
+    let totalWeight = 0;
+    const vendorTotals = {};
+
+    matrix.querySelectorAll('.weight-input').forEach(input => {
+        totalWeight += parseFloat(input.value) || 0;
+    });
+
+    const totalWeightSpan = document.getElementById('totalWeightDisplay');
+    if (totalWeightSpan) {
+        totalWeightSpan.innerText = totalWeight.toFixed(2) + '%';
+        totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
+    }
+
+    matrix.querySelectorAll('tbody tr').forEach(row => {
+        const weightInput = row.querySelector('.weight-input');
+        const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
+
+        row.querySelectorAll('.score-display').forEach(scoreSpan => {
+            const vendorId = scoreSpan.getAttribute('data-vendor-id');
+            const score = parseFloat(scoreSpan.getAttribute('data-score')) || 0;
+
+            if (!vendorTotals[vendorId]) {
+                vendorTotals[vendorId] = 0;
+            }
+            vendorTotals[vendorId] += score * (weight / 100);
+        });
+    });
+
+    for (const [vendorId, totalScore] of Object.entries(vendorTotals)) {
+        const displayElem = document.getElementById('vendorTotal_' + vendorId);
+        if (displayElem) {
+            displayElem.innerText = totalScore.toFixed(2);
+        }
+    }
+}
 
     const weightInputs = document.querySelectorAll('.weight-input');
     weightInputs.forEach(input => input.addEventListener('input', calculateAll));
 
     const lineAmountInputs = document.querySelectorAll('#lineItemsMatrix .item-amount');
     lineAmountInputs.forEach(input => input.addEventListener('input', calculateAll));
+
+    const lineQtyInputs = document.querySelectorAll('#lineItemsMatrix .item-qty');
+    lineQtyInputs.forEach(input => input.addEventListener('input', calculateAll));
 
     const lineCatSelects = document.querySelectorAll('#lineItemsMatrix .item-category');
     lineCatSelects.forEach(select => select.addEventListener('change', calculateAll));
