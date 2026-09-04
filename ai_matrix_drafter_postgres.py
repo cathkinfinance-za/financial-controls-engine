@@ -52,6 +52,16 @@ class Phase1Output(BaseModel):
     criteria: List[CriterionDetail]
     line_items: List[Any]  # Or your specific pricing line-item format if handled together
 
+def clean_schema(schema):
+    if isinstance(schema, dict):
+        schema.pop("additionalProperties", None)
+        for key, value in schema.items():
+            clean_schema(value)
+    elif isinstance(schema, list):
+        for item in schema:
+            clean_schema(item)
+    return schema
+
 def process_vendor_quote_pricing(conn, vendor_record, project_id):
     v_id = vendor_record['id']
     v_name = vendor_record['vendor_name']
@@ -224,15 +234,19 @@ def execute_phase1(project_id):
         
         gemini_contents.append(formatted_prompt)
 
+        raw_schema = Phase1Output.model_json_schema()
+        safe_schema = clean_schema(raw_schema)
+
         log_to_db(conn, project_id, "AI Matrix Drafter", "🧠 Running qualitative evaluation via Gemini...")
         ai_response = ai_client.models.generate_content(
             model=model_name,
             contents=gemini_contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
-                response_schema=Phase1Output  # <-- Update this line
+                response_schema=safe_schema
             )
         )
+        
         matrix_data = json.loads(ai_response.text)
         price_weight_pct = int(matrix_data.get("price_weight_percent", 50)) / 100.0
 
