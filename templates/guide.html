@@ -52,20 +52,22 @@
     </style>
 </head>
 <body>
+
+        {% include 'navbar.html' %}
     <div class="dashboard-container">
         <h1>DELEGATION OF FINANCIAL AUTHORITY & APPROVAL MATRIX -- DRAFT</h1>
         
         <div class="highlight">
             <strong>Compliance Status Engine Guide</strong><br>
             <em>Function: Programmatic Evaluation of Financial Authority Limits & Multi-Stage Compliance Workflows</em><br>
-            This document translates the automated financial controls engine into sequential business rules[cite: 5]. The engine evaluates purchase orders through multi-phase quality gates, executes AI compliance audits, routes structured email dispatches based on permissions, and continuously scans inbox replies to update the database state in real time[cite: 5].
+            This document translates the automated financial controls engine into sequential business rules. The engine evaluates purchase orders through multi-phase quality gates, executes AI compliance audits, routes structured email dispatches based on permissions, and continuously scans inbox replies to update the database state in real time.
         </div>
         
         <h2>1. Purpose and Scope</h2>
-        <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association[cite: 5]. It applies to all elected Directors, Portfolio Committee Members, the Finance Committee, the Estate Manager, and the appointed Managing Agent (GEMS)[cite: 5].</p>
+        <p>This document establishes the formal framework, financial thresholds, and authorization parameters for the expenditure of funds within the Cathkin Estates Homeowners Association. It applies to all elected Directors, Portfolio Committee Members, the Finance Committee, the Estate Manager, and the appointed Managing Agent (GEMS).</p>
         
         <h2>2. Schedule of Financial Authorities</h2>
-        <p>The authorization parameters, review structures, and compliance requirements governing operational and capital outlays are structured via the system's <code>approval_matrix</code> table[cite: 5]:</p>
+        <p>The authorization parameters, review structures, and compliance requirements governing operational and capital outlays are structured via the system's <code>approval_matrix</code> table:</p>
 
         <!-- DISPLAY VIEW MODE -->
         <div id="matrix-view-mode">
@@ -173,51 +175,51 @@
         
         <h2>3. Core Operational Regulations</h2>
         <h3>3.1 The Anti-Splitting Directive</h3>
-        <p>Large projects, single procurement orders, or related service invoices may not be split into multiple smaller purchase orders or partial payments to circumvent the threshold limits defined in Section 2[cite: 5]. Threshold compliance is determined by the total cumulative cost of the required work or asset procurement[cite: 5].</p>
+        <p>Large projects, single procurement orders, or related service invoices may not be split into multiple smaller purchase orders or partial payments to circumvent the threshold limits defined in Section 2. Threshold compliance is determined by the total cumulative cost of the required work or asset procurement.</p>
         
         <h3>3.2 Procurement Sourcing Thresholds</h3>
         <ul>
-            <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor[cite: 5].</li>
-            <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated[cite: 5].</li>
-            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee[cite: 5].</li>
+            <li><strong>Transactions under R10,000:</strong> A single written quote from an approved, accredited estate vendor.</li>
+            <li><strong>Transactions from R10,001 to R50,000:</strong> A minimum of two independent written quotes must be evaluated.</li>
+            <li><strong>Transactions over R50,000 / Capital Tenders:</strong> A minimum of three independent written quotes accompanied by a detailed comparison (system-generated) must be submitted to the Finance Committee.</li>
         </ul>
 
         <h2>4. Automated Workflow & Outbound Email Dispatch Engine</h2>
-        <p>When a Purchase Order is submitted, <code>2_send_approvals_postgres.py</code> evaluates the PO status and executes automated email dispatch based on the <code>approval_permission</code> designated in the <code>approvers</code> database table[cite: 5]:</p>
+        <p>When a Purchase Order is submitted, <code>2_send_approvals_postgres.py</code> evaluates the PO status and executes automated email dispatch based on the <code>approval_permission</code> designated in the <code>approvers</code> database table:</p>
 
         <h3>4.1 Multi-Stage Dispatch & Recipient Routing</h3>
         <ul>
-            <li><strong>Stage 1: Submit for Finance Review</strong>[cite: 5]
+            <li><strong>Stage 1: Submit for Finance Review</strong>
                 <ul>
-                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Finance Review'</code>[cite: 5].</li>
-                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Estate Manager'</code>[cite: 5].</li>
+                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Finance Review'</code>.</li>
+                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Estate Manager'</code>.</li>
                     <li><strong>Required Call-To-Action Text:</strong><br>
-                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".</div>[cite: 5]
+                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".</div>
                     </li>
-                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Finance Review</code>[cite: 5].</li>
+                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Finance Review</code>.</li>
                 </ul>
             </li>
-            <li><strong>Stage 2: Submit for Approval</strong>[cite: 5]
+            <li><strong>Stage 2: Submit for Approval</strong>
                 <ul>
-                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Approval Authority'</code>[cite: 5].</li>
-                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Finance Review'</code> AND <code>approval_permission = 'Estate Manager'</code>[cite: 5].</li>
+                    <li><strong>Primary Recipients ("To"):</strong> All users where <code>approval_permission = 'Approval Authority'</code>.</li>
+                    <li><strong>Copied Recipients ("CC"):</strong> All users where <code>approval_permission = 'Finance Review'</code> AND <code>approval_permission = 'Estate Manager'</code>.</li>
                     <li><strong>Required Call-To-Action Text:</strong><br>
-                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".</div>[cite: 5]
+                        <div class="code-box">Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".</div>
                     </li>
-                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Sent</code>[cite: 5].</li>
+                    <li><strong>Post-Dispatch Status:</strong> Updates <code>submission_status</code> in <code>po_log</code> to <code>Sent</code>.</li>
                 </ul>
             </li>
         </ul>
 
         <h3>4.2 AI Recommendation Persistence</h3>
-        <p>To optimize execution speed and prevent re-running costly LLM analyses, the system checks whether an <code>ai_recommendation_summary</code> already exists in the database[cite: 5]:</p>
+        <p>To optimize execution speed and prevent re-running costly LLM analyses, the system checks whether an <code>ai_recommendation_summary</code> already exists in the database:</p>
         <ul>
-            <li><strong>Initial Analysis:</strong> When sent for <code>Submit for Finance Review</code>, the Gemini AI Engine evaluates quotes, vendor OSINT records, and GL budget run-rates, storing the analysis in <code>po_log.ai_recommendation_summary</code>[cite: 5].</li>
-            <li><strong>Summary Reuse:</strong> When the item transitions to <code>Submit for Approval</code>, the engine detects the existing summary and automatically reuses the exact AI audit output in the approval email body without re-triggering the Gemini API[cite: 5].</li>
+            <li><strong>Initial Analysis:</strong> When sent for <code>Submit for Finance Review</code>, the Gemini AI Engine evaluates quotes, vendor OSINT records, and GL budget run-rates, storing the analysis in <code>po_log.ai_recommendation_summary</code>.</li>
+            <li><strong>Summary Reuse:</strong> When the item transitions to <code>Submit for Approval</code>, the engine detects the existing summary and automatically reuses the exact AI audit output in the approval email body without re-triggering the Gemini API.</li>
         </ul>
 
         <h2>5. Automated Reply Processing Engine</h2>
-        <p>The background process <code>3_process_replies_postgres.py</code> continuously monitors the incoming IMAP email inbox for responses containing bracketed PO numbers (e.g., <code>[PO-2026-001]</code>) and updates <code>po_log</code> accordingly[cite: 5]:</p>
+        <p>The background process <code>3_process_replies_postgres.py</code> continuously monitors the incoming IMAP email inbox for responses containing bracketed PO numbers (e.g., <code>[PO-2026-001]</code>) and updates <code>po_log</code> accordingly:</p>
 
         <table>
             <thead>
@@ -258,9 +260,9 @@
 
         <h2>6. Executive Safeguards & Audit Control</h2>
         <ul>
-            <li><strong>Unalterable Audit Trails:</strong> Every outbound email dispatch and inbound reply is logged chronologically to the PostgreSQL <code>workflow_control_log</code> table and localized audit log file[cite: 5].</li>
-            <li><strong>Context-Aware Parsing:</strong> The reply processor strips out historical email threads and splitters (e.g., <code>-----Original Message-----</code>) to evaluate only top-level replies from validated approvers[cite: 5].</li>
-            <li><strong>Fiscal Runway Monitoring:</strong> Post-purchase balances are checked against the estate's 2-Month Run-rate Buffer Pool during AI synthesis to flag structural deficit risks before approval sign-offs occur[cite: 5].</li>
+            <li><strong>Unalterable Audit Trails:</strong> Every outbound email dispatch and inbound reply is logged chronologically to the PostgreSQL <code>workflow_control_log</code> table and localized audit log file.</li>
+            <li><strong>Context-Aware Parsing:</strong> The reply processor strips out historical email threads and splitters (e.g., <code>-----Original Message-----</code>) to evaluate only top-level replies from validated approvers.</li>
+            <li><strong>Fiscal Runway Monitoring:</strong> Post-purchase balances are checked against the estate's 2-Month Run-rate Buffer Pool during AI synthesis to flag structural deficit risks before approval sign-offs occur.</li>
         </ul>
     </div>
 
