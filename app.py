@@ -1014,7 +1014,7 @@ def update_project(project_id):
                     # Fetch current weighting percentage from project_weightings to calculate contribution
                     cursor.execute("SELECT weighting_percent FROM project_weightings WHERE id = %s;", (criteria_id,))
                     res = cursor.fetchone()
-                    weight = float(res[0]) if res and res[0] is not None else 0.0
+                    weight = float(res['weighting_percent']) if res and res.get('weighting_percent') is not None else 0.0
                     weighted_contrib = score_val * (weight / 100.0)
 
                     # Check if row exists in options_line_items_non_pricing
