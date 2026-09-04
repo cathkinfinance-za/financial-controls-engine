@@ -471,39 +471,55 @@
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <!-- Inside the Criteria Matrix Footer (tfoot) -->
                     <tfoot>
-                            <tr class="total-row">
-                                <td colspan="2">Option Quantity &amp; Unit</td>
-                                {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color);">
-                                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                            <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="width: 75px; padding: 2px 4px; font-size: 12px;" title="Option Total Quantity">
-                                            <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 12px;" title="Unit of Measure">
-                                        </div>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                            <tr class="total-row">
-                                <td colspan="2">Total Effective Unit Rate</td>
-                                {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color);">
-                                        <strong style="font-size: 14px; color: var(--primary-blue);" id="tableVendorUnitRate_{{ vendor.id }}">
-                                            ZAR 0.00
-                                        </strong>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                            <tr class="total-row">
-                                <td colspan="2">Projected 5-Year Total Cost</td>
-                                {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color);">
-                                        <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
-                                            ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
-                                        </strong>
-                                    </td>
-                                {% endfor %}
-                            </tr>
-                        </tfoot>
+                        <tr class="total-row" style="background-color: #e7f5ff;">
+                            <td colspan="2">
+                                <strong>Final Weighted Score (/10)</strong>
+                                <span style="font-size: 12px; font-weight: normal; color: var(--text-muted); margin-left: 8px;">
+                                    (Total Weight: <span id="totalWeightDisplay">100.00%</span>)
+                                </span>
+                            </td>
+                            {% for vendor in vendors %}
+                                <td style="border-left: 2px solid var(--border-color); text-align: center;">
+                                    <strong style="font-size: 15px; color: var(--primary-blue);" id="vendorTotal_{{ vendor.id }}">
+                                        0.00
+                                    </strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="2">Option Quantity &amp; Unit</td>
+                            {% for vendor in vendors %}
+                                <td style="border-left: 2px solid var(--border-color);">
+                                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="width: 75px; padding: 2px 4px; font-size: 12px;" title="Option Total Quantity">
+                                        <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 12px;" title="Unit of Measure">
+                                    </div>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="2">Total Effective Unit Rate</td>
+                            {% for vendor in vendors %}
+                                <td style="border-left: 2px solid var(--border-color);">
+                                    <strong style="font-size: 14px; color: var(--primary-blue);" id="tableVendorUnitRate_{{ vendor.id }}">
+                                        ZAR 0.00
+                                    </strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                        <tr class="total-row">
+                            <td colspan="2">Projected 5-Year Total Cost</td>
+                            {% for vendor in vendors %}
+                                <td style="border-left: 2px solid var(--border-color);">
+                                    <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
+                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
+                                    </strong>
+                                </td>
+                            {% endfor %}
+                        </tr>
+                    </tfoot>
                 </table>
 
                 <!-- Consolidated Side-by-Side Detailed Line Items Table -->
