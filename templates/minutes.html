@@ -44,7 +44,7 @@
         }
 
         .container { 
-            max-width: 900px; 
+            max-width: 1100px; 
             margin: 0 auto; 
             background: var(--card-bg); 
             border: 1px solid var(--border-color); 
@@ -192,6 +192,7 @@
             border: 1px solid var(--border-color);
             border-radius: 6px;
             overflow: hidden;
+            table-layout: fixed;
         }
 
         th, td { 
@@ -200,6 +201,7 @@
             font-size: 13px; 
             text-align: left; 
             vertical-align: middle; 
+            word-wrap: break-word;
         }
 
         th { 
@@ -241,23 +243,30 @@
         }
 
         .back-link {
-            color: var(--primary-blue); 
-            text-decoration: none; 
-            font-size: 13px;
-            font-weight: 500;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 6px;
+            color: var(--primary-blue);
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 20px;
+            transition: background-color 0.15s ease;
         }
 
         .back-link:hover {
-            text-decoration: underline;
+            background: #dbeafe;
+            text-decoration: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="/guide" class="back-link">← Back to Guide</a>
+        <a href="/" class="back-link">← Back to Dashboard</a>
         <h1>Finance Committee Meeting Minutes</h1>
 
         <!-- MINUTES ENTRY FORM -->
@@ -401,12 +410,12 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width: 25%;">Action Description</th>
-                        <th style="width: 12%;">Responsible</th>
+                        <th style="width: 38%;">Action Description</th>
+                        <th style="width: 10%;">Responsible</th>
                         <th style="width: 12%;">Target Date</th>
                         <th style="width: 12%;">Status</th>
-                        <th style="width: 24%;">Progress / Notes</th>
-                        <th style="width: 15%;">Actions</th>
+                        <th style="width: 15%;">Progress / Notes</th>
+                        <th style="width: 13%;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
