@@ -300,6 +300,7 @@
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
                     <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <input type="hidden" name="ai_prompt_adjustments" id="hiddenPromptAdjustments">
                         <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
                     </form>
                     
@@ -715,6 +716,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
     calculateAll();
 });
+
+
+    function confirmDraftMatrix() {
+        if (confirm('Are you sure you want to draft a new matrix? This will clear the existing matrix and regenerate it.')) {
+            // Sync the current value of the AI Prompt Adjustments textarea to the hidden input
+            const textarea = document.querySelector('textarea[name="ai_prompt_adjustments"]');
+            const hiddenInput = document.getElementById('hiddenPromptAdjustments');
+            if (textarea && hiddenInput) {
+                hiddenInput.value = textarea.value;
+            }
+            return true;
+        }
+        return false;
+    }
 </script>
 
 </body>
