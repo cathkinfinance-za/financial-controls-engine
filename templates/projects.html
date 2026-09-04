@@ -527,74 +527,89 @@
                 <!-- Consolidated Side-by-Side Detailed Line Items Table -->
                 <div class="section-header" style="margin-top: 40px;">Detailed Option Line Items & Normalization</div>
                 <table class="matrix-table" id="lineItemsMatrix">
-                    <thead>
-                        <tr>
-                            <th>Cost Component Description</th>
-                            <th style="width: 140px;">Category</th>
-                            {% for vendor in vendors %}
-                                <th style="text-align: center; border-left: 2px solid var(--border-color);">
-                                    {{ vendor.vendor_name }}
-                                </th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Collect unique cost component names across all vendors -->
-                        {% set component_names = [] %}
+                <thead>
+                    <tr>
+                        <th>Cost Component Description</th>
+                        <th style="width: 140px;">Category</th>
                         {% for vendor in vendors %}
-                            {% for item in vendor.pricing_items %}
-                                {% if item.cost_component_name not in component_names %}
-                                    {% set _ = component_names.append(item.cost_component_name) %}
-                                {% endif %}
-                            {% endfor %}
+                            <th style="text-align: center; border-left: 2px solid var(--border-color);">
+                                {{ vendor.vendor_name }}
+                            </th>
                         {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Collect unique cost component names across all vendors -->
+                    {% set component_names = [] %}
+                    {% for vendor in vendors %}
+                        {% for item in vendor.pricing_items %}
+                            {% if item.cost_component_name not in component_names %}
+                                {% set _ = component_names.append(item.cost_component_name) %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endfor %}
 
-                        {% for comp_name in component_names %}
-                        {% set ns = namespace(category='One-Off Cost') %}
-                        {% for vendor in vendors %}
-                            {% for item in vendor.pricing_items %}
-                                {% if item.cost_component_name == comp_name and item.cost_type_category %}
+                    {% for comp_name in component_names %}
+                    {% set ns = namespace(category='One-Off Cost', sample_id=none) %}
+                    {% for vendor in vendors %}
+                        {% for item in vendor.pricing_items %}
+                            {% if item.cost_component_name == comp_name %}
+                                {% if item.cost_type_category %}
                                     {% set ns.category = item.cost_type_category %}
                                 {% endif %}
-                            {% endfor %}
+                                {% if ns.sample_id is none %}
+                                    {% set ns.sample_id = item.id %}
+                                {% endif %}
+                            {% endif %}
                         {% endfor %}
-                        <tr>
-                            <td><input type="text" name="pricing_name_{{ item.id }}" value="{{ comp_name }}" class="form-control" required></td>
-                            <td>
-                                <select name="pricing_category_{{ item.id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                                    <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                    <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
-                                </select>
+                    {% endfor %}
+                    <tr>
+                        <td>
+                            {% if ns.sample_id %}
+                                <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" class="form-control" required>
+                            {% else %}
+                                <input type="text" name="pricing_name_new_{% set loop_index = loop.index %}{{ loop_index }}" value="{{ comp_name }}" class="form-control" required>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if ns.sample_id %}
+                                <select name="pricing_category_{{ ns.sample_id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                            {% else %}
+                                <select name="pricing_category_new_{% set loop_index = loop.index %}{{ loop_index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                            {% endif %}
+                                <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                            </select>
+                        </td>
+                        {% for vendor in vendors %}
+                            {% set match_item = [] %}
+                            {% for item in vendor.pricing_items %}
+                                {% if item.cost_component_name == comp_name %}
+                                    {% set _ = match_item.append(item) %}
+                                {% endif %}
+                            {% endfor %}
+                            <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
+                                {% if match_item %}
+                                    {% set item = match_item[0] %}
+                                    <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" 
+                                        class="form-control item-amount" 
+                                        data-vendor-id="{{ vendor.id }}" 
+                                        data-comp-name="{{ comp_name }}"
+                                        value="{{ item.amount }}" placeholder="Total Amount">
+                                {% else %}
+                                    <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px;">Not quoted</div>
+                                    <input type="hidden" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" value="0.00">
+                                {% endif %}
                             </td>
-                            {% for vendor in vendors %}
-                                {% set match_item = [] %}
-                                {% for item in vendor.pricing_items %}
-                                    {% if item.cost_component_name == comp_name %}
-                                        {% set _ = match_item.append(item) %}
-                                    {% endif %}
-                                {% endfor %}
-                                <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
-                                    {% if match_item %}
-                                        {% set item = match_item[0] %}
-                                        <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" 
-                                            class="form-control item-amount" 
-                                            data-vendor-id="{{ vendor.id }}" 
-                                            data-comp-name="{{ comp_name }}"
-                                            value="{{ item.amount }}" placeholder="Total Amount">
-                                    {% else %}
-                                        <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px;">Not quoted</div>
-                                        <input type="hidden" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" value="0.00">
-                                    {% endif %}
-                                </td>
-                            {% endfor %}
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available. Run "Draft Matrix via AI" above.</td>
-                        </tr>
                         {% endfor %}
-                    </tbody>
-                    <tfoot>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available. Run "Draft Matrix via AI" above.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
                             <tr class="total-row">
                                 <td colspan="2">Projected 5-Year Total Cost</td>
                                 {% for vendor in vendors %}
@@ -603,8 +618,8 @@
                                     </td>
                                 {% endfor %}
                             </tr>
-                    </tfoot>
-                </table>
+                </tfoot>
+            </table>
                 {% endif %}
 
                 <div style="margin-top: 30px; text-align: right;">
