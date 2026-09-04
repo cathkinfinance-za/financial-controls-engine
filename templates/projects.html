@@ -505,7 +505,10 @@
                             {% for vendor in vendors %}
                                 <th style="text-align: center; border-left: 2px solid var(--border-color);">
                                     {{ vendor.vendor_name }}<br>
-                                    <span style="font-size: 11px; font-weight: normal; color: var(--text-muted);">Qty / Unit / Rate / Total</span>
+                                    <div style="display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 4px;">
+                                        <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Total Qty" style="width: 75px; padding: 2px 4px; font-size: 11px;" title="Option Total Quantity">
+                                        <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 11px;" title="Unit of Measure">
+                                    </div>
                                 </th>
                             {% endfor %}
                         </tr>
@@ -548,11 +551,6 @@
                                 <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
                                     {% if match_item %}
                                         {% set item = match_item[0] %}
-                                        <div style="display: grid; grid-template-columns: 60px 70px 1fr; gap: 4px; margin-bottom: 6px;">
-                                            <input type="number" step="any" name="item_qty_{{ item.id }}" class="form-control item-qty" value="{{ item.quantity or 1 }}" placeholder="Qty" style="padding: 4px; font-size: 12px;" title="Quantity">
-                                            <input type="text" name="item_uom_{{ item.id }}" class="form-control item-uom" value="{{ item.unit_of_measure or 'item' }}" placeholder="UoM" style="padding: 4px; font-size: 12px;" title="Unit of Measure">
-                                            <input type="text" class="form-control" value="Rate: ZAR {{ '%.2f' | format(item.calculated_unit_rate if item.calculated_unit_rate else item.amount / (item.quantity or 1)) }}" readonly style="padding: 4px; font-size: 11px; background: #e9ecef;" title="Calculated Unit Rate">
-                                        </div>
                                         <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" 
                                             class="form-control item-amount" 
                                             data-vendor-id="{{ vendor.id }}" 

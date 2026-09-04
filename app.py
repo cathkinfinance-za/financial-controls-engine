@@ -999,6 +999,36 @@ def update_project(project_id):
                     WHERE id = %s;
                 """, (score_val, item_id))
 
+                for key, value in request.form.items():
+                    # Update option-level total quantity
+                    if key.startswith("option_quantity_"):
+                        opt_id = key.replace("option_quantity_", "")
+                        qty_val = float(value) if value else 0.0
+                        cursor.execute("""
+                            UPDATE procurement_options 
+                            SET total_quantity = %s 
+                            WHERE id = %s;
+                        """, (qty_val, opt_id))
+
+                    # Update option-level unit of measure if captured in header
+                    elif key.startswith("option_unit_"):
+                        opt_id = key.replace("option_unit_", "")
+                        cursor.execute("""
+                            UPDATE procurement_options 
+                            SET unit_of_measure = %s 
+                            WHERE id = %s;
+                        """, (value, opt_id))
+
+                    # Update individual line item cost amounts
+                    elif key.startswith("pricing_amount_") and not key.startswith("pricing_amount_new_"):
+                        item_id = key.replace("pricing_amount_", "")
+                        amount_val = float(value) if value else 0.0
+                        cursor.execute("""
+                            UPDATE options_line_items_pricing 
+                            SET amount = %s 
+                            WHERE id = %s;
+                        """, (amount_val, item_id))
+
         conn.commit()
         flash("Project definitions and matrix line items updated successfully.")
     except Exception as e:
