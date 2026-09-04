@@ -371,6 +371,10 @@
                 <div style="white-space: pre-line; background: var(--bg-color); border: 1px solid var(--border-color); padding: 14px; border-radius: 6px; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">{{ m.notes_summary }}</div>
                 <button type="button" class="btn btn-secondary" style="margin-top: 16px;" onclick="toggleEditMode('{{ m.id }}', true)">✏️ Edit Meeting Record</button>
                 <button type="button" class="btn" onclick="printMeeting('meeting-{{ m.id }}')">🖨️ Export to PDF</button>
+                <form method="POST" action="/delete_meeting" style="margin: 0;" onsubmit="return confirm('Are you sure you want to delete this meeting record and all its associated action items?');">
+                    <input type="hidden" name="meeting_id" value="{{ m.id }}">
+                    <button type="submit" class="btn btn-danger">🗑️ Delete Meeting</button>
+                </form>
             </div>
             
             

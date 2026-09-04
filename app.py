@@ -1113,6 +1113,23 @@ def finance_minutes():
     conn.close()
     return render_template('minutes.html', meetings=meetings)
 
+@app.route('/delete_meeting', methods=['POST'])
+def delete_meeting():
+    meeting_id = request.form.get('meeting_id')
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        # Delete associated action items first to maintain referential integrity
+        cursor.execute("DELETE FROM meeting_action_items WHERE meeting_id = %s;", (meeting_id,))
+        
+        # Delete the meeting record itself
+        cursor.execute("DELETE FROM meeting_minutes WHERE id = %s;", (meeting_id,))
+        
+        conn.commit()
+    conn.close()
+
+    return redirect(url_for('finance_minutes'))
+
 @app.route('/update_action_item', methods=['POST'])
 def update_action_item():
     action_id = request.form.get('action_id')
