@@ -262,6 +262,31 @@
             background: #dbeafe;
             text-decoration: none;
         }
+
+
+    @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .container {
+                max-width: 100%;
+                border: none;
+                box-shadow: none;
+                padding: 0;
+            }
+            /* Hide navigation, forms, dropdowns, and buttons when printing */
+            .back-link, form, select, .btn, hr {
+                display: none !important;
+            }
+            .meeting-card {
+                display: block !important;
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                margin: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -340,7 +365,10 @@
                 <p style="margin: 12px 0 6px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.025em;">Summary Notes</p>
                 <div style="white-space: pre-line; background: var(--bg-color); border: 1px solid var(--border-color); padding: 14px; border-radius: 6px; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">{{ m.notes_summary }}</div>
                 <button type="button" class="btn btn-secondary" style="margin-top: 16px;" onclick="toggleEditMode('{{ m.id }}', true)">✏️ Edit Meeting Record</button>
+                <button type="button" class="btn" onclick="printMeeting('meeting-{{ m.id }}')">🖨️ Export to PDF</button>
             </div>
+            
+            
 
             <!-- EDIT FORM MODE -->
             <div id="edit-mode-{{ m.id }}" style="display: none;">
@@ -581,6 +609,23 @@
                 viewRow.style.display = 'table-row';
                 editRow.style.display = 'none';
             }
+        }
+
+
+        function printMeeting(cardId) {
+            const cards = document.querySelectorAll('.meeting-card');
+            cards.forEach(card => {
+                if (card.id === cardId) {
+                    card.classList.add('active');
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+            window.print();
+            // Restore view after print dialog closes
+            setTimeout(() => {
+                window.location.reload();
+            }, 500);
         }
     </script>
 </body>
