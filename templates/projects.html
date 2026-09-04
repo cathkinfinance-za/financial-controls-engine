@@ -299,7 +299,7 @@
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
-                    <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                    <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="return confirmDraftMatrix();">
                         <input type="hidden" name="ai_prompt_adjustments" id="hiddenPromptAdjustments">
                         <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
                     </form>
