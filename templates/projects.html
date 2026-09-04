@@ -718,8 +718,6 @@ document.addEventListener('DOMContentLoaded', function() {
             priceScore = (lowestRate / effectiveUnitRate) * 10;
         }
 
-        const totalQty = vendorQuantities[vId] || 1;
-
         const rateElem = document.getElementById('tableVendorUnitRate_' + vId);
         if (rateElem) rateElem.innerText = formatCurrency(effectiveUnitRate);
 
@@ -728,6 +726,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         const tableVendorTotal = document.getElementById('tableVendorTotal_' + vId);
         if (tableVendorTotal) tableVendorTotal.innerText = formatCurrency(total);
+
+        // Add this block to update the Detailed Line Items table footer dynamically:
+        const lineItemVendorTotal = document.getElementById('lineItemVendorTotal_' + vId);
+        if (lineItemVendorTotal) lineItemVendorTotal.innerText = formatCurrency(total);
 
         const matrixCost = document.getElementById('matrixCostDisplay_' + vId);
         if (matrixCost) matrixCost.innerText = formatCurrency(total);
