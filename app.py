@@ -15,6 +15,7 @@ from ai_matrix_drafter_postgres import execute_phase1
 from vendor_comparison_engine_postgres import execute_phase2
 from flask import request
 from collections import defaultdict
+from flask import send_file, abort
 
 try:
     from google import genai
@@ -793,6 +794,23 @@ def upload_quote():
 
     return redirect(url_for("projects_page", project_id=project_id))
 
+@app.route("/view-quote/<int:vendor_id>", methods=["GET"])
+def view_quote(vendor_id):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT quote_filename, quote_filepath FROM procurement_options WHERE id = %s;", (vendor_id,))
+    vendor = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if not vendor or not vendor.get("quote_filepath"):
+        abort(404, description="Quote file not found.")
+
+    file_path = vendor["quote_filepath"]
+    if not os.path.exists(file_path):
+        abort(404, description="File does not exist on server.")
+
+    return send_file(file_path, mimetype='application/pdf')
 
 @app.route("/draft-matrix/<int:project_id>", methods=["POST"])
 def draft_matrix(project_id):

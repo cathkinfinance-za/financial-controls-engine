@@ -377,10 +377,10 @@
                                     </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 16px;">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                    <a href="/view-quote/{{ vendor.id }}" target="_blank" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: inherit;">
                                         <div class="pdf-icon">PDF</div>
-                                        <span style="font-size: 12px; color: var(--text-muted);">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
-                                    </div>
+                                        <span style="font-size: 12px; color: var(--text-muted); text-decoration: underline;">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
+                                    </a>
                                     <!-- Delete Option Form -->
                                     <button type="submit" formaction="/delete-vendor/{{ vendor.id }}" formmethod="POST" 
                                             class="btn-icon-danger" title="Delete Option"
