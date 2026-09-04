@@ -581,7 +581,7 @@
                                 <td colspan="2">Projected 5-Year Total Cost</td>
                                 {% for vendor in vendors %}
                                     <td style="border-left: 2px solid var(--border-color); text-align: center; font-weight: bold; padding: 8px;">
-                                        {{ "%.2f"|format(vendor.projected_5yr_total | default(0.0)) }}
+                                        {{ "%.2f"|format(vendor.projected_5yr_total if vendor.projected_5yr_total is not none else 0.0) }}
                                     </td>
                                 {% endfor %}
                             </tr>
