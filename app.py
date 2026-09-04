@@ -880,7 +880,7 @@ def update_project(project_id):
                     WHERE id = %s;
                 """, (value, item_id))
 
-            elif key.startswith("pricing_amount_"):
+            elif key.startswith("pricing_amount_") and not key.startswith("pricing_amount_new_"):
                 item_id = key.replace("pricing_amount_", "")
                 amount_val = float(value) if value else 0.0
                 cursor.execute("""
@@ -888,7 +888,7 @@ def update_project(project_id):
                     SET amount = %s 
                     WHERE id = %s;
                 """, (amount_val, item_id))
-
+                
             elif key.startswith("pricing_category_"):
                 item_id = key.replace("pricing_category_", "")
                 cursor.execute("""
