@@ -1048,9 +1048,52 @@ Project Objectives: {project.get('project_objective', '')}
 
 
 # --- MINUTES ---
+from datetime import date
+
 @app.route('/minutes', methods=['GET', 'POST'])
 def finance_minutes():
     conn = get_db_connection()
+    
+    if request.method == 'POST':
+        meeting_date = request.form.get('meeting_date')
+        chairperson = request.form.get('chairperson')
+        attendees = request.form.get('attendees')
+        apologies = request.form.get('apologies')
+        notes_summary = request.form.get('notes_summary')
+
+        with conn.cursor() as cursor:
+            # Insert the new meeting record and return its new ID
+            cursor.execute("""
+                INSERT INTO meeting_minutes (meeting_date, chairperson, attendees, apologies, notes_summary)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (meeting_date, chairperson, attendees, apologies, notes_summary))
+            
+            row = cursor.fetchone()
+            meeting_id = row['id'] if isinstance(row, dict) else row[0]
+
+            # Save initial action items submitted with the form
+            descriptions = request.form.getlist('action_description[]')
+            responsibles = request.form.getlist('responsible_person[]')
+            targets = request.form.getlist('target_date[]')
+
+            for i in range(len(descriptions)):
+                desc = descriptions[i]
+                if desc and desc.strip():  # Only insert if there's text
+                    resp = responsibles[i] if i < len(responsibles) else ''
+                    raw_target = targets[i] if i < len(targets) else None
+                    target = raw_target if (raw_target and raw_target.strip()) else (meeting_date or str(date.today()))
+
+                    cursor.execute("""
+                        INSERT INTO meeting_action_items (meeting_id, action_description, responsible_person, target_date, status)
+                        VALUES (%s, %s, %s, %s, 'Pending');
+                    """, (meeting_id, desc, resp, target))
+
+            conn.commit()
+        conn.close()
+        return redirect(url_for('finance_minutes'))
+
+    # GET request: Load existing meetings and their action items
     with conn.cursor() as cursor:
         cursor.execute("""
             SELECT id, meeting_date, chairperson, attendees, apologies, notes_summary 
@@ -1059,16 +1102,6 @@ def finance_minutes():
         """)
         meetings = cursor.fetchall()
         
-        # Attach action items to each meeting card
-        for m in meetings:
-            cursor.execute("""
-                SELECT id, action_description, responsible_person, target_date, status 
-                FROM meeting_action_items 
-                WHERE meeting_id = %s ORDER BY id ASC;
-            """, (m['id'],))
-            m['action_items'] = cursor.fetchall()
-
-        # Attach action items to each meeting card (include action_notes)
         for m in meetings:
             cursor.execute("""
                 SELECT id, action_description, responsible_person, target_date, status, action_notes 
