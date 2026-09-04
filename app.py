@@ -16,6 +16,8 @@ from vendor_comparison_engine_postgres import execute_phase2
 from flask import request
 from collections import defaultdict
 from flask import send_file, abort
+from flask import render_template, request, session, redirect, url_for, flash
+from werkzeug.security import check_password_hash
 
 try:
     from google import genai
@@ -37,6 +39,41 @@ def get_db_connection():
     if not db_url:
         raise ValueError("DATABASE_URL environment variable is missing.")
     return psycopg2.connect(db_url, cursor_factory=RealDictCursor)
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        # Querying your exact columns from the approvers table
+        cur.execute(
+            "SELECT id, email, password_hash, role, Name, Surname FROM approvers WHERE email = %s", 
+            (email,)
+        )
+        user = cur.fetchone()
+        cur.close()
+        conn.close()
+        
+        # user[2] is password_hash
+        if user and user[2] and check_password_hash(user[2], password):
+            session['user_id'] = user[0]
+            session['user_email'] = user[1]
+            session['role'] = user[3]
+            session['user_name'] = f"{user[4]} {user[5]}"
+            
+            flash('Welcome back, ' + user[4] + '!', 'success')
+            
+            # Redirect back to original page if 'next' parameter exists, else dashboard
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('dashboard_home'))
+        else:
+            flash('Invalid email or password.', 'danger')
+            
+    return render_template('login.html')
+
 
 # Helper to fetch all projects for the sidebar
 def get_all_projects_summary(cursor):
