@@ -62,6 +62,10 @@ def login():
         user = cur.fetchone()
         cur.close()
         conn.close()
+
+        print(f"DEBUG -> Found user: {user}")
+        if user:
+            print(f"DEBUG -> Stored hash starts with: {user['password_hash'][:15] if user['password_hash'] else 'None'}")
         
         # Verify the password against the database hash
         if user and check_password_hash(user['password_hash'], password):
