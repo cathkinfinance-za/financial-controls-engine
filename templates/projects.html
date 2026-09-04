@@ -258,6 +258,42 @@
             border-radius: 4px;
             margin-bottom: 20px;
         }
+
+        /* Tooltip styling for score justifications */
+        .info-tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            margin-left: 4px;
+            color: var(--primary-blue);
+            font-size: 12px;
+        }
+
+        .info-tooltip .tooltip-text {
+            visibility: hidden;
+            width: 220px;
+            background-color: #212529;
+            color: #fff;
+            text-align: left;
+            border-radius: 4px;
+            padding: 8px;
+            position: absolute;
+            z-index: 100;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.2s;
+            font-size: 11px;
+            font-weight: normal;
+            line-height: 1.4;
+            box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .info-tooltip:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -462,12 +498,24 @@
                             {% for vendor in vendors %}
                                 {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id) %}
                                 {% set current_score = score_entry.score if score_entry else 0 %}
-                                <td>
-                                    <input type="number" step="0.01" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" 
-                                        class="form-control form-control-sm score-input vendor-score-{{ vendor.id }}" 
-                                        data-vendor-id="{{ vendor.id }}" 
-                                        value="{{ '%.2f'|format(current_score) }}" 
-                                        style="width: 75px; text-align: center;">
+                                {% set current_justification = score_entry.justification if score_entry and score_entry.justification else 'No justification provided.' %}
+                                <td style="text-align: center;">
+                                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                        <input type="number" step="0.01" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" 
+                                            class="form-control form-control-sm score-input vendor-score-{{ vendor.id }}" 
+                                            data-vendor-id="{{ vendor.id }}" 
+                                            value="{{ '%.2f'|format(current_score) }}" 
+                                            style="width: 75px; text-align: center;">
+                                        
+                                        <!-- Hover Tooltip Icon -->
+                                        <div class="info-tooltip" title="">
+                                            ℹ️
+                                            <div class="tooltip-text">
+                                                <strong>AI Reasoning:</strong><br>
+                                                {{ current_justification }}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             {% endfor %}
                         </tr>
@@ -687,6 +735,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 vendorCosts[vendorId] += amount * multiplier;
             });
         });
+
+        // --- Automatic VAT Fallback (15% for ZAR if no explicit VAT item exists) ---
+        // If your backend prompt occasionally fails, this guarantees VAT is added dynamically.
+        const VAT_RATE = 0.15; 
+        
+        for (const vendorId of Object.keys(vendorCosts)) {
+            // Check if this vendor already has a row named "VAT" or "Value Added Tax"
+            let hasVatRow = false;
+            rows.forEach(row => {
+                const nameInput = row.querySelector('input[name*="pricing_name"]');
+                const amountInput = row.querySelector(`.item-amount[data-vendor-id="${vendorId}"]`);
+                if (nameInput && amountInput) {
+                    const name = nameInput.value.toLowerCase();
+                    if ((name.includes('vat') || name.includes('value added tax')) && parseFloat(amountInput.value) > 0) {
+                        hasVatRow = true;
+                    }
+                }
+            });
+
+            // If missing, apply VAT dynamically to the subtotal
+            if (!hasVatRow) {
+                const subtotal = vendorCosts[vendorId];
+                const calculatedVat = subtotal * VAT_RATE;
+                vendorCosts[vendorId] += calculatedVat;
+            }
+        }
 
         // Collect quantities from the criteria matrix footer inputs
         document.querySelectorAll('#criteriaMatrix tfoot input[name^="option_quantity_"]').forEach(input => {

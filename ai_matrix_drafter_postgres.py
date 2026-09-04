@@ -9,6 +9,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 from typing import List
+from typing import Dict, Any
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,6 +39,18 @@ class LineItem(BaseModel):
 class PricingExtraction(BaseModel):
     line_items: List[LineItem]
     quote_total: float = Field(description="Final grand total stated on quote.")
+
+class CriterionDetail(BaseModel):
+    component_name: str = Field(description="Name of the technical/qualitative evaluation criteria.")
+    weight_percent: float = Field(description="Percentage weight of this criteria.")
+    vendor_scores: Dict[str, float] = Field(description="Dictionary mapping vendor name to numeric score out of 10.0.")
+    vendor_justifications: Dict[str, str] = Field(description="Dictionary mapping vendor name to a brief qualitative justification explaining the assigned score.")
+
+class Phase1Output(BaseModel):
+    price_weight_percent: int
+    precheck_analysis: str
+    criteria: List[CriterionDetail]
+    line_items: List[Any]  # Or your specific pricing line-item format if handled together
 
 def process_vendor_quote_pricing(conn, vendor_record, project_id):
     v_id = vendor_record['id']
@@ -153,7 +166,7 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             
     conn.commit()
     log_to_db(conn, project_id, "Pricing Extractor", f"✅ Option-level quantities and normalized pricing inserted for {v_name}.")
-    
+
 def execute_phase1(project_id):
     conn = get_db_connection()
     try:
@@ -215,9 +228,11 @@ def execute_phase1(project_id):
         ai_response = ai_client.models.generate_content(
             model=model_name,
             contents=gemini_contents,
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=Phase1Output  # <-- Update this line
+            )
         )
-
         matrix_data = json.loads(ai_response.text)
         price_weight_pct = int(matrix_data.get("price_weight_percent", 50)) / 100.0
 
@@ -245,15 +260,18 @@ def execute_phase1(project_id):
                 weighting_id = cursor.fetchone()['id']
 
                 scores_map = item.get("vendor_scores", {})
+                justifications_map = item.get("vendor_justifications", {})
+
                 for v_name in vendor_names:
                     v_id = vendor_map.get(v_name)
                     v_score = float(scores_map.get(v_name, 5.0))
+                    v_justification = justifications_map.get(v_name, "")
                     line_item_id = f"NON_PRICE_{v_id}_{weighting_id}"
                     cursor.execute("""
                         INSERT INTO options_line_items_non_pricing 
-                        (line_item_id, procurement_option_id, weighting_id, score)
-                        VALUES (%s, %s, %s, %s);
-                    """, (line_item_id, v_id, weighting_id, v_score))
+                        (line_item_id, procurement_option_id, weighting_id, score, justification)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """, (line_item_id, v_id, weighting_id, v_score, v_justification))
         conn.commit()
 
         # Parse line-item pricing for each vendor
