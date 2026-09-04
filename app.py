@@ -74,6 +74,14 @@ def login():
             
     return render_template('login.html')
 
+@app.before_request
+def require_login():
+    # List endpoints that do not require authentication
+    allowed_endpoints = ['login', 'static']
+    
+    if request.endpoint not in allowed_endpoints and 'user_id' not in session:
+        return redirect(url_for('login', next=request.url))
+
 
 # Helper to fetch all projects for the sidebar
 def get_all_projects_summary(cursor):
