@@ -1059,6 +1059,8 @@ def update_project(project_id):
         flash("Project definitions and matrix line items updated successfully.")
     except Exception as e:
         conn.rollback()
+        import traceback
+        traceback.print_exc()
         flash(f"Error updating project: {str(e)}")
     finally:
         cursor.close()
