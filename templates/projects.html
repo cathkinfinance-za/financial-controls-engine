@@ -658,23 +658,34 @@ document.addEventListener('DOMContentLoaded', function() {
             vendorQuantities[vendorId] = parseFloat(input.value) || 0;
         });
 
-        // 2. Determine lowest cost benchmark for relative inverse pricing
-        let lowestCost = Infinity;
-        for (const total of Object.values(vendorCosts)) {
-            if (total > 0 && total < lowestCost) {
-                lowestCost = total;
-            }
+        // 2. Calculate effective unit rates for all vendors
+    const effectiveRates = {};
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        const totalQty = vendorQuantities[vId] || 0;
+        if (total > 0 && totalQty > 0) {
+            effectiveRates[vId] = total / totalQty;
+        } else {
+            effectiveRates[vId] = 0;
+        }
+    }
+
+    // 3. Determine lowest effective unit rate benchmark for relative inverse pricing
+    let lowestRate = Infinity;
+    for (const rate of Object.values(effectiveRates)) {
+        if (rate > 0 && rate < lowestRate) {
+            lowestRate = rate;
+        }
+    }
+
+    // 4. Update vendor totals, effective unit rates, and pricing scores
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        const effectiveUnitRate = effectiveRates[vId];
+        let priceScore = 0;
+        if (lowestRate !== Infinity && effectiveUnitRate > 0) {
+            priceScore = (lowestRate / effectiveUnitRate) * 10;
         }
 
-        // 3. Update vendor totals, effective unit rates, and pricing scores
-        for (const [vId, total] of Object.entries(vendorCosts)) {
-            let priceScore = 0;
-            if (lowestCost !== Infinity && total > 0) {
-                priceScore = (lowestCost / total) * 10;
-            }
-
-            const totalQty = vendorQuantities[vId] || 1;
-            const effectiveUnitRate = total / totalQty;
+        const totalQty = vendorQuantities[vId] || 1;
 
         const rateElem = document.getElementById('tableVendorUnitRate_' + vId);
         if (rateElem) rateElem.innerText = formatCurrency(effectiveUnitRate);
@@ -695,7 +706,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // 4. Re-calculate criteria composite score matrix
+    // 5. Re-calculate criteria composite score matrix
     const matrix = document.getElementById('criteriaMatrix');
     if (!matrix) return;
 
