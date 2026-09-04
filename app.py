@@ -735,6 +735,7 @@ def projects_page(project_id=None):
     for vendor in vendors:
         cursor.execute("SELECT * FROM options_line_items_pricing WHERE procurement_option_id = %s ORDER BY id ASC;", (vendor["id"],))
         vendor["pricing_items"] = cursor.fetchall()
+        vendor['projected_5yr_total'] = vendor.get('total_effective_rate') or vendor.get('quote_total') or 0.0
 
     cursor.execute("""
         SELECT line_item_id, procurement_option_id, weighting_id, score 
