@@ -63,7 +63,6 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         valid_units = cursor.fetchall()
         uom_list_str = ", ".join([f"'{u['unit_code']}' ({u['unit_name']})" for u in valid_units])
 
-
     if not prompt_record:
         log_to_db(conn, project_id, "Pricing Extractor", "❌ Aborted: Active 'project matrix drafter' prompt not found in system_prompts.")
         return
@@ -96,6 +95,9 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
     quote_total = extracted_data.get("quote_total")
 
     processed_items = []
+    total_option_qty = 0.0
+    primary_uom = ""
+
     for item in items:
         qty = float(item.get("quantity", 1.0) or 1.0)
         uom = item.get("unit_of_measure", "").strip().lower()
@@ -108,14 +110,17 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             target_baseline_qty = float(project_scopes[uom])
             if qty != target_baseline_qty:
                 final_amount = round(unit_rate * target_baseline_qty, 2)
+                qty = target_baseline_qty  # update quantity to the normalized baseline
+
+        # Track total quantity and primary unit of measure at the option level
+        total_option_qty += qty
+        if not primary_uom and uom:
+            primary_uom = uom
 
         processed_items.append({
             "cost_component_name": item["cost_component_name"],
             "cost_type_category": item["cost_type_category"],
-            "amount": final_amount,
-            "quantity": qty,
-            "unit_of_measure": uom,
-            "calculated_unit_rate": unit_rate
+            "amount": final_amount
         })
 
     if quote_total and quote_total > 0:
@@ -125,24 +130,30 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             processed_items.append({
                 "cost_component_name": "VAT / Alignment Adjustment",
                 "cost_type_category": "One-Off Cost",
-                "amount": diff,
-                "quantity": 1.0,
-                "unit_of_measure": "adjustment",
-                "calculated_unit_rate": diff
+                "amount": diff
             })
 
     with conn.cursor() as cursor:
+        # 1. Update procurement_options with total quantity and unit of measure
+        cursor.execute("""
+            UPDATE procurement_options 
+            SET total_quantity = %s, unit_of_measure = %s
+            WHERE id = %s;
+        """, (total_option_qty, primary_uom, v_id))
+
+        # 2. Insert line items without quantity, unit_of_measure, or calculated_unit_rate
         cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
         for idx, item in enumerate(processed_items):
             line_item_id = f"PRICE_{v_id}_{idx}_{int(time.time())}"
             cursor.execute("""
                 INSERT INTO options_line_items_pricing 
-                (line_item_id, procurement_option_id, cost_component_name, cost_type_category, amount, quantity, unit_of_measure, calculated_unit_rate)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-            """, (line_item_id, v_id, item["cost_component_name"], item["cost_type_category"], item["amount"], item["quantity"], item["unit_of_measure"], item["calculated_unit_rate"]))
+                (line_item_id, procurement_option_id, cost_component_name, cost_type_category, amount)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (line_item_id, v_id, item["cost_component_name"], item["cost_type_category"], item["amount"]))
+            
     conn.commit()
-    log_to_db(conn, project_id, "Pricing Extractor", f"✅ Normalized pricing items inserted for {v_name}.")
-
+    log_to_db(conn, project_id, "Pricing Extractor", f"✅ Option-level quantities and normalized pricing inserted for {v_name}.")
+    
 def execute_phase1(project_id):
     conn = get_db_connection()
     try:

@@ -473,6 +473,17 @@
                     </tbody>
                     <tfoot>
                             <tr class="total-row">
+                                <td colspan="2">Option Quantity &amp; Unit</td>
+                                {% for vendor in vendors %}
+                                    <td style="border-left: 2px solid var(--border-color);">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                            <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="width: 75px; padding: 2px 4px; font-size: 12px;" title="Option Total Quantity">
+                                            <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 12px;" title="Unit of Measure">
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                            <tr class="total-row">
                                 <td colspan="2">Total Effective Unit Rate</td>
                                 {% for vendor in vendors %}
                                     <td style="border-left: 2px solid var(--border-color);">
@@ -504,11 +515,7 @@
                             <th style="width: 140px;">Category</th>
                             {% for vendor in vendors %}
                                 <th style="text-align: center; border-left: 2px solid var(--border-color);">
-                                    {{ vendor.vendor_name }}<br>
-                                    <div style="display: flex; justify-content: center; align-items: center; gap: 4px; margin-top: 4px;">
-                                        <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Total Qty" style="width: 75px; padding: 2px 4px; font-size: 11px;" title="Option Total Quantity">
-                                        <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 11px;" title="Unit of Measure">
-                                    </div>
+                                    {{ vendor.vendor_name }}
                                 </th>
                             {% endfor %}
                         </tr>
@@ -565,30 +572,24 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available. Run "Draft Matrix via AI" to extract line items.</td>
+                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available. Run "Draft Matrix via AI" above.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                     <tfoot>
-                        <tr class="total-row">
-                            <td colspan="2">Projected 5-Year Total Cost</td>
-                            {% for vendor in vendors %}
-                                <td style="border-left: 2px solid var(--border-color);">
-                                    <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
-                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
-                                    </strong>
-                                </td>
-                            {% endfor %}
-                        </tr>
+                            <tr class="total-row">
+                                <td colspan="2">Option Quantity &amp; Unit</td>
+                                {% for vendor in vendors %}
+                                    <td style="border-left: 2px solid var(--border-color);">
+                                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;">
+                                            <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="flex: 1; min-width: 0; padding: 4px 6px; font-size: 13px;" title="Option Total Quantity">
+                                            <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 60px; padding: 4px 6px; font-size: 13px; text-align: center;" title="Unit of Measure">
+                                        </div>
+                                    </td>
+                                {% endfor %}
+                            </tr>
                     </tfoot>
                 </table>
-
-                <div class="section-header" style="margin-top: 40px;">Summary and Recommendation</div>
-
-                <div class="form-row">
-                    <label class="form-label">Executive Sourcing Recommendation</label>
-                    <textarea name="executive_sourcing_recommendation" class="form-control" style="min-height: 140px;">{{ project.executive_sourcing_recommendation if project else '' }}</textarea>
-                </div>
                 {% endif %}
 
                 <div style="margin-top: 30px; text-align: right;">
