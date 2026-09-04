@@ -64,7 +64,7 @@ def login():
         conn.close()
         
         # Verify the password against the database hash
-        if user and check_password_hash(user[2], password):
+        if user and check_password_hash(user['password_hash'], password):
             session['user_id'] = user[0]
             return redirect(url_for('dashboard'))
         
