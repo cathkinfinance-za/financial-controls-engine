@@ -34,6 +34,8 @@ class LineItem(BaseModel):
     cost_component_name: str = Field(description="Name or line description of charge item.")
     cost_type_category: str = Field(description="'One-Off Cost' or 'Annual Cost'.")
     amount: float = Field(description="Raw numeric amount.")
+    quantity: float = Field(default=1.0, description="Extracted numerical quantity (e.g., 810 for m2, 540 for meters).")
+    unit_of_measure: str = Field(default="", description="Unit of measure (e.g., 'm2', 'm', 'item').")
 
 class PricingExtraction(BaseModel):
     line_items: List[LineItem]
@@ -49,14 +51,34 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         log_to_db(conn, project_id, "Pricing Extractor", f"⚠️ No PDF binary found for '{v_name}'. Skipping.")
         return
 
-    log_to_db(conn, project_id, "Pricing Extractor", f"🧠 Gemini parsing quote items for {v_name}...")
+    # Fetch active prompt template and selected model from system_prompts
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            SELECT prompt_template, selected_model FROM system_prompts 
+            WHERE process = 'project matrix drafter' AND is_active = true;
+        """)
+        prompt_record = cursor.fetchone()
+
+    if not prompt_record:
+        log_to_db(conn, project_id, "Pricing Extractor", "❌ Aborted: Active 'project matrix drafter' prompt not found in system_prompts.")
+        return
+
+    prompt_template = prompt_record['prompt_template']
+    model_name = prompt_record['selected_model'] or 'gemini-3.5-flash-lite'
+
+    # Fetch project scopes (JSONB) for normalization baselines
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT project_scopes FROM projects WHERE id = %s;", (project_id,))
+        proj_res = cursor.fetchone()
+        project_scopes = proj_res.get('project_scopes', {}) if proj_res else {}
+
+    log_to_db(conn, project_id, "Pricing Extractor", f"🧠 Gemini parsing quote items & quantities for {v_name} using {model_name}...")
     
     doc_part = types.Part.from_bytes(data=bytes(file_bytes), mime_type="application/pdf")
-    prompt = "Extract all sub-total cost line items and explicit grand total from this vendor quote."
 
     ai_response = ai_client.models.generate_content(
-        model='gemini-3.5-flash-lite',
-        contents=[doc_part, prompt],
+        model=model_name,
+        contents=[doc_part, prompt_template],
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=PricingExtraction,
@@ -68,27 +90,53 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
     items = extracted_data.get("line_items", [])
     quote_total = extracted_data.get("quote_total")
 
+    processed_items = []
+    for item in items:
+        qty = float(item.get("quantity", 1.0) or 1.0)
+        uom = item.get("unit_of_measure", "").strip().lower()
+        raw_amount = float(item.get("amount", 0.0))
+        
+        unit_rate = round(raw_amount / qty, 2) if qty > 0 else raw_amount
+        final_amount = raw_amount
+
+        if uom in project_scopes and qty > 0:
+            target_baseline_qty = float(project_scopes[uom])
+            if qty != target_baseline_qty:
+                final_amount = round(unit_rate * target_baseline_qty, 2)
+
+        processed_items.append({
+            "cost_component_name": item["cost_component_name"],
+            "cost_type_category": item["cost_type_category"],
+            "amount": final_amount,
+            "quantity": qty,
+            "unit_of_measure": uom,
+            "calculated_unit_rate": unit_rate
+        })
+
     if quote_total and quote_total > 0:
-        sum_items = round(sum(item["amount"] for item in items), 2)
+        sum_items = round(sum(i["amount"] for i in processed_items), 2)
         diff = round(quote_total - sum_items, 2)
         if abs(diff) > 0.01:
-            items.append({
+            processed_items.append({
                 "cost_component_name": "VAT / Alignment Adjustment",
                 "cost_type_category": "One-Off Cost",
-                "amount": diff
+                "amount": diff,
+                "quantity": 1.0,
+                "unit_of_measure": "adjustment",
+                "calculated_unit_rate": diff
             })
 
     with conn.cursor() as cursor:
         cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
-        for idx, item in enumerate(items):
+        for idx, item in enumerate(processed_items):
             line_item_id = f"PRICE_{v_id}_{idx}_{int(time.time())}"
             cursor.execute("""
                 INSERT INTO options_line_items_pricing 
-                (line_item_id, procurement_option_id, cost_component_name, cost_type_category, amount)
-                VALUES (%s, %s, %s, %s, %s);
-            """, (line_item_id, v_id, item["cost_component_name"], item["cost_type_category"], item["amount"]))
+                (line_item_id, procurement_option_id, cost_component_name, cost_type_category, amount, quantity, unit_of_measure, calculated_unit_rate)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+            """, (line_item_id, v_id, item["cost_component_name"], item["cost_type_category"], item["amount"], item["quantity"], item["unit_of_measure"], item["calculated_unit_rate"]))
     conn.commit()
-    log_to_db(conn, project_id, "Pricing Extractor", f"✅ Pricing items inserted for {v_name}.")
+    log_to_db(conn, project_id, "Pricing Extractor", f"✅ Normalized pricing items inserted for {v_name}.")
 
 def execute_phase1(project_id):
     conn = get_db_connection()
@@ -109,6 +157,12 @@ def execute_phase1(project_id):
         gemini_contents = [
             f"Project Ref: {project['project_reference']}\nScope: {project['project_description']}\nObjective: {project['project_objective']}\n"
         ]
+
+        # Inject user-specific Phase 1 prompt adjustments if available
+        phase1_adj = project.get('phase1_prompt_adjustments')
+        if phase1_adj and phase1_adj.strip():
+            gemini_contents.append(f"Additional User Instructions / Focus Areas: {phase1_adj.strip()}\n")
+
         vendor_names = []
         vendor_map = {}
 
@@ -122,27 +176,21 @@ def execute_phase1(project_id):
                 gemini_contents.append(doc_part)
 
         schema_example = ", ".join([f'"{v}": 7.5' for v in vendor_names])
-        prompt_instruction = f"""
-        TASK:
-        1. Determine price_weight_percent (integer between 40-60).
-        2. Provide precheck_analysis highlighting gaps, risk areas, missing items.
-        3. Create 7 technical non-pricing evaluation criteria with percentage weightings.
-        4. Sum of price_weight_percent + all criteria weightings MUST EQUAL EXACTLY 100.
-        5. Score each vendor out of 10.0 for each criteria.
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT prompt_template, selected_model FROM prompts 
+                WHERE process = 'project matrix drafter' AND is_active = true;
+            """)
+            prompt_record = cursor.fetchone()
 
-        Return strictly valid JSON:
-        {{
-            "price_weight_percent": 50,
-            "precheck_analysis": "Text summary...",
-            "criteria": [
-                {{
-                    "component_name": "Criterion name",
-                    "weight_percent": 7,
-                    "vendor_scores": {{ {schema_example} }}
-                }}
-            ]
-        }}
-        """
+        if not prompt_record:
+            log_to_db(conn, project_id, "AI Matrix Drafter", "❌ Aborted: Active 'project matrix drafter' prompt not found in database.")
+            return
+
+        template = prompt_record['prompt_template']
+        model_name = prompt_record['selected_model'] or 'gemini-3.5-flash'
+
+        prompt_instruction = template.replace("{schema_example}", schema_example)
         gemini_contents.append(prompt_instruction)
 
         log_to_db(conn, project_id, "AI Matrix Drafter", "🧠 Running qualitative evaluation via Gemini...")
