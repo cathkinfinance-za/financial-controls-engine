@@ -796,15 +796,21 @@ def upload_quote():
 
 @app.route("/draft-matrix/<int:project_id>", methods=["POST"])
 def draft_matrix(project_id):
+    try:
+        raw_weight = float(request.form.get("price_weighting", 30))
+    except (ValueError, TypeError):
+        raw_weight = 30.0
+
+    price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
+    prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
+
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
     cursor.execute("""
         UPDATE projects 
-        SET ai_prompt_adjustments = %s, latest_ai_status = 'Processing AI Matrix...' 
+        SET ai_prompt_adjustments = %s, price_weighting = %s, latest_ai_status = 'Processing AI Matrix...' 
         WHERE id = %s;
-    """, (prompt_adjustments, project_id))
+    """, (prompt_adjustments, price_weighting, project_id))
     conn.commit()
     cursor.close()
     conn.close()
