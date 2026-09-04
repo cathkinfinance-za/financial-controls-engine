@@ -178,7 +178,7 @@ def execute_phase1(project_id):
         schema_example = ", ".join([f'"{v}": 7.5' for v in vendor_names])
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT prompt_template, selected_model FROM prompts 
+                SELECT prompt_template, selected_model FROM system_prompts 
                 WHERE process = 'project matrix drafter' AND is_active = true;
             """)
             prompt_record = cursor.fetchone()
