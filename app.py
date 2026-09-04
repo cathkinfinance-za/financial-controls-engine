@@ -794,23 +794,29 @@ def upload_quote():
 
     return redirect(url_for("projects_page", project_id=project_id))
 
-@app.route("/view-quote/<int:vendor_id>", methods=["GET"])
-def view_quote(vendor_id):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT quote_filename, quote_filepath FROM procurement_options WHERE id = %s;", (vendor_id,))
-    vendor = cursor.fetchone()
-    cursor.close()
-    conn.close()
-
-    if not vendor or not vendor.get("quote_filepath"):
-        abort(404, description="Quote file not found.")
-
-    file_path = vendor["quote_filepath"]
-    if not os.path.exists(file_path):
-        abort(404, description="File does not exist on server.")
-
-    return send_file(file_path, mimetype='application/pdf')
+@app.route('/view-quote/<int:option_id>')
+def view_quote(option_id):
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT quote_filename, quote_file_bytes 
+                FROM procurement_options 
+                WHERE id = %s;
+            """, (option_id,))
+            record = cursor.fetchone()
+            
+            if not record or not record.get('quote_file_bytes'):
+                return "Quote not found", 404
+                
+            filename = record.get('quote_filename') or f"quote_{option_id}.pdf"
+            file_bytes = bytes(record['quote_file_bytes'])
+            
+            return send_file(
+                io.BytesIO(file_bytes),
+                mimetype='application/pdf',
+                as_attachment=False,
+                download_name=filename
+            )
 
 @app.route("/draft-matrix/<int:project_id>", methods=["POST"])
 def draft_matrix(project_id):

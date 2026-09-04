@@ -59,6 +59,7 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         """)
         prompt_record = cursor.fetchone()
 
+
     if not prompt_record:
         log_to_db(conn, project_id, "Pricing Extractor", "❌ Aborted: Active 'project matrix drafter' prompt not found in system_prompts.")
         return
@@ -154,14 +155,7 @@ def execute_phase1(project_id):
             log_to_db(conn, project_id, "AI Matrix Drafter", "❌ Aborted: No procurement options linked to project.")
             return
 
-        gemini_contents = [
-            f"Project Ref: {project['project_reference']}\nScope: {project['project_description']}\nObjective: {project['project_objective']}\n"
-        ]
-
-        # Inject user-specific Phase 1 prompt adjustments if available
-        phase1_adj = project.get('phase1_prompt_adjustments')
-        if phase1_adj and phase1_adj.strip():
-            gemini_contents.append(f"Additional User Instructions / Focus Areas: {phase1_adj.strip()}\n")
+        gemini_contents = []
 
         vendor_names = []
         vendor_map = {}
@@ -176,6 +170,7 @@ def execute_phase1(project_id):
                 gemini_contents.append(doc_part)
 
         schema_example = ", ".join([f'"{v}": 7.5' for v in vendor_names])
+        
         with conn.cursor() as cursor:
             cursor.execute("""
                 SELECT prompt_template, selected_model FROM system_prompts 
@@ -190,12 +185,20 @@ def execute_phase1(project_id):
         template = prompt_record['prompt_template']
         model_name = prompt_record['selected_model'] or 'gemini-3.5-flash'
 
-        prompt_instruction = template.replace("{schema_example}", schema_example)
-        gemini_contents.append(prompt_instruction)
+        # Format template placeholders dynamically
+        formatted_prompt = template.format(
+            schema_example=schema_example,
+            project_reference=project.get('project_reference', ''),
+            project_description=project.get('project_description', ''),
+            project_objective=project.get('project_objective', ''),
+            phase1_prompt_adjustments=project.get('phase1_prompt_adjustments', '')
+        )
+        
+        gemini_contents.append(formatted_prompt)
 
         log_to_db(conn, project_id, "AI Matrix Drafter", "🧠 Running qualitative evaluation via Gemini...")
         ai_response = ai_client.models.generate_content(
-            model='gemini-3.5-flash',
+            model=model_name,
             contents=gemini_contents,
             config=types.GenerateContentConfig(response_mime_type="application/json")
         )
