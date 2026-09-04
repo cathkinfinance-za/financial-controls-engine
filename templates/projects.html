@@ -578,13 +578,10 @@
                     </tbody>
                     <tfoot>
                             <tr class="total-row">
-                                <td colspan="2">Option Quantity &amp; Unit</td>
+                                <td colspan="2">Projected 5-Year Total Cost</td>
                                 {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color);">
-                                        <div style="display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%;">
-                                            <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="flex: 1; min-width: 0; padding: 4px 6px; font-size: 13px;" title="Option Total Quantity">
-                                            <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 60px; padding: 4px 6px; font-size: 13px; text-align: center;" title="Unit of Measure">
-                                        </div>
+                                    <td style="border-left: 2px solid var(--border-color); text-align: center; font-weight: bold; padding: 8px;">
+                                        {{ "%.2f"|format(vendor.projected_5yr_total | default(0.0)) }}
                                     </td>
                                 {% endfor %}
                             </tr>
