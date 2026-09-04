@@ -65,7 +65,7 @@ def login():
         
         # Verify the password against the database hash
         if user and check_password_hash(user['password_hash'], password):
-            session['user_id'] = user[0]
+            session['user_id'] = user['id']
             return redirect(url_for('dashboard'))
         
         flash('Invalid email or password', 'danger')
