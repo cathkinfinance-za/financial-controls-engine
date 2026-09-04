@@ -559,9 +559,9 @@
                             {% endfor %}
                         {% endfor %}
                         <tr>
-                            <td><strong>{{ comp_name }}</strong></td>
+                            <td><input type="text" name="pricing_name_{{ item.id }}" value="{{ comp_name }}" class="form-control" required></td>
                             <td>
-                                <select name="category_{{ loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                <select name="pricing_category_{{ item.id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
                                     <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
                                     <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
                                 </select>
