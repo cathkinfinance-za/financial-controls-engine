@@ -712,7 +712,8 @@ def projects_page(project_id=None):
         vendors=vendors, 
         criteria_list=criteria_list, 
         scores_map=scores_map,
-        all_projects=all_projects
+        all_projects=all_projects,
+        gl_records=gl_records
     )
 
 
