@@ -336,11 +336,21 @@
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
-                    <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="return confirmDraftMatrix();">
-                        <input type="hidden" name="ai_prompt_adjustments" id="hiddenPromptAdjustments">
-                        <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
+                    <!-- Phase 1: Assessment Criteria Formulation -->
+                    <form action="/execute-phase1/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>
+                            Phase 1: Formulate Criteria
+                        </button>
                     </form>
                     
+                    <!-- Phase 2: Vendor Quote & Pricing Processing -->
+                    <form action="/process-vendor-pricing/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-blue" {% if not project or not vendors %}disabled{% endif %}>
+                            Phase 2: Evaluate Vendors
+                        </button>
+                    </form>
+                    
+                    <!-- Generate Recommendation (Untouched) -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
                             Generate Recommendation
