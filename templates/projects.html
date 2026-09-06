@@ -449,7 +449,7 @@
                 <!-- Qualitative & Pricing Criteria Matrix -->
                 <div class="section-header" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
                     <span>Qualitative & Pricing Criteria Matrix</span>
-                    <button type="button" class="btn btn-secondary" onclick="addPricingRow()">+ Add Pricing Line Item</button>
+                    <button type="button" class="btn btn-secondary" onclick="addQualitativeRow()">+ Add Qualitative Criteria</button>
                 </div>
 
                 <table class="matrix-table" id="criteriaMatrix">
@@ -566,17 +566,19 @@
                 </table>
 
                 <!-- Consolidated Side-by-Side Detailed Line Items Table -->
-                <div class="section-header" style="margin-top: 40px;">Detailed Option Line Items & Normalization</div>
+                <div class="section-header" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Detailed Option Line Items & Normalization</span>
+                    <button type="button" class="btn btn-secondary" onclick="addPricingLineItem()">+ Add Pricing Line Item</button>
+                </div>
                 <table class="matrix-table" id="lineItemsMatrix">
                 <thead>
                     <tr>
                         <th>Cost Component Description</th>
                         <th style="width: 140px;">Category</th>
                         {% for vendor in vendors %}
-                            <th style="text-align: center; border-left: 2px solid var(--border-color);">
-                                {{ vendor.vendor_name }}
-                            </th>
+                            <th style="text-align: center; border-left: 2px solid var(--border-color);">{{ vendor.vendor_name }}</th>
                         {% endfor %}
+                        <th style="width: 50px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -591,64 +593,57 @@
                     {% endfor %}
 
                     {% for comp_name in component_names %}
-                    {% set ns = namespace(category='One-Off Cost', sample_id=none) %}
-                    {% for vendor in vendors %}
-                        {% for item in vendor.pricing_items %}
-                            {% if item.cost_component_name == comp_name %}
-                                {% if item.cost_type_category %}
-                                    {% set ns.category = item.cost_type_category %}
-                                {% endif %}
-                                {% if ns.sample_id is none %}
-                                    {% set ns.sample_id = item.id %}
-                                {% endif %}
-                            {% endif %}
-                        {% endfor %}
-                    {% endfor %}
-                    <tr>
-                        <td>
-                            {% if ns.sample_id %}
-                                <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" class="form-control" required>
-                            {% else %}
-                                <input type="text" name="pricing_name_new_{% set loop_index = loop.index %}{{ loop_index }}" value="{{ comp_name }}" class="form-control" required>
-                            {% endif %}
-                        </td>
-                        <td>
-                            {% if ns.sample_id %}
-                                <select name="pricing_category_{{ ns.sample_id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                            {% else %}
-                                <select name="pricing_category_new_{% set loop_index = loop.index %}{{ loop_index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                            {% endif %}
-                                <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
-                            </select>
-                        </td>
+                        {% set ns = namespace(category='One-Off Cost', sample_id=none) %}
                         {% for vendor in vendors %}
-                            {% set match_item = [] %}
                             {% for item in vendor.pricing_items %}
                                 {% if item.cost_component_name == comp_name %}
-                                    {% set _ = match_item.append(item) %}
+                                    {% if item.cost_type_category %}{% set ns.category = item.cost_type_category %}{% endif %}
+                                    {% if ns.sample_id is none %}{% set ns.sample_id = item.id %}{% endif %}
                                 {% endif %}
                             {% endfor %}
-                            <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
-                                {% if match_item %}
-                                    {% set item = match_item[0] %}
-                                    <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" 
-                                        class="form-control item-amount" 
-                                        data-vendor-id="{{ vendor.id }}" 
-                                        data-comp-name="{{ comp_name }}"
-                                        value="{{ item.amount }}" placeholder="Total Amount">
+                        {% endfor %}
+                        <tr>
+                            <td>
+                                {% if ns.sample_id %}
+                                    <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" class="form-control" required>
                                 {% else %}
-                                    <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px;">Not quoted</div>
-                                    <input type="hidden" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" value="0.00">
+                                    <input type="text" name="pricing_name_new_{{ loop.index }}" value="{{ comp_name }}" class="form-control" required>
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if ns.sample_id %}
+                                    <select name="pricing_category_{{ ns.sample_id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                {% else %}
+                                    <select name="pricing_category_new_{{ loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                {% endif %}
+                                    <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                    <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                </select>
+                            </td>
+                            {% for vendor in vendors %}
+                                {% set match_item = [] %}
+                                {% for item in vendor.pricing_items %}
+                                    {% if item.cost_component_name == comp_name %}{% set _ = match_item.append(item) %}{% endif %}
+                                {% endfor %}
+                                <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
+                                    {% if match_item %}
+                                        {% set item = match_item[0] %}
+                                        <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" 
+                                            class="form-control item-amount" 
+                                            data-vendor-id="{{ vendor.id }}" 
+                                            data-comp-name="{{ comp_name }}"
+                                            value="{{ item.amount }}" placeholder="Total Amount">
+                                    {% else %}
+                                        <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px;">Not quoted</div>
+                                        <input type="hidden" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" value="0.00">
+                                    {% endif %}
+                                </td>
+                            {% endfor %}
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="trackAndDeleteRow(this, 'pricing', '{{ ns.sample_id }}')">&#128465;</button>
+                            </td>
+                        </tr>
                         {% endfor %}
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No detailed cost line items available. Run "Draft Matrix via AI" above.</td>
-                    </tr>
-                    {% endfor %}
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
@@ -699,197 +694,231 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    
-    function formatCurrency(val) {
-        return 'ZAR ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function formatCurrency(val) {
+    return 'ZAR ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function calculateAll() {
+    const vendorCosts = {};
+    const vendorQuantities = {};
+    const tbody = document.getElementById('matrixTableBody');
+    if (!tbody) return;
+
+    // 1. Collect quantities per vendor
+    document.querySelectorAll('input[name^="total_quantity_"]').forEach(input => {
+        const vendorId = input.name.split('_')[2];
+        vendorQuantities[vendorId] = parseFloat(input.value) || 1.0;
+    });
+
+    // 2. Loop through Table 2 line items to sum One-Off + (5 * Annual)
+    document.querySelectorAll('#lineItemsMatrix tbody tr').forEach(row => {
+        const categorySelect = row.querySelector('.item-category');
+        const category = categorySelect ? categorySelect.value : 'One-Off Cost';
+        const multiplier = (category === 'Annual Cost') ? 5 : 1;
+
+        row.querySelectorAll('.item-amount').forEach(input => {
+            const vendorId = input.getAttribute('data-vendor-id');
+            const amount = parseFloat(input.value) || 0;
+
+            if (vendorId) {
+                if (!vendorCosts[vendorId]) vendorCosts[vendorId] = 0;
+                vendorCosts[vendorId] += amount * multiplier;
+            }
+        });
+    });
+
+    // Update display targets in Table 2 footer & cards
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        const cardTotal = document.getElementById('cardTotal_' + vId);
+        if (cardTotal) cardTotal.innerText = formatCurrency(total);
+
+        const lineItemTotal = document.getElementById('lineItemVendorTotal_' + vId);
+        if (lineItemTotal) lineItemTotal.innerText = formatCurrency(total);
     }
 
-    function calculateAll() {
-        const vendorCosts = {};
-        const vendorQuantities = {};
-        const tbody = document.getElementById('matrixTableBody');
-        if (!tbody) return;
+    // 3. Compute Effective Rates & Relative Inverse Price Scores
+    const effectiveRates = {};
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        const qty = vendorQuantities[vId] && vendorQuantities[vId] > 0 ? vendorQuantities[vId] : 1.0;
+        effectiveRates[vId] = total / qty;
+    }
 
-        // 1. Collect quantities per vendor from footer or input fields
-        document.querySelectorAll('input[name^="total_quantity_"]').forEach(input => {
-            const vendorId = input.name.split('_')[2];
-            vendorQuantities[vendorId] = parseFloat(input.value) || 1.0;
-        });
+    let minRate = Infinity;
+    for (const rate of Object.values(effectiveRates)) {
+        if (rate > 0 && rate < minRate) minRate = rate;
+    }
 
-        // 2. Loop through pricing rows to sum One-Off + (5 * Annual) costs per vendor
-        const pricingRows = tbody.querySelectorAll('.pricing-line-item-row');
-        pricingRows.forEach(row => {
-            const categorySelect = row.querySelector('select[name^="pricing_category_"]');
-            const category = categorySelect ? categorySelect.value : 'One-Off Cost';
-            const multiplier = (category === 'Annual Cost') ? 5 : 1;
+    // 4. Update Price Score displays
+    for (const [vId, total] of Object.entries(vendorCosts)) {
+        const rate = effectiveRates[vId] || 0;
+        let priceScore = (minRate !== Infinity && rate > 0) ? (minRate / rate) * 10.0 : 0;
 
-            // Check inputs in vendor columns
-            row.querySelectorAll('input[name^="pricing_amount_"]').forEach(input => {
-                const parts = input.name.split('_');
-                // Handles both existing pricing_amount_{itemId} and new row formats
-                const amount = parseFloat(input.value) || 0;
-                
-                // Find vendor ID from parent cell context if needed, or dataset
-                const vendorCell = input.closest('td');
-                const vendorIndex = Array.from(vendorCell.parentNode.children).indexOf(vendorCell) - 3; 
-                // Index offset accounts for: Description (0), Category (1), Weight (2)
+        const rateDisplay = document.getElementById('matrixRateDisplay_' + vId);
+        if (rateDisplay) rateDisplay.innerText = formatCurrency(rate) + ' per unit';
 
-                // Match against vendor order in DOM or fallback to dataset
-                const vendorScoreElem = document.querySelectorAll('.vendor-price-score')[vendorIndex];
-                if (vendorScoreElem) {
-                    const vendorId = vendorScoreElem.getAttribute('data-vendor-id');
-                    if (!vendorCosts[vendorId]) vendorCosts[vendorId] = 0;
-                    vendorCosts[vendorId] += amount * multiplier;
-                }
-            });
-        });
-
-        // 3. Compute Effective Rates & Relative Inverse Price Scores
-        const effectiveRates = {};
-        for (const [vId, total] of Object.entries(vendorCosts)) {
-            const qty = vendorQuantities[vId] && vendorQuantities[vId] > 0 ? vendorQuantities[vId] : 1.0;
-            effectiveRates[vId] = total / qty;
-        }
-
-        // Find lowest non-zero rate benchmark
-        let minRate = Infinity;
-        for (const rate of Object.values(effectiveRates)) {
-            if (rate > 0 && rate < minRate) {
-                minRate = rate;
-            }
-        }
-
-        // 4. Update Price Score displays dynamically in the matrix
-        for (const [vId, total] of Object.entries(vendorCosts)) {
-            const rate = effectiveRates[vId] || 0;
-            let priceScore = 0;
-            if (minRate !== Infinity && rate > 0) {
-                priceScore = (minRate / rate) * 10.0;
-            }
-
-            // Display effective unit rate
-            const rateDisplay = document.getElementById('matrixRateDisplay_' + vId);
-            if (rateDisplay) rateDisplay.innerText = formatCurrency(rate) + ' per unit';
-
-            // Display price score
-            const scoreDisplay = document.getElementById('priceScoreDisplay_' + vId);
-            if (scoreDisplay) {
-                scoreDisplay.innerText = priceScore.toFixed(2);
-                scoreDisplay.setAttribute('data-score', priceScore.toFixed(2));
-            }
-        }
-
-        // 5. Re-calculate Total Weight and Overall Vendor Scores
-        let totalWeight = 0;
-        const vendorFinalScores = {};
-
-        // Calculate weighting total
-        document.querySelectorAll('.weight-input').forEach(input => {
-            totalWeight += parseFloat(input.value) || 0;
-        });
-
-        const totalWeightSpan = document.getElementById('totalWeightDisplay');
-        if (totalWeightSpan) {
-            totalWeightSpan.innerText = totalWeight.toFixed(2) + '%';
-            totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
-        }
-
-        // Aggregate price score + qualitative scores
-        const priceWeightInput = document.querySelector('input[name="price_weighting"]');
-        const priceWeight = priceWeightInput ? (parseFloat(priceWeightInput.value) || 0) : 0;
-
-        // Add Price score component
-        document.querySelectorAll('.vendor-price-score').forEach(scoreSpan => {
-            const vId = scoreSpan.getAttribute('data-vendor-id');
-            const score = parseFloat(scoreSpan.innerText) || 0;
-            if (!vendorFinalScores[vId]) vendorFinalScores[vId] = 0;
-            vendorFinalScores[vId] += score * (priceWeight / 100);
-        });
-
-        // Add Qualitative score components
-        const qualitativeRows = tbody.querySelectorAll('.qualitative-row');
-        qualitativeRows.forEach(row => {
-            const weightInput = row.querySelector('.weight-input');
-            const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
-
-            row.querySelectorAll('input[name^="score_"]').forEach(scoreInput => {
-                const parts = scoreInput.name.split('_');
-                const vendorId = parts[2];
-                const score = parseFloat(scoreInput.value) || 0;
-
-                if (!vendorFinalScores[vendorId]) vendorFinalScores[vendorId] = 0;
-                vendorFinalScores[vendorId] += score * (weight / 100);
-            });
-        });
-
-        // Render final weighted totals to footer cells
-        for (const [vId, finalScore] of Object.entries(vendorFinalScores)) {
-            const totalCell = document.getElementById('vendorTotal_' + vId);
-            if (totalCell) {
-                totalCell.innerText = finalScore.toFixed(2);
-            }
+        const scoreDisplay = document.getElementById('priceScoreDisplay_' + vId);
+        if (scoreDisplay) {
+            scoreDisplay.innerText = priceScore.toFixed(2);
+            scoreDisplay.setAttribute('data-score', priceScore.toFixed(2));
         }
     }
 
-    // Attach Delegation Event Listener for On-The-Fly Input Changes
+    // 5. Calculate Total Weights and Overall Scores
+    let totalWeight = 0;
+    const vendorFinalScores = {};
+
+    document.querySelectorAll('.weight-input').forEach(input => {
+        totalWeight += parseFloat(input.value) || 0;
+    });
+
+    const totalWeightSpan = document.getElementById('totalWeightDisplay');
+    if (totalWeightSpan) {
+        totalWeightSpan.innerText = totalWeight.toFixed(2) + '%';
+        totalWeightSpan.style.color = Math.abs(totalWeight - 100) < 0.01 ? '#0f5132' : '#dc3545';
+    }
+
+    const priceWeightInput = document.querySelector('input[name="price_weighting"]');
+    const priceWeight = priceWeightInput ? (parseFloat(priceWeightInput.value) || 0) : 0;
+
+    document.querySelectorAll('.vendor-price-score').forEach(scoreSpan => {
+        const vId = scoreSpan.getAttribute('data-vendor-id');
+        const score = parseFloat(scoreSpan.innerText) || 0;
+        if (!vendorFinalScores[vId]) vendorFinalScores[vId] = 0;
+        vendorFinalScores[vId] += score * (priceWeight / 100);
+    });
+
+    tbody.querySelectorAll('.qualitative-row').forEach(row => {
+        const weightInput = row.querySelector('.weight-input');
+        const weight = weightInput ? (parseFloat(weightInput.value) || 0) : 0;
+
+        row.querySelectorAll('input[name^="score_"]').forEach(scoreInput => {
+            const parts = scoreInput.name.split('_');
+            const vendorId = parts[2];
+            const score = parseFloat(scoreInput.value) || 0;
+
+            if (!vendorFinalScores[vendorId]) vendorFinalScores[vendorId] = 0;
+            vendorFinalScores[vendorId] += score * (weight / 100);
+        });
+    });
+
+    for (const [vId, finalScore] of Object.entries(vendorFinalScores)) {
+        const totalCell = document.getElementById('vendorTotal_' + vId);
+        if (totalCell) totalCell.innerText = finalScore.toFixed(2);
+    }
+}
+
+function trackAndDeleteRow(button, itemType, itemId) {
+    if (confirm("Are you sure you want to delete this item?")) {
+        let container = document.getElementById('deletedItemsContainer');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'deletedItemsContainer';
+            document.getElementById('projectForm').appendChild(container);
+        }
+
+        if (itemId && itemId !== 'None' && itemId !== '') {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = itemType === 'criteria' ? 'deleted_criteria_ids' : 'deleted_item_ids';
+            input.value = itemId;
+            container.appendChild(input);
+        }
+
+        const row = button.closest('tr');
+        if (row) row.remove();
+        calculateAll();
+    }
+}
+
+function addQualitativeRow() {
+    const tbody = document.getElementById('matrixTableBody');
+    if (!tbody) return;
+
+    const newId = 'new_' + Date.now();
+    const vendors = document.querySelectorAll('.vendor-price-score');
+
+    let vendorCellsHtml = '';
+    vendors.forEach(v => {
+        const vId = v.getAttribute('data-vendor-id');
+        vendorCellsHtml += `
+            <td class="text-center">
+                <input type="number" step="0.1" min="0" max="10" name="score_new_${newId}_${vId}" class="form-control form-control-sm text-center score-input" value="0.0" data-vendor-id="${vId}">
+            </td>`;
+    });
+
+    const tr = document.createElement('tr');
+    tr.className = 'qualitative-row';
+    tr.innerHTML = `
+        <td><input type="text" name="criteria_name_new_${newId}" class="form-control form-control-sm criteria-name-input" placeholder="New Criterion" required></td>
+        <td>Qualitative</td>
+        <td>
+            <div class="input-group input-group-sm">
+                <input type="number" step="0.01" name="criteria_weight_new_${newId}" class="form-control weight-input" value="0.00" required>
+                <span class="input-group-text">%</span>
+            </div>
+        </td>
+        ${vendorCellsHtml}
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); calculateAll();">&#128465;</button>
+        </td>`;
+
+    tbody.appendChild(tr);
+    calculateAll();
+}
+
+function addPricingLineItem() {
+    const lineItemTable = document.getElementById('lineItemsMatrix');
+    if (!lineItemTable) return;
+    const tbody = lineItemTable.querySelector('tbody');
+    if (!tbody) return;
+
+    const newId = 'new_' + Date.now();
+    const vendors = document.querySelectorAll('.vendor-price-score');
+
+    let vendorCells = '';
+    vendors.forEach((v) => {
+        const vId = v.getAttribute('data-vendor-id');
+        vendorCells += `
+            <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
+                <input type="number" step="0.01" name="pricing_amount_new_${vId}_${newId}" 
+                    class="form-control item-amount" data-vendor-id="${vId}" value="0.00" placeholder="0.00">
+            </td>`;
+    });
+
+    const tr = document.createElement('tr');
+    tr.className = 'pricing-line-item-row';
+    tr.innerHTML = `
+        <td><input type="text" name="pricing_name_new_${newId}" class="form-control" placeholder="New Cost Item" required></td>
+        <td>
+            <select name="pricing_category_new_${newId}" class="form-control item-category">
+                <option value="One-Off Cost">One-Off Cost</option>
+                <option value="Annual Cost">Annual Cost</option>
+            </select>
+        </td>
+        ${vendorCells}
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); calculateAll();">&#128465;</button>
+        </td>`;
+
+    tbody.appendChild(tr);
+    calculateAll();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('matrixTableBody');
     if (tbody) {
         tbody.addEventListener('input', calculateAll);
         tbody.addEventListener('change', calculateAll);
     }
 
-    // Run initial calculation on DOM load
+    const lineItemTable = document.getElementById('lineItemsMatrix');
+    if (lineItemTable) {
+        lineItemTable.addEventListener('input', calculateAll);
+        lineItemTable.addEventListener('change', calculateAll);
+    }
+
     calculateAll();
 });
-
-// Helper Function for Deleting Pricing Rows
-function deletePricingRow(itemId) {
-    if (confirm("Are you sure you want to delete this line item?")) {
-        const row = document.getElementById(`row_pricing_${itemId}`);
-        if (row) {
-            const hiddenDelete = document.createElement('input');
-            hiddenDelete.type = 'hidden';
-            hiddenDelete.name = 'delete_pricing_item';
-            hiddenDelete.value = itemId;
-            document.querySelector('form').appendChild(hiddenDelete);
-            row.remove();
-            
-            // Trigger recalculation after row removal
-            const event = new Event('input', { bubbles: true });
-            document.getElementById('matrixTableBody').dispatchEvent(event);
-        }
-    }
-}
-
-    function trackAndDeleteRow(button, itemType, itemId) {
-        if (confirm("Are you sure you want to delete this item?")) {
-            // Find or create hidden inputs container
-            let container = document.getElementById('deletedItemsContainer');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'deletedItemsContainer';
-                document.getElementById('projectForm').appendChild(container);
-            }
-
-            // Create a hidden input to send the deleted ID to the backend
-            if (itemId && itemId !== 'None' && itemId !== '') {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = itemType === 'criteria' ? 'deleted_criteria_ids' : 'deleted_item_ids';
-                input.value = itemId;
-                container.appendChild(input);
-            }
-
-            // Remove row from DOM and recalculate matrix
-            const row = button.closest('tr');
-            if (row) row.remove();
-            
-            if (typeof calculateAll === 'function') {
-                calculateAll();
-            }
-        }
-    }
 
 </script>
 
