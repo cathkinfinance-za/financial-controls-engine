@@ -217,7 +217,7 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         project = cursor.fetchone()
         
         cursor.execute("""
-            SELECT id, component_name, weight_percent 
+            SELECT id, criteria_name, weight_percent 
             FROM project_weightings 
             WHERE project_id = %s;
         """, (project_id,))
