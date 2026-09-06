@@ -1304,12 +1304,17 @@ def generate_recommendation(project_id):
             raw_cost = cheapest.get('projected_5yr_total') or cheapest.get('total_cost') or 0
             min_cost = f"{int(round(float(raw_cost))):,}"
 
-            formatted_task_prompt = prompt_template.format(
-                winner_name=winner_name,
-                winning_score=winning_score,
-                cheapest_vendor=cheapest_vendor,
-                min_cost=min_cost
-            )
+            # Safe replace dictionary
+            context_vars = {
+                "{winner_name}": winner_name,
+                "{winning_score}": winning_score,
+                "{cheapest_vendor}": cheapest_vendor,
+                "{min_cost}": min_cost
+            }
+
+            formatted_task_prompt = prompt_template
+            for placeholder, val in context_vars.items():
+                formatted_task_prompt = formatted_task_prompt.replace(placeholder, str(val))
 
             full_prompt = f"""
 === COMPANY & SYSTEM DIRECTIVES ===
