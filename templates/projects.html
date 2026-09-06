@@ -474,7 +474,9 @@
                             <td>N/A</td>
                             <td>
                                 <div class="input-group input-group-sm">
-                                    <input type="number" step="0.01" name="price_weighting" class="form-control weight-input" value="{{ project.price_weighting if project and project.price_weighting is not none else 90.00 }}">
+                                    <!-- Line 316 -->
+                                    <input type="number" step="0.01" name="price_weighting" class="form-control weight-input" 
+                                        value="{{ (project.price_weighting * 100) if project and project.price_weighting <= 1.0 else (project.price_weighting or 90.00) }}">
                                     <span class="input-group-text">%</span>
                                 </div>
                             </td>
@@ -511,7 +513,7 @@
                             </td>
                             {% endfor %}
                             <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); calculateAll();">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="trackAndDeleteRow(this, 'criteria', '{{ criteria.id }}')">
                                     &#128465;
                                 </button>
                             </td>
@@ -859,6 +861,36 @@ function deletePricingRow(itemId) {
         }
     }
 }
+
+    function trackAndDeleteRow(button, itemType, itemId) {
+        if (confirm("Are you sure you want to delete this item?")) {
+            // Find or create hidden inputs container
+            let container = document.getElementById('deletedItemsContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'deletedItemsContainer';
+                document.getElementById('projectForm').appendChild(container);
+            }
+
+            // Create a hidden input to send the deleted ID to the backend
+            if (itemId && itemId !== 'None' && itemId !== '') {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = itemType === 'criteria' ? 'deleted_criteria_ids' : 'deleted_item_ids';
+                input.value = itemId;
+                container.appendChild(input);
+            }
+
+            // Remove row from DOM and recalculate matrix
+            const row = button.closest('tr');
+            if (row) row.remove();
+            
+            if (typeof calculateAll === 'function') {
+                calculateAll();
+            }
+        }
+    }
+
 </script>
 
 </body>
