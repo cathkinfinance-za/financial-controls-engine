@@ -635,7 +635,14 @@
                                             value="{{ item.amount }}" placeholder="Total Amount">
                                     {% else %}
                                         <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 4px;">Not quoted</div>
-                                        <input type="hidden" name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" value="0.00">
+                                            <input 
+                                            type="number" 
+                                            step="0.01" 
+                                            name="pricing_amount_new_{{ vendor.id }}_{{ loop.index }}" 
+                                            class="form-control" 
+                                            value="0.00" 
+                                            placeholder="0.00"
+                                            >                                    
                                     {% endif %}
                                 </td>
                             {% endfor %}
@@ -883,8 +890,7 @@ function addPricingLineItem() {
         const vId = v.getAttribute('data-vendor-id');
         vendorCells += `
             <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
-                <input type="number" step="0.01" name="pricing_amount_new_${vId}_${newId}" 
-                    class="form-control item-amount" data-vendor-id="${vId}" value="0.00" placeholder="0.00">
+                <input type="number" step="0.01" name="pricing_amount_new_${vendorId}_${newIndex}" class="form-control item-amount" value="0.00">
             </td>`;
     });
 

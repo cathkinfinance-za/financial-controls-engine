@@ -986,6 +986,9 @@ def update_project(project_id):
 
         conn.commit()
 
+        cursor.execute("SELECT id, total_quantity FROM procurement_options WHERE project_id = %s;", (project_id,))
+        project_vendors = cursor.fetchall()
+
         # 3. Process Form Field Dynamic Updates
         for key, value in request.form.items():
             # Skip fields associated with deleted line items
@@ -1028,19 +1031,21 @@ def update_project(project_id):
                 suffix = key.replace("pricing_name_new_", "")
                 cost_name = value
                 category = request.form.get(f"pricing_category_new_{suffix}", "One-Off Cost")
-                amount = float(request.form.get(f"pricing_amount_new_{suffix}", 0.0))
-                vendor_id = request.form.get(f"pricing_vendor_new_{suffix}")
 
-                if cost_name and vendor_id and vendor_id.isdigit():
-                    cursor.execute("""
-                        INSERT INTO options_line_items_pricing 
-                        (procurement_option_id, cost_component_name, cost_type_category, amount)
-                        VALUES (%s, %s, %s, %s);
-                    """, (int(vendor_id), cost_name, category, amount))
+                # Iterate across pre-fetched project vendors to record quoted amounts per vendor
+                for vendor in project_vendors:
+                    v_id = vendor["id"]
+                    raw_amount = request.form.get(f"pricing_amount_new_{v_id}_{suffix}", 0.0)
+                    amount_val = float(raw_amount) if raw_amount else 0.0
 
-            # In app.py -> update_project(project_id) inside the form loop:
+                    if cost_name:
+                        cursor.execute("""
+                            INSERT INTO options_line_items_pricing 
+                            (procurement_option_id, cost_component_name, cost_type_category, amount)
+                            VALUES (%s, %s, %s, %s);
+                        """, (v_id, cost_name, category, amount_val))
 
-            # 1. Catch newly added qualitative criteria definitions
+            # Newly Added Qualitative Criteria Definitions
             elif key.startswith("criteria_name_new_"):
                 suffix = key.replace("criteria_name_new_", "")
                 criteria_name = value.strip()
@@ -1048,7 +1053,6 @@ def update_project(project_id):
                 if criteria_name:
                     weight_val = float(request.form.get(f"criteria_weight_new_{suffix}", 0.0))
                     
-                    # Insert new weighting record into DB
                     cursor.execute("""
                         INSERT INTO project_weightings (project_id, criteria_name, weighting_percent)
                         VALUES (%s, %s, %s)
@@ -1057,7 +1061,7 @@ def update_project(project_id):
                     
                     new_criteria_id = cursor.fetchone()["id"]
 
-                    # Insert corresponding vendor scores for the new criterion
+                    # Iterates safely through project_vendors now
                     for vendor in project_vendors:
                         v_id = vendor["id"]
                         raw_score = request.form.get(f"score_new_{suffix}_{v_id}", 0.0)
