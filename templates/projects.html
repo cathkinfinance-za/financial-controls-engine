@@ -303,7 +303,6 @@
     <div>
         <a href="/" style="background: #f1f5f9; color: #1e293b; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500;">← Main Dashboard</a>
     </div>
-    </nav>
 
 <div class="app-layout">
 
@@ -354,8 +353,11 @@
                 </div>
             </div>
 
-            <form action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
+            <form id="projectForm" action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
                 <input type="hidden" name="project_id" value="{{ project.id if project and project.id is not string else '' }}">
+                <!-- Container to hold hidden inputs for deleted line items -->
+                <div id="deletedItemsContainer"></div>
+
                 <div class="section-header">
                     {% if project %}Project Definitions{% else %}Create New Project{% endif %}
                 </div>
@@ -463,7 +465,7 @@
                         </tr>
                     </thead>
                     <tbody id="matrixTableBody">
-                        <!-- 1. Mandatory Price Evaluation Row -->
+                        <!-- 1. Mandatory Price Weighting Row -->
                         <tr class="price-evaluation-row">
                             <td>
                                 <strong>Commercial / Price Evaluation</strong><br>

@@ -1,0 +1,536 @@
+<!DOCTYPE html> - staging
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projects Management Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --border-color: #e9ecef;
+            --text-main: #212529;
+            --text-muted: #6c757d;
+            --primary-blue: #0d6efd;
+            --card-bg: #ffffff;
+            --danger-red: #dc3545;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+        }
+
+        .app-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            width: 280px;
+            background: #ffffff;
+            border-right: 1px solid var(--border-color);
+            padding: 24px 16px;
+            box-sizing: border-box;
+            flex-shrink: 0;
+        }
+
+        .sidebar-title {
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+            color: var(--text-muted);
+        }
+
+        .btn-new-project {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background-color: #212529;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 600;
+            margin-bottom: 20px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+
+        .btn-new-project:hover { background-color: #000000; }
+
+        .project-list { list-style: none; padding: 0; margin: 0; }
+
+        .project-item a {
+            display: block;
+            padding: 10px 12px;
+            color: var(--text-main);
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+        }
+
+        .project-item a:hover { background-color: #f1f3f5; }
+
+        .project-item.active a {
+            background-color: #e7f5ff;
+            color: var(--primary-blue);
+            font-weight: 600;
+            border-color: #74c0fc;
+        }
+
+        .main-content {
+            flex-grow: 1;
+            padding: 32px;
+            overflow-y: auto;
+        }
+
+        .dashboard-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 32px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .control-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+
+        .control-buttons { display: flex; gap: 12px; align-items: center; }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            font-size: 14px;
+        }
+
+        .btn-primary { background-color: #212529; color: white; }
+        .btn-secondary { background-color: #e9ecef; color: var(--text-main); border-color: #ced4da; }
+        .btn-blue { background-color: var(--primary-blue); color: white; }
+
+        .btn-icon-danger {
+            background: transparent;
+            border: none;
+            color: #adb5bd;
+            cursor: pointer;
+            padding: 4px 8px;
+            font-size: 16px;
+            border-radius: 4px;
+            transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+        }
+
+        .btn-icon-danger:hover {
+            color: var(--danger-red);
+            background-color: #f8d7da;
+        }
+
+        .status-badge {
+            font-size: 13px;
+            color: var(--text-muted);
+            background: #f1f3f5;
+            padding: 6px 12px;
+            border-radius: 4px;
+        }
+
+        .section-header {
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 240px 1fr;
+            align-items: start;
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-main);
+            padding-top: 6px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            background-color: #fff;
+        }
+
+        textarea.form-control { min-height: 70px; resize: vertical; }
+
+        .vendor-card {
+            background-color: #fdfdfd;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .vendor-info {
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 16px;
+        }
+
+        .pdf-icon {
+            width: 32px;
+            height: 38px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+        }
+
+        table.matrix-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+            margin-bottom: 20px;
+        }
+
+        table.matrix-table th, table.matrix-table td {
+            border: 1px solid var(--border-color);
+            padding: 10px 14px;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        table.matrix-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+
+        .flash-message {
+            padding: 12px 18px;
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    {% include 'navbar.html' %}
+
+    <div style="padding: 16px 32px 0 32px;">
+        <a href="/" style="background: #f1f5f9; color: #1e293b; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 500;">← Main Dashboard</a>
+    </div>
+
+<div class="app-layout">
+
+    <div class="sidebar">
+        <a href="/projects/" class="btn-new-project">+ New Project</a>
+        <div class="sidebar-title">Projects Directory</div>
+        <ul class="project-list">
+            {% for p in all_projects %}
+                <li class="project-item {% if project and project.id == p.id %}active{% endif %}">
+                    <a href="/projects/{{ p.id }}">
+                        <strong>{{ p.project_reference or 'Project #' ~ p.id }}</strong><br>
+                        <span style="font-size: 12px; color: var(--text-muted);">{{ p.name or 'Untitled Project' }}</span>
+                    </a>
+                </li>
+            {% else %}
+                <li style="color: var(--text-muted); font-size: 13px;">No projects created yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="dashboard-container">
+            {% with messages = get_flashed_messages() %}
+              {% if messages %}
+                {% for message in messages %}
+                  <div class="flash-message">{{ message }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <div class="control-bar">
+                <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
+                <div class="control-buttons">
+                    <form action="/draft-matrix/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>Draft Matrix via AI</button>
+                    </form>
+                    
+                    <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                        <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
+                            Generate Recommendation
+                        </button>
+                    </form>
+                    
+                    <span class="status-badge">
+                        Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
+                    </span>
+                </div>
+            </div>
+
+            <form id="projectForm" action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
+                <input type="hidden" name="project_id" value="{{ project.id if project else '' }}">
+                
+                <!-- Container to hold hidden inputs for deleted line items -->
+                <div id="deletedItemsContainer"></div>
+
+                <div class="section-header">
+                    {% if project %}Project Definitions{% else %}Create New Project{% endif %}
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Project Reference</label>
+                    <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '' }}" style="width: 200px;">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control" value="{{ project.name if project else '' }}" placeholder="Name">
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Project Description</label>
+                    <textarea name="project_description" class="form-control">{{ project.project_description if project else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Project Objective</label>
+                    <textarea name="project_objective" class="form-control">{{ project.project_objective if project else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Phase 1 AI Prompt Adjustments</label>
+                    <textarea class="form-control" name="phase1_prompt_adjustments" placeholder="Add custom instructions...">{{ project.phase1_prompt_adjustments if project else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">AI Prompt Adjustments (Qualitative)</label>
+                    <textarea name="ai_prompt_adjustments" class="form-control">{{ project.ai_prompt_adjustments if project else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Select GL Code</label>
+                    <div>
+                        <select name="gl_code" class="form-control">
+                            <option value="" disabled {% if not project or not project.gl_code %}selected{% endif %}>Select GL Code</option>
+                            {% for gl in gl_records %}
+                                <option value="{{ gl.gl_code }}" {% if project and project.gl_code == gl.gl_code %}selected{% endif %}>
+                                    {{ gl.gl_code }} - {{ gl.description }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                {% if project %}
+                <!-- Qualitative & Pricing Criteria Matrix -->
+                <div class="section-header" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Qualitative & Pricing Criteria Matrix</span>
+                    <button type="button" class="btn btn-secondary" onclick="addPricingRow()">+ Add Pricing Line Item</button>
+                </div>
+
+                <table class="matrix-table" id="criteriaMatrix">
+                    <thead>
+                        <tr>
+                            <th>Evaluation Criteria / Line Item</th>
+                            <th style="width: 140px;">Category</th>
+                            <th style="width: 140px;">Weight (%) / Amount</th>
+                            {% for vendor in vendors %}
+                                <th>{{ vendor.vendor_name }}</th>
+                            {% endfor %}
+                            <th style="width: 50px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Mandatory Price Weighting Row -->
+                        <tr class="price-evaluation-row">
+                            <td>
+                                <strong>Commercial / Price Evaluation</strong><br>
+                                <small style="color: var(--text-muted);">Calculated via relative inverse quote pricing</small>
+                            </td>
+                            <td>N/A</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <input type="number" step="0.01" name="price_weighting" class="form-control" 
+                                           value="{{ (project.price_weighting * 100) if project and project.price_weighting is not none and project.price_weighting <= 1.0 else (project.price_weighting if project else 30.0) }}">
+                                    <span>%</span>
+                                </div>
+                            </td>
+                            {% for vendor in vendors %}
+                            <td style="text-align: center;">
+                                <strong>{{ "%.2f"|format(vendor.price_score or 0.0) }}</strong><br>
+                                <small style="color: var(--text-muted);">ZAR {{ "{:,.2f}".format(vendor.total_effective_rate or 0.0) }}</small>
+                            </td>
+                            {% endfor %}
+                            <td></td>
+                        </tr>
+
+                        <!-- Qualitative Criteria Rows -->
+                        {% for criteria in criteria_list %}
+                        <tr data-criteria-id="{{ criteria.id }}">
+                            <td>
+                                <input type="text" name="criteria_name_{{ criteria.id }}" class="form-control" value="{{ criteria.criteria_name }}" required>
+                            </td>
+                            <td>Qualitative</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 4px;">
+                                    <input type="number" step="0.01" name="criteria_weight_{{ criteria.id }}" class="form-control" value="{{ criteria.weighting_percent }}" required>
+                                    <span>%</span>
+                                </div>
+                            </td>
+                            {% for vendor in vendors %}
+                            {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
+                            <td style="text-align: center;">
+                                <input type="number" step="0.1" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" class="form-control" style="text-align: center;" value="{{ score_entry.score if score_entry.score is not none else 0.0 }}">
+                            </td>
+                            {% endfor %}
+                            <td style="text-align: center;">
+                                <button type="button" class="btn-icon-danger" onclick="this.closest('tr').remove();">&#128465;</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <!-- Pricing Line Items Table -->
+                <div class="section-header" style="margin-top: 40px;">Detailed Line Items & Normalization</div>
+                <table class="matrix-table" id="lineItemsMatrix">
+                    <thead>
+                        <tr>
+                            <th>Cost Component Description</th>
+                            <th style="width: 160px;">Category</th>
+                            {% for vendor in vendors %}
+                                <th style="text-align: center;">{{ vendor.vendor_name }} Amount (ZAR)</th>
+                            {% endfor %}
+                            <th style="width: 50px;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingTableBody">
+                        {% set unique_items = [] %}
+                        {% for vendor in vendors %}
+                            {% for item in vendor.pricing_items %}
+                                <tr data-pricing-id="{{ item.id }}">
+                                    <td>
+                                        <input type="text" name="pricing_name_{{ item.id }}" class="form-control" value="{{ item.cost_component_name }}">
+                                    </td>
+                                    <td>
+                                        <select name="pricing_category_{{ item.id }}" class="form-control">
+                                            <option value="One-Off Cost" {% if item.cost_type_category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                            <option value="Annual Cost" {% if item.cost_type_category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                        </select>
+                                    </td>
+                                    {% for v in vendors %}
+                                        {% if v.id == vendor.id %}
+                                        <td style="text-align: center;">
+                                            <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" class="form-control" style="text-align: right;" value="{{ "%.2f"|format(item.amount or 0.0) }}">
+                                        </td>
+                                        {% else %}
+                                        <td style="text-align: center; color: var(--text-muted);">-</td>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn-icon-danger" onclick="markLineItemDeleted({{ item.id }}, this);">&#128465;</button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+
+                <div style="margin-top: 30px; text-align: right;">
+                    <button type="submit" class="btn btn-blue" style="padding: 10px 24px; font-size: 15px;">Save Changes & Recalculate</button>
+                </div>
+                {% else %}
+                <div style="margin-top: 30px; text-align: right;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 24px; font-size: 15px;">Create Project</button>
+                </div>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let newPricingCounter = 0;
+
+    function markLineItemDeleted(itemId, btn) {
+        if (confirm("Are you sure you want to delete this pricing line item?")) {
+            const container = document.getElementById("deletedItemsContainer");
+            const hiddenInput = document.createElement("input");
+            hiddenInput.type = "hidden";
+            hiddenInput.name = "delete_pricing_item";
+            hiddenInput.value = itemId;
+            container.appendChild(hiddenInput);
+
+            const row = btn.closest("tr");
+            row.remove();
+        }
+    }
+
+    function addPricingRow() {
+        newPricingCounter++;
+        const tbody = document.getElementById("pricingTableBody");
+        const vendorCount = {{ vendors|length if vendors else 0 }};
+        
+        let vendorColumnsHtml = '';
+        {% for vendor in vendors %}
+            vendorColumnsHtml += `
+                <td style="text-align: center;">
+                    <input type="number" step="0.01" name="pricing_amount_new_${newPricingCounter}" class="form-control" style="text-align: right;" value="0.00">
+                    <input type="hidden" name="pricing_vendor_new_${newPricingCounter}" value="{{ vendor.id }}">
+                </td>
+            `;
+        {% endfor %}
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>
+                <input type="text" name="pricing_name_new_${newPricingCounter}" class="form-control" placeholder="New Cost Item" required>
+            </td>
+            <td>
+                <select name="pricing_category_new_${newPricingCounter}" class="form-control">
+                    <option value="One-Off Cost">One-Off Cost</option>
+                    <option value="Annual Cost">Annual Cost</option>
+                </select>
+            </td>
+            ${vendorColumnsHtml}
+            <td style="text-align: center;">
+                <button type="button" class="btn-icon-danger" onclick="this.closest('tr').remove();">&#128465;</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    }
+</script>
+
+</body>
+</html>
