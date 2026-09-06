@@ -733,7 +733,7 @@ def projects_page(project_id=None):
     conn.commit()
 
     cursor.execute("""
-        SELECT line_item_id, procurement_option_id, weighting_id, score 
+        SELECT line_item_id, procurement_option_id, weighting_id, score, justification
         FROM options_line_items_non_pricing 
         WHERE procurement_option_id IN (SELECT id FROM procurement_options WHERE project_id = %s);
     """, (project_id,))
