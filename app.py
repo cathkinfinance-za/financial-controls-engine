@@ -1021,7 +1021,8 @@ def update_project(project_id):
             if any(key.endswith(f"_{d_id}") for d_id in deleted_item_ids):
                 continue
 
-            if key.startswith("pricing_name_"):
+            # Pricing Line Items
+            if key.startswith("pricing_name_") and not key.startswith("pricing_name_new_"):
                 item_id = key.replace("pricing_name_", "")
                 cursor.execute("""
                     UPDATE options_line_items_pricing 
@@ -1038,7 +1039,7 @@ def update_project(project_id):
                     WHERE id = %s;
                 """, (amount_val, item_id))
 
-            elif key.startswith("pricing_category_"):
+            elif key.startswith("pricing_category_") and not key.startswith("pricing_category_new_"):
                 item_id = key.replace("pricing_category_", "")
                 cursor.execute("""
                     UPDATE options_line_items_pricing 
@@ -1060,8 +1061,17 @@ def update_project(project_id):
                         VALUES (%s, %s, %s, %s);
                     """, (vendor_id, cost_name, category, amount))
 
-            elif key.startswith("weighting_"):
-                criteria_id = key.replace("weighting_", "")
+            # Qualitative Criteria Names & Weights (Fixes saving weight & criteria titles)
+            elif key.startswith("criteria_name_"):
+                criteria_id = key.replace("criteria_name_", "")
+                cursor.execute("""
+                    UPDATE project_weightings 
+                    SET criteria_name = %s 
+                    WHERE id = %s;
+                """, (value, criteria_id))
+
+            elif key.startswith("criteria_weight_") or key.startswith("weighting_"):
+                criteria_id = key.replace("criteria_weight_", "").replace("weighting_", "")
                 weight_val = float(value) if value else 0.0
                 cursor.execute("""
                     UPDATE project_weightings 
@@ -1069,21 +1079,19 @@ def update_project(project_id):
                     WHERE id = %s;
                 """, (weight_val, criteria_id))
 
+            # Non-Pricing Scores
             elif key.startswith("score_"):
-                # Parses format: score_{criteria_id}_{vendor_id}
                 parts = key.split("_")
                 if len(parts) == 3:
                     criteria_id = parts[1]
                     vendor_id = parts[2]
                     score_val = float(value) if value else 0.0
 
-                    # Fetch current weighting percentage from project_weightings to calculate contribution
                     cursor.execute("SELECT weighting_percent FROM project_weightings WHERE id = %s;", (criteria_id,))
                     res = cursor.fetchone()
                     weight = float(res['weighting_percent']) if res and res.get('weighting_percent') is not None else 0.0
                     weighted_contrib = score_val * (weight / 100.0)
 
-                    # Check if row exists in options_line_items_non_pricing
                     cursor.execute("""
                         SELECT id FROM options_line_items_non_pricing 
                         WHERE weighting_id = %s AND procurement_option_id = %s;
@@ -1104,6 +1112,7 @@ def update_project(project_id):
                             VALUES (%s, %s, %s, %s, %s);
                         """, (line_item_id, vendor_id, criteria_id, score_val, weighted_contrib))
 
+            # Vendor Quantity & Units
             elif key.startswith("option_quantity_"):
                 opt_id = key.replace("option_quantity_", "")
                 qty_val = float(value) if value else 0.0
@@ -1133,7 +1142,6 @@ def update_project(project_id):
         conn.close()
 
     return redirect(url_for("projects_page", project_id=project_id))
-
 
 @app.route('/generate-recommendation/<int:project_id>', methods=['POST'])
 def generate_recommendation(project_id):
