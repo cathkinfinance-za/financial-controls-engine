@@ -463,141 +463,100 @@
                         </tr>
                     </thead>
                     <tbody id="matrixTableBody">
-                        <!-- Existing Commercial / Price Evaluation Weighting Row -->
-                        <tr class="pricing-row">
+                        <!-- 1. Mandatory Price Evaluation Row -->
+                        <tr class="price-evaluation-row">
                             <td>
                                 <strong>Commercial / Price Evaluation</strong><br>
-                                <span style="font-size: 12px; color: var(--text-muted);">Calculated via relative inverse quote pricing</span>
+                                <small class="text-muted">Calculated via relative inverse quote pricing</small>
                             </td>
                             <td>N/A</td>
                             <td>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <input type="number" step="0.1" min="0" max="100" name="price_weighting" class="form-control weight-input" 
-                                        value="{{ (project.price_weighting * 100)|round(2) if project.price_weighting <= 1 else project.price_weighting }}">
-                                    <span>%</span>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.01" name="price_weighting" class="form-control weight-input" value="{{ project.price_weighting if project and project.price_weighting is not none else 90.00 }}">
+                                    <span class="input-group-text">%</span>
                                 </div>
                             </td>
                             {% for vendor in vendors %}
-                                <td>
-                                    <span class="score-display vendor-price-score" id="priceScoreDisplay_{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0 }}">
-                                        {{ "%.2f"|format(vendor.price_score or 0) }}
-                                    </span>
-                                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;" id="matrixRateDisplay_{{ vendor.id }}">
-                                        ZAR {{ "{:,.2f}".format(vendor.total_effective_rate) if vendor.total_effective_rate else '0.00' }} per unit
-                                    </div>
-                                </td>
+                            <td class="text-center">
+                                <span class="vendor-price-score fw-bold fs-5" id="priceScoreDisplay_{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0.0 }}">
+                                    {{ "%.2f"|format(vendor.price_score or 0.0) }}
+                                </span><br>
+                                <small class="text-muted" id="matrixRateDisplay_{{ vendor.id }}">
+                                    {{ "ZAR {:,.2f}".format(vendor.total_effective_rate or 0.0) }} per unit
+                                </small>
+                            </td>
                             {% endfor %}
                             <td></td>
                         </tr>
 
-                        <!-- Detailed Pricing Line Items per Vendor -->
-                        {% for vendor in vendors %}
-                            {% for item in vendor.pricing_items %}
-                            <tr class="pricing-line-item-row" id="row_pricing_{{ item.id }}">
-                                <td>
-                                    <input type="text" name="pricing_name_{{ item.id }}" class="form-control" value="{{ item.cost_component_name }}">
-                                </td>
-                                <td>
-                                    <select name="pricing_category_{{ item.id }}" class="form-control">
-                                        <option value="One-Off Cost" {% if item.cost_type_category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                        <option value="Annual Cost" {% if item.cost_type_category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
-                                    </select>
-                                </td>
-                                <td>
-                                    <!-- Weight/Amount placeholder or leave blank for individual vendors -->
-                                </td>
-                                {% for v in vendors %}
-                                    {% if v.id == vendor.id %}
-                                        <td>
-                                            <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" class="form-control" value="{{ item.amount }}">
-                                        </td>
-                                    {% else %}
-                                        <td></td>
-                                    {% endif %}
-                                {% endfor %}
-                                <td style="text-align: center;">
-                                    <button type="button" class="btn-icon-danger" onclick="deletePricingRow('{{ item.id }}')" title="Remove Line Item">&#128465;</button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% endfor %}
-
-                        <!-- Qualitative / Non-Pricing Rows -->
-                        {% for criteria in qualitative_criteria %}
-                        <tr class="qualitative-row" id="row_qualitative_{{ criteria.id }}">
+                        <!-- 2. Dynamic Qualitative Criteria Rows from project_weightings -->
+                        {% for criteria in criteria_list %}
+                        <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
                             <td>
-                                <strong>{{ criteria.criteria_name }}</strong>
+                                <input type="text" name="criteria_name_{{ criteria.id }}" class="form-control form-control-sm criteria-name-input" value="{{ criteria.criteria_name }}" required>
                             </td>
                             <td>Qualitative</td>
                             <td>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <input type="number" step="0.1" min="0" max="100" name="weighting_{{ criteria.id }}" class="form-control weight-input" value="{{ criteria.weighting_percent }}">
-                                    <span>%</span>
+                                <div class="input-group input-group-sm">
+                                    <input type="number" step="0.01" name="criteria_weight_{{ criteria.id }}" class="form-control weight-input" value="{{ criteria.weighting_percent }}" required>
+                                    <span class="input-group-text">%</span>
                                 </div>
                             </td>
                             {% for vendor in vendors %}
-                                {% set ns = namespace(score=0) %}
-                                {% for item in criteria.scores %}
-                                    {% if item.procurement_option_id == vendor.id %}
-                                        {% set ns.score = item.score %}
-                                    {% endif %}
-                                {% endfor %}
-                                <td>
-                                    <input type="number" step="0.1" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" class="form-control" value="{{ ns.score }}">
-                                </td>
+                            {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
+                            <td class="text-center">
+                                <input type="number" step="0.1" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" class="form-control form-control-sm text-center score-input" value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" data-vendor-id="{{ vendor.id }}">
+                            </td>
                             {% endfor %}
-                            <td></td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); calculateAll();">
+                                    &#128465;
+                                </button>
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
-                </table>
+              
                     <!-- Inside the Criteria Matrix Footer (tfoot) -->
                     <tfoot>
-                        <tr class="total-row" style="background-color: #e7f5ff;">
-                            <td colspan="2">
-                                <strong>Final Weighted Score (/10)</strong>
-                                <span style="font-size: 12px; font-weight: normal; color: var(--text-muted); margin-left: 8px;">
-                                    (Total Weight: <span id="totalWeightDisplay">100.00%</span>)
-                                </span>
-                            </td>
+                        <tr>
+                            <th colspan="3">Final Weighted Score (/10) <small id="totalWeightDisplay" class="ms-2 fw-bold"></small></th>
                             {% for vendor in vendors %}
-                                <td style="border-left: 2px solid var(--border-color); text-align: center;">
-                                    <strong style="font-size: 15px; color: var(--primary-blue);" id="vendorTotal_{{ vendor.id }}">
-                                        0.00
-                                    </strong>
-                                </td>
+                            <th class="text-center">
+                                <span id="vendorTotal_{{ vendor.id }}" class="fs-5 text-primary">0.00</span>
+                            </th>
                             {% endfor %}
+                            <th></th>
                         </tr>
-                        <tr class="total-row">
-                            <td colspan="2">Option Quantity &amp; Unit</td>
+                        <tr>
+                            <th colspan="3">Option Quantity & Unit</th>
                             {% for vendor in vendors %}
-                                <td style="border-left: 2px solid var(--border-color);">
-                                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                        <input type="number" step="any" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.total_quantity or '' }}" placeholder="Qty" style="width: 75px; padding: 2px 4px; font-size: 12px;" title="Option Total Quantity">
-                                        <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm" value="{{ vendor.unit_of_measure or 'm2' }}" placeholder="Unit" style="width: 55px; padding: 2px 4px; font-size: 12px;" title="Unit of Measure">
-                                    </div>
-                                </td>
+                            <th class="text-center">
+                                <div class="d-flex justify-content-center gap-1">
+                                    <input type="number" step="0.01" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm text-center" style="width: 80px;" value="{{ vendor.option_quantity or 1.0 }}">
+                                    <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm text-center" style="width: 60px;" value="{{ vendor.option_unit or 'm2' }}">
+                                </div>
+                            </th>
                             {% endfor %}
+                            <th></th>
                         </tr>
-                        <tr class="total-row">
-                            <td colspan="2">Total Effective Unit Rate</td>
+                        <tr>
+                            <th colspan="3">Total Effective Unit Rate</th>
                             {% for vendor in vendors %}
-                                <td style="border-left: 2px solid var(--border-color);">
-                                    <strong style="font-size: 14px; color: var(--primary-blue);" id="tableVendorUnitRate_{{ vendor.id }}">
-                                        ZAR 0.00
-                                    </strong>
-                                </td>
+                            <th class="text-center" id="tableVendorUnitRate_{{ vendor.id }}">
+                                ZAR {{ "%.2f"|format(vendor.total_effective_rate or 0.0) }}
+                            </th>
                             {% endfor %}
+                            <th></th>
                         </tr>
-                        <tr class="total-row">
-                            <td colspan="2">Projected 5-Year Total Cost</td>
+                        <tr>
+                            <th colspan="3">Projected 5-Year Total Cost</th>
                             {% for vendor in vendors %}
-                                <td style="border-left: 2px solid var(--border-color);">
-                                    <strong style="font-size: 15px; color: var(--text-main);" id="tableVendorTotal_{{ vendor.id }}">
-                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}
-                                    </strong>
-                                </td>
+                            <th class="text-center" id="cardTotal_{{ vendor.id }}">
+                                ZAR {{ "%.2f"|format(vendor.projected_5yr_cost or 0.0) }}
+                            </th>
                             {% endfor %}
+                            <th></th>
                         </tr>
                     </tfoot>
                 </table>
