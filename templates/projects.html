@@ -535,7 +535,7 @@
                             {% for vendor in vendors %}
                             <th class="text-center">
                                 <div class="d-flex justify-content-center gap-1">
-                                    <input type="number" step="0.01" name="option_quantity_{{ vendor.id }}" class="form-control form-control-sm text-center" style="width: 80px;" value="{{ vendor.total_quantity if vendor.total_quantity is not none else (vendor.option_quantity or 1.0) }}">
+                                    <input type="number" step="0.01" name="total_quantity_{{ vendor.id }}" class="form-control form-control-sm text-center" style="width: 80px;" value="{{ vendor.total_quantity if vendor.total_quantity is not none else (vendor.total_quantity or 1.0) }}">
                                     <input type="text" name="option_unit_{{ vendor.id }}" class="form-control form-control-sm text-center" style="width: 60px;" value="{{ vendor.unit_of_measure if vendor.unit_of_measure is not none else (vendor.option_unit or 'm2') }}">
                                 </div>
                             </th>
@@ -710,7 +710,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!tbody) return;
 
         // 1. Collect quantities per vendor from footer or input fields
-        document.querySelectorAll('input[name^="option_quantity_"]').forEach(input => {
+        document.querySelectorAll('input[name^="total_quantity_"]').forEach(input => {
             const vendorId = input.name.split('_')[2];
             vendorQuantities[vendorId] = parseFloat(input.value) || 1.0;
         });

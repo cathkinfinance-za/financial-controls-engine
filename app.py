@@ -690,14 +690,14 @@ def projects_page(project_id=None):
         cursor.execute("SELECT * FROM options_line_items_pricing WHERE procurement_option_id = %s ORDER BY id ASC;", (vendor["id"],))
         vendor["pricing_items"] = cursor.fetchall()
         total_cost = vendor.get('total_cost', 0.0)
-        quantity = vendor.get('option_quantity', 1.0) or 1.0
+        quantity = vendor.get('total_quantity', 1.0) or 1.0
         vendor['total_effective_rate'] = total_cost / quantity
         vendor['projected_5yr_total'] = vendor.get('total_effective_rate') or vendor.get('quote_total') or 0.0
 
     vendor_rates = {}
 
     for vendor in vendors:
-        qty = float(vendor.get('total_quantity') or vendor.get('option_quantity') or 1.0)
+        qty = float(vendor.get('total_quantity') or vendor.get('total_quantity') or 1.0)
         if qty <= 0:
             qty = 1.0
 
@@ -1081,8 +1081,8 @@ def update_project(project_id):
                         """, (line_item_id, vendor_id, criteria_id, score_val, weighted_contrib))
 
             # Option Quantities & Units
-            elif key.startswith("option_quantity_"):
-                opt_id = key.replace("option_quantity_", "")
+            elif key.startswith("total_quantity_"):
+                opt_id = key.replace("total_quantity_", "")
                 if opt_id.isdigit():
                     qty_val = float(value) if value else 1.0
                     cursor.execute("""
@@ -1103,13 +1103,13 @@ def update_project(project_id):
         conn.commit()
 
         # 4. Instantly Recalculate 5-Year Totals & Inverse Pricing Scores
-        cursor.execute("SELECT id, total_quantity, option_quantity FROM procurement_options WHERE project_id = %s;", (project_id,))
+        cursor.execute("SELECT id, total_quantity, total_quantity FROM procurement_options WHERE project_id = %s;", (project_id,))
         project_vendors = cursor.fetchall()
 
         vendor_rates = {}
         for v in project_vendors:
             v_id = v['id']
-            qty = float(v.get('total_quantity') or v.get('option_quantity') or 1.0)
+            qty = float(v.get('total_quantity') or v.get('total_quantity') or 1.0)
             if qty <= 0:
                 qty = 1.0
 
