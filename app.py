@@ -740,6 +740,47 @@ def projects_page(project_id=None):
         vendor['total_effective_rate'] = total_cost / quantity
         vendor['projected_5yr_total'] = vendor.get('total_effective_rate') or vendor.get('quote_total') or 0.0
 
+    vendor_rates = {}
+
+    # 1. Calculate Projected 5-Year Total Cost & Effective Unit Rate per Vendor
+    for vendor in vendors:
+        qty = float(vendor.get('total_quantity') or vendor.get('option_quantity') or 1.0)
+        if qty <= 0:
+            qty = 1.0
+
+        one_off = sum(float(item['amount']) for item in vendor['pricing_items'] if item['cost_type_category'] == 'One-Off Cost')
+        annual = sum(float(item['amount']) for item in vendor['pricing_items'] if item['cost_type_category'] == 'Annual Cost')
+        
+        projected_5yr_cost = one_off + (annual * 5)
+        effective_unit_rate = projected_5yr_cost / qty
+        
+        vendor['projected_5yr_cost'] = projected_5yr_cost
+        vendor['total_effective_rate'] = effective_unit_rate
+        vendor_rates[vendor['id']] = effective_unit_rate
+
+    # 2. Inversely Score Price based on lowest Total Effective Unit Rate
+    min_rate = min([r for r in vendor_rates.values() if r > 0], default=0)
+
+    for vendor in vendors:
+        rate = vendor_rates[vendor['id']]
+        if rate > 0 and min_rate > 0:
+            price_score = (min_rate / rate) * 10.0
+        else:
+            price_score = 0.0
+            
+        vendor['price_score'] = round(price_score, 2)
+        
+        # Persist calculations back to DB
+        cursor.execute("""
+            UPDATE procurement_options 
+            SET price_score = %s, total_effective_rate = %s, projected_5yr_cost = %s 
+            WHERE id = %s;
+        """, (vendor['price_score'], vendor['total_effective_rate'], vendor['projected_5yr_cost'], vendor['id']))
+
+    # Commit DB updates for updated pricing metrics
+    conn.commit()
+    # =========================================================================
+
     cursor.execute("""
         SELECT line_item_id, procurement_option_id, weighting_id, score 
         FROM options_line_items_non_pricing 
@@ -968,7 +1009,8 @@ def update_project(project_id):
             price_weighting, executive_sourcing_recommendation, project_id
         ))
 
-        deleted_item_ids = request.form.getlist("delete_pricing_item")
+        deleted_item_ids = set(request.form.getlist("delete_pricing_item"))
+
         for item_id in deleted_item_ids:
             cursor.execute("""
                 DELETE FROM options_line_items_pricing 
@@ -976,6 +1018,9 @@ def update_project(project_id):
             """, (item_id,))
 
         for key, value in request.form.items():
+            if any(key.endswith(f"_{d_id}") for d_id in deleted_item_ids):
+                continue
+
             if key.startswith("pricing_name_"):
                 item_id = key.replace("pricing_name_", "")
                 cursor.execute("""
