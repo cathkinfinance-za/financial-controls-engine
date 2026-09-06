@@ -208,15 +208,15 @@ def execute_phase1(project_id):
             cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
             vendors = cursor.fetchall()
 
-        if not vendors:
-            log_to_db(conn, project_id, "AI Matrix Drafter", "❌ Aborted: No procurement options linked to project.")
-            return
+            if not vendors:
+                log_to_db(conn, project_id, "AI Matrix Drafter", "❌ Aborted: No procurement options linked to project.")
+                return
 
-        # Wipe out old pricing & non-pricing line items before regenerating
-        reset_project_matrix(cursor, project_id)
+            # Wipe out old pricing & non-pricing line items before regenerating
+            reset_project_matrix(cursor, project_id)
+            conn.commit()
 
         gemini_contents = []
-
         vendor_names = []
         vendor_map = {}
 
