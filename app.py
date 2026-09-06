@@ -1275,10 +1275,15 @@ Project Objectives: {project.get('project_objective', '')}
 {formatted_task_prompt}
 """
 
-            model_name = (rec_row.get('selected_model') if rec_row else None) or 'gemini-3.6-flash'
-            model = genai.GenerativeModel(model_name)
-            
-            response = model.generate_content(full_prompt)
+            model_name = (rec_row.get('selected_model') if rec_row else None) or 'gemini-2.5-flash'
+
+            # Initialize client (uses GEMINI_API_KEY from environment)
+            client = genai.Client()
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=[full_prompt]
+            )
             generated_text = response.text if response and response.text else "No content generated."
 
             cursor.execute("""
