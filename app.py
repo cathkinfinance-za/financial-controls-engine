@@ -969,13 +969,22 @@ def update_project(project_id):
         ))
 
         # 2. Process Line Item Deletions First
-        deleted_item_ids = set(request.form.getlist("delete_pricing_item"))
-        for item_id in deleted_item_ids:
-            if item_id and item_id.isdigit():
-                cursor.execute("""
-                    DELETE FROM options_line_items_pricing 
-                    WHERE id = %s;
-                """, (int(item_id),))
+        deleted_criteria_ids = request.form.getlist('deleted_criteria_ids')
+        deleted_item_ids = request.form.getlist('deleted_item_ids')
+
+        if deleted_criteria_ids:
+            cursor.execute(
+            "DELETE FROM project_weightings WHERE id = ANY(%s::int[]);", 
+            (deleted_criteria_ids,)
+        )
+
+        if deleted_item_ids:
+            cursor.execute(
+                "DELETE FROM options_line_items_pricing WHERE id = ANY(%s::int[]);", 
+                (deleted_item_ids,)
+            )
+
+        conn.commit()
 
         # 3. Process Form Field Dynamic Updates
         for key, value in request.form.items():
