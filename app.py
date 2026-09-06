@@ -864,32 +864,75 @@ def view_quote(option_id):
             )
 
 
-@app.route("/draft-matrix/<int:project_id>", methods=["POST"])
-def draft_matrix(project_id):
-    try:
-        raw_weight = float(request.form.get("price_weighting", 30))
-    except (ValueError, TypeError):
-        raw_weight = 30.0
-
-    price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
-    prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
+@app.route("/execute-phase1/<int:project_id>", methods=["POST"])
+def handle_phase1(project_id):
+    # Retrieve Phase 1 dynamic adjustments from form submission
+    phase1_adjustments = request.form.get("phase1_prompt_adjustments", "")
 
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE projects 
-        SET ai_prompt_adjustments = %s, price_weighting = %s, latest_ai_status = 'Processing AI Matrix...' 
-        WHERE id = %s;
-    """, (prompt_adjustments, price_weighting, project_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
     try:
-        execute_phase1(project_id)
-        flash("AI Matrix Draft completed successfully.")
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE projects 
+                SET phase1_prompt_adjustments = %s, latest_ai_status = 'Formulating Criteria (Phase 1)...' 
+                WHERE id = %s;
+            """, (phase1_adjustments, project_id))
+        conn.commit()
+
+        # Pass BOTH conn and project_id to match the refactored function signature
+        execute_phase1(conn, project_id)
+        
+        # Update status upon completion
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE projects SET latest_ai_status = 'Phase 1 Complete' WHERE id = %s;", (project_id,))
+        conn.commit()
+
+        flash("Phase 1: Assessment Criteria Formulated Successfully!")
     except Exception as e:
-        flash(f"Error during AI drafting: {str(e)}")
+        conn.rollback()
+        flash(f"Error during Phase 1 processing: {str(e)}")
+    finally:
+        conn.close()
+
+    return redirect(url_for("projects_page", project_id=project_id))
+
+
+@app.route("/process-vendor-pricing/<int:project_id>", methods=["POST"])
+def handle_phase2(project_id):
+    # Retrieve Phase 2 qualitative prompt adjustments from form submission
+    ai_adjustments = request.form.get("ai_prompt_adjustments", "")
+
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE projects 
+                SET ai_prompt_adjustments = %s, latest_ai_status = 'Evaluating Vendors (Phase 2)...' 
+                WHERE id = %s;
+            """, (ai_adjustments, project_id))
+            
+            cursor.execute("SELECT * FROM vendor_options WHERE project_id = %s;", (project_id,))
+            vendors = cursor.fetchall()
+        conn.commit()
+
+        if not vendors:
+            flash("No vendor quotes uploaded to evaluate.")
+            return redirect(url_for("projects_page", project_id=project_id))
+
+        # Loop through each vendor and evaluate quotes/pricing against criteria
+        for vendor in vendors:
+            process_vendor_quote_pricing(conn, vendor, project_id)
+
+        with conn.cursor() as cursor:
+            cursor.execute("UPDATE projects SET latest_ai_status = 'Phase 2 Complete' WHERE id = %s;", (project_id,))
+        conn.commit()
+
+        flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error during Phase 2 evaluation: {str(e)}")
+    finally:
+        conn.close()
 
     return redirect(url_for("projects_page", project_id=project_id))
 
