@@ -11,7 +11,7 @@ import requests
 import time
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, g
 from werkzeug.utils import secure_filename
-from ai_matrix_drafter_postgres import execute_phase1
+from ai_matrix_drafter_postgres import execute_phase1, process_vendor_quote_pricing
 from vendor_comparison_engine_postgres import execute_phase2
 from collections import defaultdict
 from flask import send_file, abort

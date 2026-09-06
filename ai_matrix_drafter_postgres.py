@@ -4,6 +4,7 @@ import json
 import time
 import datetime
 import psycopg2
+from google.genai import types
 from psycopg2.extras import RealDictCursor
 from google import genai
 from google.genai import types
@@ -51,6 +52,27 @@ class Phase1Output(BaseModel):
     precheck_analysis: str
     criteria: List[CriterionDetail]
     line_items: List[Any]  # Or your specific pricing line-item format if handled together
+
+def call_gemini_api(model: str, contents: list) -> dict:
+    """
+    Helper function to invoke Gemini model and return parsed JSON output.
+    """
+    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    
+    response = client.models.generate_content(
+        model=model,
+        contents=contents,
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json"
+        )
+    )
+    
+    try:
+        parsed_content = json.loads(response.text)
+    except json.JSONDecodeError:
+        parsed_content = {}
+        
+    return {"parsed_content": parsed_content, "raw_text": response.text}
 
 def clean_schema(schema):
     if isinstance(schema, dict):
