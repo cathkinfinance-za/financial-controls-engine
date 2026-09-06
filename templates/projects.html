@@ -882,7 +882,9 @@ function addPricingLineItem() {
     const tbody = lineItemTable.querySelector('tbody');
     if (!tbody) return;
 
-    const newId = 'new_' + Date.now();
+    const newIndex = Date.now();
+    
+    // Select vendor elements to grab data-vendor-id attributes
     const vendors = document.querySelectorAll('.vendor-price-score');
 
     let vendorCells = '';
@@ -890,26 +892,31 @@ function addPricingLineItem() {
         const vId = v.getAttribute('data-vendor-id');
         vendorCells += `
             <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
-                <input type="number" step="0.01" name="pricing_amount_new_${vendorId}_${newIndex}" class="form-control item-amount" value="0.00">
+                <input type="number" step="0.01" name="pricing_amount_new_${vId}_${newIndex}" class="form-control item-amount" value="0.00">
             </td>`;
     });
 
-    const tr = document.createElement('tr');
-    tr.className = 'pricing-line-item-row';
-    tr.innerHTML = `
-        <td><input type="text" name="pricing_name_new_${newId}" class="form-control" placeholder="New Cost Item" required></td>
+    const newRow = document.createElement('tr');
+    newRow.innerHTML = `
         <td>
-            <select name="pricing_category_new_${newId}" class="form-control item-category">
+            <input type="text" name="pricing_name_new_${newIndex}" class="form-control" placeholder="Enter cost component description..." required>
+        </td>
+        <td>
+            <select name="pricing_category_new_${newIndex}" class="form-control">
                 <option value="One-Off Cost">One-Off Cost</option>
-                <option value="Annual Cost">Annual Cost</option>
+                <option value="Annual Recurring Cost">Annual Recurring Cost</option>
+                <option value="Variable Cost">Variable Cost</option>
             </select>
         </td>
         ${vendorCells}
-        <td class="text-center">
-            <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); calculateAll();">&#128465;</button>
-        </td>`;
+        <td style="text-align: center;">
+            <button type="button" class="btn btn-outline-danger btn-sm" onclick="this.closest('tr').remove();">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
 
-    tbody.appendChild(tr);
+    tbody.appendChild(newRow);
     calculateAll();
 }
 
