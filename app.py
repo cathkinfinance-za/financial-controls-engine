@@ -982,6 +982,7 @@ def update_project(project_id):
     project_objective = request.form.get("project_objective", "")
     ai_prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
     phase1_prompt_adjustments = request.form.get("phase1_prompt_adjustments", "")
+    phase2_prompt_adjustments = request.form.get("ai_prompt_adjustments", "")
     gl_code = request.form.get("gl_code", "")
     gl_title = request.form.get("gl_title", "")
     gl_sub = request.form.get("gl_sub", "")

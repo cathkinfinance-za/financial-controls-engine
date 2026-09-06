@@ -243,13 +243,13 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         # 5. Database Writes: Non-Pricing Items
         cursor.execute("""
             DELETE FROM options_line_items_non_pricing 
-            WHERE vendor_option_id = %s;
+            WHERE procurement_option_id = %s;
         """, (vendor_id,))
         
         for np_item in parsed_data.get('non_pricing_evaluations', []):
             cursor.execute("""
                 INSERT INTO options_line_items_non_pricing 
-                (vendor_option_id, weighting_id, score, justification)
+                (procurement_option_id, weighting_id, score, justification)
                 VALUES (%s, %s, %s, %s);
             """, (
                 vendor_id, 
@@ -261,13 +261,13 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         # 6. Database Writes: Pricing Line Items
         cursor.execute("""
             DELETE FROM options_line_items_pricing 
-            WHERE vendor_option_id = %s;
+            WHERE procurement_option_id = %s;
         """, (vendor_id,))
         
         for p_item in parsed_data.get('pricing_line_items', []):
             cursor.execute("""
                 INSERT INTO options_line_items_pricing 
-                (vendor_option_id, description, cost_type, raw_amount, quantity, normalized_amount)
+                (procurement_option_id, description, cost_type, raw_amount, quantity, normalized_amount)
                 VALUES (%s, %s, %s, %s, %s, %s);
             """, (
                 vendor_id,
