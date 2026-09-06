@@ -142,9 +142,9 @@ def execute_phase1(conn, project_id):
         
         for item in criteria_list:
             cursor.execute("""
-                INSERT INTO project_weightings (project_id, component_name, weight_percent)
+                INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
                 VALUES (%s, %s, %s);
-            """, (project_id, item.get('component_name'), item.get('weight_percent')))
+            """, (project_id, item.get('criteria_name'), item.get('weight_percent')))
 
     conn.commit()
     return {"status": "success", "project_id": project_id}
