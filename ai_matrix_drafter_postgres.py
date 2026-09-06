@@ -263,19 +263,17 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
             DELETE FROM options_line_items_pricing 
             WHERE procurement_option_id = %s;
         """, (vendor_id,))
-        
+
         for p_item in parsed_data.get('pricing_line_items', []):
             cursor.execute("""
                 INSERT INTO options_line_items_pricing 
-                (procurement_option_id, description, cost_type, raw_amount, quantity, normalized_amount)
-                VALUES (%s, %s, %s, %s, %s, %s);
+                (procurement_option_id, cost_component_name, cost_type_category, amount)
+                VALUES (%s, %s, %s, %s);
             """, (
                 vendor_id,
-                p_item.get('description'),
-                p_item.get('cost_type', 'One-Off'),
-                p_item.get('raw_amount'),
-                p_item.get('quantity', 1),
-                p_item.get('normalized_amount')
+                p_item.get('cost_component_name'),
+                p_item.get('cost_type_category', 'One-Off Cost'),
+                p_item.get('amount')
             ))
 
     conn.commit()
