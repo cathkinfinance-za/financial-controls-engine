@@ -294,6 +294,43 @@
             visibility: visible;
             opacity: 1;
         }
+
+        /* Progress Gradient Button Styling */
+        .btn-phase1 { 
+            background-color: #212529; 
+            color: #ffffff; 
+            border: 1px solid #212529; 
+        }
+        .btn-phase1:hover { 
+            background-color: #000000; 
+        }
+
+        .btn-phase2 { 
+            background-color: #0d6efd; 
+            color: #ffffff; 
+            border: 1px solid #0d6efd; 
+        }
+        .btn-phase2:hover { 
+            background-color: #0b5ed7; 
+        }
+
+        .btn-phase3 { 
+            background-color: #e2e8f0; 
+            color: #1e293b; 
+            border: 1px solid #cbd5e1; 
+        }
+        .btn-phase3:hover { 
+            background-color: #cbd5e1; 
+        }
+
+
+        textarea[name="executive_sourcing_recommendation"] {
+            min-height: 140px;
+            background-color: #fdfdfd;
+            font-family: inherit;
+            line-height: 1.5;
+        }
+
     </style>
 </head>
 <body>
@@ -339,22 +376,22 @@
                     <!-- Phase 1: Assessment Criteria Formulation -->
                     <form id="phase1-form" action="/execute-phase1/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="syncPhase1Text()">
                         <input type="hidden" name="phase1_prompt_adjustments" id="hidden_phase1_adjustments">
-                        <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>
+                        <button type="submit" class="btn btn-phase1" {% if not project %}disabled{% endif %}>
                             Phase 1: Formulate Criteria
                         </button>
                     </form>
                     
                     <!-- Phase 2: Vendor Quote & Pricing Processing -->
                     <form action="/process-vendor-pricing/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-blue" {% if not project or not vendors %}disabled{% endif %}>
+                        <button type="submit" class="btn btn-phase2" {% if not project or not vendors %}disabled{% endif %}>
                             Phase 2: Evaluate Vendors
                         </button>
                     </form>
                     
                     <!-- Generate Recommendation (Untouched) -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
-                                Generate Recommendation
+                            <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
+                                Phase 3: Executive Recommendation
                             </button>
                         </form>
 
@@ -677,6 +714,15 @@
                 </tfoot>
             </table>
                 {% endif %}
+
+                <!-- Executive Sourcing Recommendation Output -->
+                <div class="form-row">
+                    <label class="form-label">Executive Sourcing Recommendation</label>
+                    <textarea name="executive_sourcing_recommendation" 
+                            class="form-control" 
+                            rows="6" 
+                            placeholder="Phase 3 recommendation text will appear here after execution...">{{ project.executive_sourcing_recommendation if project and project.executive_sourcing_recommendation else '' }}</textarea>
+                </div>
 
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">
