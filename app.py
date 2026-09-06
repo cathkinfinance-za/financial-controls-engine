@@ -1097,7 +1097,7 @@ def update_project(project_id):
                     weight_val = float(request.form.get(f"criteria_weight_new_{suffix}", 0.0))
                     
                     cursor.execute("""
-                        INSERT INTO project_weightings (project_id, criteria_name, weighting_percent)
+                        INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
                         VALUES (%s, %s, %s)
                         RETURNING id;
                     """, (project_id, criteria_name, weight_val))
@@ -1134,7 +1134,7 @@ def update_project(project_id):
                     weight_val = float(value) if value else 0.0
                     cursor.execute("""
                         UPDATE project_weightings 
-                        SET weighting_percent = %s 
+                        SET weight_percent = %s 
                         WHERE id = %s;
                     """, (weight_val, int(criteria_id)))
 
@@ -1146,9 +1146,9 @@ def update_project(project_id):
                     vendor_id = int(parts[2])
                     score_val = float(value) if value else 0.0
 
-                    cursor.execute("SELECT weighting_percent FROM project_weightings WHERE id = %s;", (criteria_id,))
+                    cursor.execute("SELECT weight_percent FROM project_weightings WHERE id = %s;", (criteria_id,))
                     res = cursor.fetchone()
-                    weight = float(res['weighting_percent']) if res and res.get('weighting_percent') is not None else 0.0
+                    weight = float(res['weight_percent']) if res and res.get('weight_percent') is not None else 0.0
                     weighted_contrib = score_val * (weight / 100.0)
 
                     cursor.execute("""
