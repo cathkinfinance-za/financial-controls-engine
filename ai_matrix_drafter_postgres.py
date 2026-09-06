@@ -90,6 +90,7 @@ def execute_phase1(conn, project_id):
     Retrieves system prompt & adjustments, runs Gemini to define project weights,
     and updates 'projects' and 'project_weightings'.
     """
+
     with conn.cursor() as cursor:
         # 1. Fetch active system prompt
         cursor.execute("""
