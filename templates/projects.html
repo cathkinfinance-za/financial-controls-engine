@@ -842,7 +842,10 @@ function addQualitativeRow() {
         const vId = v.getAttribute('data-vendor-id');
         vendorCellsHtml += `
             <td class="text-center">
-                <input type="number" step="0.1" min="0" max="10" name="score_new_${newId}_${vId}" class="form-control form-control-sm text-center score-input" value="0.0" data-vendor-id="${vId}">
+                <input type="number" step="0.1" min="0" max="10" 
+                    name="score_new_${newId}_${vId}" 
+                    class="form-control form-control-sm text-center score-input" 
+                    value="0.0" data-vendor-id="${vId}">
             </td>`;
     });
 

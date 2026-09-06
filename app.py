@@ -1038,6 +1038,39 @@ def update_project(project_id):
                         VALUES (%s, %s, %s, %s);
                     """, (int(vendor_id), cost_name, category, amount))
 
+            # In app.py -> update_project(project_id) inside the form loop:
+
+            # 1. Catch newly added qualitative criteria definitions
+            elif key.startswith("criteria_name_new_"):
+                suffix = key.replace("criteria_name_new_", "")
+                criteria_name = value.strip()
+                
+                if criteria_name:
+                    weight_val = float(request.form.get(f"criteria_weight_new_{suffix}", 0.0))
+                    
+                    # Insert new weighting record into DB
+                    cursor.execute("""
+                        INSERT INTO project_weightings (project_id, criteria_name, weighting_percent)
+                        VALUES (%s, %s, %s)
+                        RETURNING id;
+                    """, (project_id, criteria_name, weight_val))
+                    
+                    new_criteria_id = cursor.fetchone()["id"]
+
+                    # Insert corresponding vendor scores for the new criterion
+                    for vendor in project_vendors:
+                        v_id = vendor["id"]
+                        raw_score = request.form.get(f"score_new_{suffix}_{v_id}", 0.0)
+                        score_val = float(raw_score) if raw_score else 0.0
+                        weighted_contrib = score_val * (weight_val / 100.0)
+                        line_item_id = f"np_{new_criteria_id}_{v_id}"
+
+                        cursor.execute("""
+                            INSERT INTO options_line_items_non_pricing 
+                            (line_item_id, procurement_option_id, weighting_id, score, weighted_score_contribution)
+                            VALUES (%s, %s, %s, %s, %s);
+                        """, (line_item_id, v_id, new_criteria_id, score_val, weighted_contrib))
+            
             # Qualitative Criteria Names & Weightings
             elif key.startswith("criteria_name_"):
                 criteria_id = key.replace("criteria_name_", "")
