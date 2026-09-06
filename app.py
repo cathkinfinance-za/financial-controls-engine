@@ -870,13 +870,22 @@ def handle_phase1(project_id):
     phase1_adjustments = request.form.get("phase1_prompt_adjustments", "")
 
     conn = get_db_connection()
+
     try:
         with conn.cursor() as cursor:
+            if phase1_adjustments:
+                cursor.execute("""
+                    UPDATE projects 
+                    SET phase1_prompt_adjustments = %s
+                    WHERE id = %s;
+                """, (phase1_adjustments, project_id))
+            
             cursor.execute("""
                 UPDATE projects 
-                SET phase1_prompt_adjustments = %s, latest_ai_status = 'Formulating Criteria (Phase 1)...' 
+                SET latest_ai_status = 'Formulating Criteria (Phase 1)...' 
                 WHERE id = %s;
-            """, (phase1_adjustments, project_id))
+            """, (project_id,))
+
         conn.commit()
 
         # Pass BOTH conn and project_id to match the refactored function signature

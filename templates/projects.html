@@ -337,7 +337,8 @@
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
                     <!-- Phase 1: Assessment Criteria Formulation -->
-                    <form id="phase1-form" action="/execute-phase1/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                    <form id="phase1-form" action="/execute-phase1/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="syncPhase1Text()">
+                        <input type="hidden" name="phase1_prompt_adjustments" id="hidden_phase1_adjustments">
                         <button type="submit" class="btn btn-primary" {% if not project %}disabled{% endif %}>
                             Phase 1: Formulate Criteria
                         </button>
@@ -352,20 +353,22 @@
                     
                     <!-- Generate Recommendation (Untouched) -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
-                        <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
-                            Generate Recommendation
-                        </button>
-                    </form>
-                    
+                            <button type="submit" class="btn btn-secondary" {% if not project %}disabled{% endif %}>
+                                Generate Recommendation
+                            </button>
+                        </form>
+
                     <span class="status-badge">
                         Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
                     </span>
                 </div>
             </div>
 
+            <!-- Main Project Form -->
             <form id="projectForm" action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST">
                 <input type="hidden" name="project_id" value="{{ project.id if project and project.id is not string else '' }}">
-                <!-- Container to hold hidden inputs for deleted line items -->
+                
+            <!-- Container to hold hidden inputs for deleted line items -->
                 <div id="deletedItemsContainer"></div>
 
                 <div class="section-header">
@@ -394,7 +397,7 @@
 
                 <div class="form-row">
                     <label class="form-label" for="phase1_prompt_adjustments">Phase 1 AI Prompt Adjustments</label>
-                    <textarea form="phase1-form" class="form-control" id="phase1_prompt_adjustments" name="phase1_prompt_adjustments" placeholder="Add custom instructions, focus areas, or constraints for Phase 1 matrix drafting...">{{ project.phase1_prompt_adjustments if project else '' }}</textarea>
+                    <textarea class="form-control" id="phase1_prompt_adjustments" name="phase1_prompt_adjustments" placeholder="Add custom instructions, focus areas, or constraints for Phase 1 matrix drafting...">{{ project.phase1_prompt_adjustments if project else '' }}</textarea>
                 </div>
 
                 <div class="form-row">
@@ -945,6 +948,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     calculateAll();
 });
+
+
+function syncPhase1Text() {
+    var sourceText = document.getElementById('phase1_prompt_adjustments').value;
+    document.getElementById('hidden_phase1_adjustments').value = sourceText;
+}
 
 </script>
 
