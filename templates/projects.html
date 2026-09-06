@@ -559,15 +559,25 @@
                             {% for vendor in vendors %}
                             {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
                             <td class="text-center">
-                                <input type="number" step="0.1" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" class="form-control form-control-sm text-center score-input" value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" data-vendor-id="{{ vendor.id }}">
+                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                                    <input type="number" step="0.1" min="0" max="10" 
+                                        name="score_{{ criteria.id }}_{{ vendor.id }}" 
+                                        class="form-control form-control-sm text-center score-input" 
+                                        value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" 
+                                        data-vendor-id="{{ vendor.id }}" 
+                                        style="width: 60px;">
+                                    
+                                    {% if score_entry.justification %}
+                                        <span class="info-tooltip">
+                                            &#9432;
+                                            <span class="tooltip-text">
+                                                <strong>AI Justification:</strong><br>
+                                                {{ score_entry.justification }}
+                                            </span>
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
-                            {% endfor %}
-                            <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="trackAndDeleteRow(this, 'criteria', '{{ criteria.id }}')">
-                                    &#128465;
-                                </button>
-                            </td>
-                        </tr>
                         {% endfor %}
                     </tbody>
               
