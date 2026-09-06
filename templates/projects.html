@@ -725,7 +725,7 @@
                     </tfoot>
                 </table>
 
-                {% endif %} <!-- CLOSES {% if project %} STRUCTURAL BLOCK -->
+                <!--{% endif %} <!-- CLOSES {% if project %} STRUCTURAL BLOCK -->
 
                 <!-- Executive Sourcing Recommendation Output -->
                 <div class="form-row">
@@ -735,6 +735,8 @@
                             rows="6" 
                             placeholder="Phase 3 recommendation text will appear here after execution...">{{ project.executive_sourcing_recommendation if project and project.executive_sourcing_recommendation else '' }}</textarea>
                 </div>
+
+                {% endif %}
 
                 <div style="margin-top: 30px; text-align: right;">
                     <button type="submit" class="btn btn-blue">
