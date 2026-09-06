@@ -91,7 +91,7 @@ def execute_phase1(conn, project_id):
     and updates 'projects' and 'project_weightings'.
     """
     with conn.cursor() as cursor:
-        # 1. Fetch system prompt
+        # 1. Fetch active system prompt
         cursor.execute("""
             SELECT prompt_template, selected_model 
             FROM system_prompts 
@@ -127,7 +127,11 @@ def execute_phase1(conn, project_id):
         ai_response = call_gemini_api(model=selected_model, contents=[formatted_prompt])
         parsed_data = ai_response.get('parsed_content', {})
 
-        price_weighting = parsed_data.get('price_weighting', 0)
+        # Key normalization for price weighting
+        price_weighting = parsed_data.get('price_weight_percent')
+        if price_weighting is None:
+            price_weighting = parsed_data.get('price_weighting', 0)
+
         criteria_list = parsed_data.get('criteria', [])
 
         # 5. Database Writes
@@ -141,10 +145,18 @@ def execute_phase1(conn, project_id):
         cursor.execute("DELETE FROM project_weightings WHERE project_id = %s;", (project_id,))
         
         for item in criteria_list:
-            cursor.execute("""
-                INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
-                VALUES (%s, %s, %s);
-            """, (project_id, item.get('criteria_name'), item.get('weight_percent')))
+            criteria_name = item.get('criteria_name') or item.get('component_name')
+            
+            # Handle weight_percent key extraction safely
+            weight_val = item.get('weight_percent')
+            if weight_val is None:
+                weight_val = item.get('weighting', 0.0)
+
+            if criteria_name and str(criteria_name).strip():
+                cursor.execute("""
+                    INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
+                    VALUES (%s, %s, %s);
+                """, (project_id, str(criteria_name).strip(), weight_val))
 
     conn.commit()
     return {"status": "success", "project_id": project_id}
