@@ -920,7 +920,7 @@ def handle_phase2(project_id):
                 WHERE id = %s;
             """, (ai_adjustments, project_id))
             
-            cursor.execute("SELECT * FROM vendor_options WHERE project_id = %s;", (project_id,))
+            cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
             vendors = cursor.fetchall()
         conn.commit()
 
