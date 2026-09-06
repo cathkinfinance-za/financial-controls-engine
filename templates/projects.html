@@ -524,7 +524,6 @@
                             <td>N/A</td>
                             <td>
                                 <div class="input-group input-group-sm">
-                                    <!-- Line 316 -->
                                     <input type="number" step="0.01" name="price_weighting" class="form-control weight-input" 
                                         value="{{ (project.price_weighting * 100) if project and project.price_weighting <= 1.0 else (project.price_weighting or 90.00) }}">
                                     <span class="input-group-text">%</span>
@@ -712,7 +711,7 @@
                                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="trackAndDeleteRow(this, 'pricing', '{{ ns.sample_id }}')">&#128465;</button>
                                 </td>
                             </tr>
-                        {% endfor %} <!-- PROPERLY CLOSES THE OUTER COMPONENT LOOP -->
+                        {% endfor %}
                     </tbody>
                     <tfoot>
                         <tr class="total-row">
@@ -725,6 +724,8 @@
                         </tr>
                     </tfoot>
                 </table>
+
+                {% endif %} <!-- CLOSES {% if project %} STRUCTURAL BLOCK -->
 
                 <!-- Executive Sourcing Recommendation Output -->
                 <div class="form-row">
