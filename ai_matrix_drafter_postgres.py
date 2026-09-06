@@ -177,6 +177,25 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
     conn.commit()
     log_to_db(conn, project_id, "Pricing Extractor", f"✅ Option-level quantities and normalized pricing inserted for {v_name}.")
 
+def reset_project_matrix(cursor, project_id):
+    """
+    Deletes all existing pricing and non-pricing line items for a project
+    so the AI Drafter can rewrite everything from scratch.
+    """
+    cursor.execute("""
+        DELETE FROM options_line_items_pricing 
+        WHERE procurement_option_id IN (
+            SELECT id FROM procurement_options WHERE project_id = %s
+        );
+    """, (project_id,))
+
+    cursor.execute("""
+        DELETE FROM options_line_items_non_pricing 
+        WHERE procurement_option_id IN (
+            SELECT id FROM procurement_options WHERE project_id = %s
+        );
+    """, (project_id,))
+
 def execute_phase1(project_id):
     conn = get_db_connection()
     try:
@@ -192,6 +211,9 @@ def execute_phase1(project_id):
         if not vendors:
             log_to_db(conn, project_id, "AI Matrix Drafter", "❌ Aborted: No procurement options linked to project.")
             return
+
+        # Wipe out old pricing & non-pricing line items before regenerating
+        reset_project_matrix(cursor, project_id)
 
         gemini_contents = []
 

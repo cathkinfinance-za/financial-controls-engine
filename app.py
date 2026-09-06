@@ -968,6 +968,13 @@ def update_project(project_id):
             price_weighting, executive_sourcing_recommendation, project_id
         ))
 
+        deleted_item_ids = request.form.getlist("delete_pricing_item")
+        for item_id in deleted_item_ids:
+            cursor.execute("""
+                DELETE FROM options_line_items_pricing 
+                WHERE id = %s;
+            """, (item_id,))
+
         for key, value in request.form.items():
             if key.startswith("pricing_name_"):
                 item_id = key.replace("pricing_name_", "")
@@ -993,6 +1000,20 @@ def update_project(project_id):
                     SET cost_type_category = %s 
                     WHERE id = %s;
                 """, (value, item_id))
+
+            elif key.startswith("pricing_name_new_"):
+                suffix = key.replace("pricing_name_new_", "")
+                cost_name = value
+                category = request.form.get(f"pricing_category_new_{suffix}", "One-Off Cost")
+                amount = float(request.form.get(f"pricing_amount_new_{suffix}", 0.0))
+                vendor_id = request.form.get(f"pricing_vendor_new_{suffix}")
+
+                if cost_name and vendor_id:
+                    cursor.execute("""
+                        INSERT INTO options_line_items_pricing 
+                        (procurement_option_id, cost_component_name, cost_type_category, amount)
+                        VALUES (%s, %s, %s, %s);
+                    """, (vendor_id, cost_name, category, amount))
 
             elif key.startswith("weighting_"):
                 criteria_id = key.replace("weighting_", "")

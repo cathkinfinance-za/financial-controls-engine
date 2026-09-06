@@ -445,23 +445,31 @@
 
                 {% if project %}
                 <!-- Qualitative & Pricing Criteria Matrix -->
-                <div class="section-header" style="margin-top: 40px;">Qualitative & Pricing Criteria Matrix</div>
+                <div class="section-header" style="margin-top: 40px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Qualitative & Pricing Criteria Matrix</span>
+                    <button type="button" class="btn btn-secondary" onclick="addPricingRow()">+ Add Pricing Line Item</button>
+                </div>
+
                 <table class="matrix-table" id="criteriaMatrix">
                     <thead>
                         <tr>
-                            <th>Evaluation Criteria</th>
-                            <th style="width: 120px;">Weight (%)</th>
+                            <th>Evaluation Criteria / Line Item</th>
+                            <th style="width: 140px;">Category</th>
+                            <th style="width: 120px;">Weight (%) / Amount</th>
                             {% for vendor in vendors %}
-                                <th>{{ vendor.vendor_name }} (Score /10)</th>
+                                <th>{{ vendor.vendor_name }}</th>
                             {% endfor %}
+                            <th style="width: 50px;">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="matrixTableBody">
+                        <!-- Existing Commercial / Price Evaluation Weighting Row -->
                         <tr class="pricing-row">
                             <td>
                                 <strong>Commercial / Price Evaluation</strong><br>
                                 <span style="font-size: 12px; color: var(--text-muted);">Calculated via relative inverse quote pricing</span>
                             </td>
+                            <td>N/A</td>
                             <td>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <input type="number" step="0.1" min="0" max="100" name="price_weighting" class="form-control weight-input" 
@@ -479,52 +487,36 @@
                                     </div>
                                 </td>
                             {% endfor %}
+                            <td></td>
                         </tr>
-                        {% for criteria in criteria_list %}
-                        <tr class="criteria-row" data-criteria-id="{{ criteria.id }}">
-                            <td>
-                                <input type="text" name="criteria_name_{{ criteria.id }}" 
-                                    class="form-control form-control-sm criteria-name-input" 
-                                    value="{{ criteria.criteria_name }}" 
-                                    style="width: 100%; min-width: 150px;">
-                            </td>
-                            <td>
-                                <div style="display: flex; align-items: center; gap: 4px;">
-                                    <input type="number" step="0.1" min="0" max="100" name="weighting_{{ criteria.id }}" class="form-control weight-input" 
-                                        value="{{ criteria.weighting_percent }}">
-                                    <span>%</span>
-                                </div>
-                            </td>
-                            {% for vendor in vendors %}
-                                {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id) %}
-                                {% set current_score = score_entry.score if score_entry else 0 %}
-                                {% set current_justification = score_entry.justification if score_entry and score_entry.justification else 'No justification provided.' %}
-                                <td style="text-align: center;">
-                                    <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
-                                        <input type="number" step="0.01" min="0" max="10" name="score_{{ criteria.id }}_{{ vendor.id }}" 
-                                            class="form-control form-control-sm score-input vendor-score-{{ vendor.id }}" 
-                                            data-vendor-id="{{ vendor.id }}" 
-                                            value="{{ '%.2f'|format(current_score) }}" 
-                                            style="width: 75px; text-align: center;">
-                                        
-                                        <!-- Hover Tooltip Icon -->
-                                        <div class="info-tooltip" title="">
-                                            ℹ️
-                                            <div class="tooltip-text">
-                                                <strong>AI Reasoning:</strong><br>
-                                                {{ current_justification }}
-                                            </div>
-                                        </div>
-                                    </div>
+
+                        <!-- Detailed Pricing Line Items per Vendor -->
+                        {% for vendor in vendors %}
+                            {% for item in vendor.pricing_items %}
+                            <tr class="pricing-line-item-row" id="row_pricing_{{ item.id }}">
+                                <td>
+                                    <input type="text" name="pricing_name_{{ item.id }}" class="form-control" value="{{ item.cost_component_name }}">
                                 </td>
+                                <td>
+                                    <select name="pricing_category_{{ item.id }}" class="form-control">
+                                        <option value="One-Off Cost" {% if item.cost_type_category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                        <option value="Annual Cost" {% if item.cost_type_category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" step="0.01" name="pricing_amount_{{ item.id }}" class="form-control" value="{{ item.amount }}">
+                                </td>
+                                <td colspan="{{ vendors|length }}">
+                                    <span style="font-size: 12px; color: var(--text-muted);">Option: {{ vendor.vendor_name }}</span>
+                                </td>
+                                <td style="text-align: center;">
+                                    <button type="button" class="btn-icon-danger" onclick="deletePricingRow('{{ item.id }}')" title="Remove Line Item">&#128465;</button>
+                                </td>
+                            </tr>
                             {% endfor %}
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="{{ vendors|length + 2 }}" style="color: var(--text-muted);">No non-pricing criteria available. Click "Draft Matrix via AI" above.</td>
-                        </tr>
                         {% endfor %}
                     </tbody>
+                </table>
                     <!-- Inside the Criteria Matrix Footer (tfoot) -->
                     <tfoot>
                         <tr class="total-row" style="background-color: #e7f5ff;">
@@ -962,6 +954,61 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalCell = document.getElementById(`vendorTotal_${vendorId}`);
             if (totalCell) {
                 totalCell.textContent = finalScore.toFixed(2);
+            }
+        }
+    }
+
+    let newRowCounter = 0;
+
+    function addPricingRow() {
+        newRowCounter++;
+        const tbody = document.getElementById('matrixTableBody');
+        const newRow = document.createElement('tr');
+        newRow.className = 'pricing-line-item-row';
+        newRow.id = `row_pricing_new_${newRowCounter}`;
+
+        let vendorOptions = `
+            {% for vendor in vendors %}
+                <option value="{{ vendor.id }}">{{ vendor.vendor_name }}</option>
+            {% endfor %}
+        `;
+
+        newRow.innerHTML = `
+            <td>
+                <input type="text" name="pricing_name_new_${newRowCounter}" class="form-control" placeholder="New Charge Description" required>
+            </td>
+            <td>
+                <select name="pricing_category_new_${newRowCounter}" class="form-control">
+                    <option value="One-Off Cost">One-Off Cost</option>
+                    <option value="Annual Cost">Annual Cost</option>
+                </select>
+            </td>
+            <td>
+                <input type="number" step="0.01" name="pricing_amount_new_${newRowCounter}" class="form-control" value="0.00" required>
+            </td>
+            <td colspan="{{ vendors|length }}">
+                <select name="pricing_vendor_new_${newRowCounter}" class="form-control">
+                    ${vendorOptions}
+                </select>
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="btn-icon-danger" onclick="this.closest('tr').remove()" title="Remove Line Item">&#128465;</button>
+            </td>
+        `;
+        tbody.appendChild(newRow);
+    }
+
+    function deletePricingRow(itemId) {
+        if (confirm("Are you sure you want to delete this line item?")) {
+            const row = document.getElementById(`row_pricing_${itemId}`);
+            if (row) {
+                // Append hidden field to inform backend to delete this row from database on submit
+                const hiddenDelete = document.createElement('input');
+                hiddenDelete.type = 'hidden';
+                hiddenDelete.name = 'delete_pricing_item';
+                hiddenDelete.value = itemId;
+                document.forms[0].appendChild(hiddenDelete);
+                row.remove();
             }
         }
     }
