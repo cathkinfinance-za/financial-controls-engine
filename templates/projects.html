@@ -710,7 +710,7 @@
                                     <button type="button" class="btn btn-sm btn-outline-danger" onclick="trackAndDeleteRow(this, 'pricing', '{{ ns.sample_id }}')">&#128465;</button>
                                 </td>
                             </tr>
-                        {% endfor %}
+                        {% endfor %} <!-- PROPERLY CLOSES THE OUTER COMPONENT LOOP -->
                     </tbody>
                     <tfoot>
                         <tr class="total-row">
