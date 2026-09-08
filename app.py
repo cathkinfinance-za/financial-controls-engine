@@ -971,11 +971,16 @@ def process_vendor_pricing(project_id):
         flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!", "success")
 
     except Exception as e:
-        conn.rollback()
-        flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
-
+            # Check that conn exists AND is still open before rolling back
+            if conn and not conn.closed:
+                conn.rollback()
+                
+            flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
+            
     finally:
-        conn.close()
+        # Ensure the connection is closed cleanly at the very end
+        if conn and not conn.closed:
+            conn.close()
 
     return redirect(url_for("view_project", project_id=project_id))
 
