@@ -8,6 +8,7 @@ from google import genai
 from google.genai import types
 from duckduckgo_search import DDGS
 
+
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -16,18 +17,67 @@ ai_client = genai.Client(api_key=GEMINI_KEY)
 def get_db_connection():
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
+def build_vendor_payload_part(vendor: dict) -> types.Part | None:
+    """
+    Selects HTML analysis text over PDF raw bytes if available.
+    """
+    analysis_html = vendor.get("analysis_sheet_html")
+    quote_bytes = vendor.get("quote_file_bytes")
+
+    if analysis_html and str(analysis_html).strip():
+        # Pass HTML analysis document as text content
+        return types.Part.from_bytes(
+            data=str(analysis_html).encode("utf-8"),
+            mime_type="text/html",
+        )
+    elif quote_bytes:
+        # Fallback to binary PDF quote
+        raw_data = bytes(quote_bytes) if not isinstance(quote_bytes, bytes) else quote_bytes
+        return types.Part.from_bytes(
+            data=raw_data,
+            mime_type="application/pdf",
+        )
+    
+    return None
+
+def process_vendor_quote_pricing(project_id: int, vendor_options: list[dict], db_connection=None):
+    """
+    Phase 2b Evaluation Engine with Conditional Vendor Content Payload.
+    """
+    contents = []
+
+    for vendor in vendor_options:
+        content_part = build_vendor_payload_part(vendor)
+        if not content_part:
+            continue
+
+        # Construct vendor block for Gemini Evaluation
+        vendor_info_text = f"Vendor ID: {vendor.get('id')}\nVendor Name: {vendor.get('vendor_name', 'Unknown')}\n"
+        
+        contents.append(vendor_info_text)
+        contents.append(content_part)
+
+    if not contents:
+        raise ValueError("No valid PDF or HTML analysis documents found for Phase 2b evaluation.")
+
+    # Proceed with model evaluation call
+    res = ai_client.models.generate_content(
+        model='gemini-3.5-flash-lite',
+        contents=contents
+    )
+    return res.text or ""
+
 def run_due_diligence_osint(conn, project_id, vendors):
     for v in vendors:
         v_id = v['id']
         v_name = v['vendor_name']
-        file_bytes = v.get('quote_file_bytes')
 
         legal_name = v_name
         cipc_num = "N/A"
         vat_num = "N/A"
 
-        if file_bytes:
-            doc_part = types.Part.from_bytes(data=bytes(file_bytes), mime_type="application/pdf")
+        doc_part = build_vendor_payload_part(v)
+        if doc_part:
             parse_prompt = "Extract legal_name, cipc_number, vat_number from document as JSON."
             try:
                 res = ai_client.models.generate_content(
@@ -195,19 +245,17 @@ Pre-Check Analysis: {project['analysis']}
 {formatted_prompt}
 """.strip()
 
-        # Build PDF attachment parts
-        pdf_parts = []
+        # Build document attachment parts (HTML or PDF per vendor)
+        doc_parts = []
         for v in vendors:
-            file_bytes = v.get('quote_file_bytes')
-            if file_bytes:
-                pdf_parts.append(
-                    types.Part.from_bytes(data=bytes(file_bytes), mime_type="application/pdf")
-                )
+            part = build_vendor_payload_part(v)
+            if part:
+                doc_parts.append(part)
 
-        # Execute call with dynamic DB prompt + PDF attachments
+        # Execute call with dynamic DB prompt + attachment parts
         res = ai_client.models.generate_content(
             model=selected_model,
-            contents=[*pdf_parts, narrative_prompt]
+            contents=[*doc_parts, narrative_prompt]
         )
         recommendation_narrative = res.text.strip()
 

@@ -11,8 +11,10 @@ import requests
 import time
 from flask import Flask, render_template, request, redirect, url_for, jsonify, flash, g
 from werkzeug.utils import secure_filename
-from ai_matrix_drafter_postgres import execute_phase1, process_vendor_quote_pricing
-from vendor_comparison_engine_postgres import execute_phase2
+# Phase 1: Assessment criteria formulation
+from ai_matrix_drafter_postgres import execute_phase1
+# Phase 2: Vendor evaluation & pricing comparison (supports HTML analysis & fallback PDF)
+from vendor_comparison_engine_postgres import execute_phase2, process_vendor_quote_pricing
 from collections import defaultdict
 from flask import send_file, abort
 from flask import session
@@ -814,32 +816,40 @@ def upload_quote():
         project_id = 1
 
     conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        with conn.cursor() as cursor:
+            # Ensure project exists
+            cursor.execute("SELECT id FROM projects WHERE id = %s;", (project_id,))
+            if not cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO projects (id, project_reference, name, project_description) 
+                    VALUES (%s, %s, %s, %s);
+                """, (project_id, f"2026_{project_id:02d}", f"New Project #{project_id}", "Initial Evaluation"))
+                conn.commit()
 
-    cursor.execute("SELECT id FROM projects WHERE id = %s;", (project_id,))
-    if not cursor.fetchone():
-        cursor.execute("""
-            INSERT INTO projects (id, project_reference, name, project_description) 
-            VALUES (%s, %s, %s, %s);
-        """, (project_id, f"2026_{project_id:02d}", f"New Project #{project_id}", "Initial Evaluation"))
-        conn.commit()
+            # Upload raw file binary if valid
+            if file and file.filename != '':
+                file_bytes = file.read()
+                filename = file.filename
 
-    if file and file.filename != '':
-        file_bytes = file.read()
-        filename = file.filename
+                cursor.execute("""
+                    INSERT INTO procurement_options (project_id, vendor_name, quote_filename, quote_file_bytes)
+                    VALUES (%s, %s, %s, %s);
+                """, (project_id, vendor_name, filename, psycopg2.Binary(file_bytes)))
+                
+                conn.commit()
+                
+                flash(f"Quote for '{vendor_name}' uploaded successfully.", "success")
+            else:
+                flash("No valid file selected for upload.", "warning")
 
-        cursor.execute("""
-            INSERT INTO procurement_options (project_id, vendor_name, quote_filename, quote_file_bytes)
-            VALUES (%s, %s, %s, %s);
-        """, (project_id, vendor_name, filename, psycopg2.Binary(file_bytes)))
-        
-        conn.commit()
-        flash(f"Quote for '{vendor_name}' uploaded successfully.")
+    except Exception as e:
+        conn.rollback()
+        flash(f"Error uploading quote: {str(e)}", "danger")
+    finally:
+        conn.close()
 
-    cursor.close()
-    conn.close()
-
-    return redirect(url_for("projects_page", project_id=project_id))
+    return redirect(url_for("view_project", project_id=project_id))
 
 
 @app.route('/view-quote/<int:option_id>')
@@ -910,43 +920,39 @@ def handle_phase1(project_id):
 
 
 @app.route("/process-vendor-pricing/<int:project_id>", methods=["POST"])
-def handle_phase2(project_id):
-    # Retrieve Phase 2 qualitative prompt adjustments from form submission
+def process_vendor_pricing(project_id):
+    # 1. Capture prompt adjustments from UI form if provided
     ai_adjustments = request.form.get("ai_prompt_adjustments", "")
 
     conn = get_db_connection()
     try:
+        # 2. Persist adjustments and update status in database
         with conn.cursor() as cursor:
             cursor.execute("""
                 UPDATE projects 
                 SET ai_prompt_adjustments = %s, latest_ai_status = 'Evaluating Vendors (Phase 2)...' 
                 WHERE id = %s;
             """, (ai_adjustments, project_id))
-            
-            cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
-            vendors = cursor.fetchall()
         conn.commit()
 
-        if not vendors:
-            flash("No vendor quotes uploaded to evaluate.")
-            return redirect(url_for("projects_page", project_id=project_id))
-
-        # Loop through each vendor and evaluate quotes/pricing against criteria
-        for vendor in vendors:
-            process_vendor_quote_pricing(conn, vendor, project_id)
+        # 3. Delegate execution directly to vendor_comparison_engine_postgres
+        # execute_phase2 checks for analysis_sheet_html per vendor before falling back to quote_file_bytes
+        execute_phase2(conn, project_id)
 
         with conn.cursor() as cursor:
             cursor.execute("UPDATE projects SET latest_ai_status = 'Phase 2 Complete' WHERE id = %s;", (project_id,))
         conn.commit()
 
-        flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!")
+        flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!", "success")
+
     except Exception as e:
         conn.rollback()
-        flash(f"Error during Phase 2 evaluation: {str(e)}")
+        flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
+
     finally:
         conn.close()
 
-    return redirect(url_for("projects_page", project_id=project_id))
+    return redirect(url_for("view_project", project_id=project_id))
 
 
 @app.route("/recalculate-matrix/<int:project_id>", methods=["POST"])
