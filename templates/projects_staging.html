@@ -353,7 +353,6 @@
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Project Controls</h2>
                 <div class="control-buttons">
-                    <!-- Phase 1: Assessment Criteria Formulation -->
                     <form id="phase1-form" action="/execute-phase1/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="syncPhase1Text()">
                         <input type="hidden" name="phase1_prompt_adjustments" id="hidden_phase1_adjustments">
                         <button type="submit" class="btn btn-phase1" {% if not project %}disabled{% endif %}>
@@ -361,19 +360,17 @@
                         </button>
                     </form>
                     
-                    <!-- Phase 2: Vendor Quote & Pricing Processing -->
                     <form action="/process-vendor-pricing/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-phase2" {% if not project or not vendors %}disabled{% endif %}>
                             Phase 2: Evaluate Vendors
                         </button>
                     </form>
                     
-                    <!-- Generate Recommendation (Untouched) -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
-                            <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
-                                Phase 3: Executive Recommendation
-                            </button>
-                        </form>
+                        <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
+                            Phase 3: Executive Recommendation
+                        </button>
+                    </form>
 
                     <span class="status-badge">
                         Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
@@ -384,18 +381,16 @@
             <!-- Main Project Form -->
             <form id="projectForm" action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST" onsubmit="unformatInputsForSubmit()">
                 <input type="hidden" name="project_id" value="{{ project.id if project and project.id is not string else '' }}">
-                
-            <!-- Container to hold hidden inputs for deleted line items -->
                 <div id="deletedItemsContainer"></div>
 
                 <div class="section-header">
                     {% if project %}Project Definitions{% else %}Create New Project{% endif %}
                 </div>
 
-             <div class="form-row">
-                <label class="form-label">Project Reference</label>
-                <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '' }}" style="width: 200px;">
-            </div>
+                <div class="form-row">
+                    <label class="form-label">Project Reference</label>
+                    <input type="text" name="project_reference" class="form-control" value="{{ project.project_reference if project else '' }}" style="width: 200px;">
+                </div>
 
                 <div class="form-row">
                     <label class="form-label">Name</label>
@@ -456,7 +451,6 @@
                                         <div class="pdf-icon">PDF</div>
                                         <span style="font-size: 12px; color: var(--text-muted); text-decoration: underline;">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
                                     </a>
-                                    <!-- Delete Option Form -->
                                     <button type="submit" formaction="/delete-vendor/{{ vendor.id }}" formmethod="POST" 
                                             class="btn-icon-danger" title="Delete Option"
                                             onclick="return confirm('Are you sure you want to delete option {{ vendor.vendor_name }}?');">
@@ -483,132 +477,128 @@
                 </div>
 
                 <div class="table-responsive">
-                <table class="matrix-table" id="criteriaMatrix">
-                    <thead>
-                        <tr>
+                    <table class="matrix-table" id="criteriaMatrix">
+                        <thead>
+                            <tr>
                                 <th class="col-desc">Evaluation Criteria / Line Item</th>
                                 <th class="col-cat">Category</th>
                                 <th class="col-weight">Weight (%) / Amount</th>
-                            {% for vendor in vendors %}
+                                {% for vendor in vendors %}
                                     <th class="col-vendor" style="text-align: center;">{{ vendor.vendor_name }}</th>
-                            {% endfor %}
+                                {% endfor %}
                                 <th class="col-actions">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="matrixTableBody">
-                        <!-- 1. Mandatory Price Weighting Row -->
-                        <tr class="price-evaluation-row">
-                            <td>
-                                <strong>Commercial / Price Evaluation</strong><br>
-                                <small class="text-muted">Calculated via relative inverse quote pricing</small>
-                            </td>
-                            <td>N/A</td>
-                            <td>
+                            </tr>
+                        </thead>
+                        <tbody id="matrixTableBody">
+                            <tr class="price-evaluation-row">
+                                <td>
+                                    <strong>Commercial / Price Evaluation</strong><br>
+                                    <small class="text-muted">Calculated via relative inverse quote pricing</small>
+                                </td>
+                                <td>N/A</td>
+                                <td>
                                     <div style="display: flex; align-items: center; gap: 4px;">
                                         <input type="text" name="price_weighting" class="form-control weight-input number-format" 
-                                        value="{{ (project.price_weighting * 100) if project and project.price_weighting <= 1.0 else (project.price_weighting or 90.00) }}">
+                                            value="{{ (project.price_weighting * 100) if project and project.price_weighting <= 1.0 else (project.price_weighting or 90.00) }}">
                                         <span>%</span>
-                                </div>
-                            </td>
-                            {% for vendor in vendors %}
+                                    </div>
+                                </td>
+                                {% for vendor in vendors %}
                                 <td class="text-center" style="text-align: center;">
                                     <span class="vendor-price-score" style="font-weight: bold; font-size: 16px;" id="priceScoreDisplay_{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0.0 }}">
-                                    {{ "%.2f"|format(vendor.price_score or 0.0) }}
-                                </span><br>
-                                <small class="text-muted" id="matrixRateDisplay_{{ vendor.id }}">
-                                    {{ "ZAR {:,.2f}".format(vendor.total_effective_rate or 0.0) }} per unit
-                                </small>
-                            </td>
-                            {% endfor %}
+                                        {{ "%.2f"|format(vendor.price_score or 0.0) }}
+                                    </span><br>
+                                    <small class="text-muted" id="matrixRateDisplay_{{ vendor.id }}">
+                                        {{ "ZAR {:,.2f}".format(vendor.total_effective_rate or 0.0) }} per unit
+                                    </small>
+                                </td>
+                                {% endfor %}
                                 <td class="text-center"></td>
-                        </tr>
+                            </tr>
 
-                        <!-- 2. Dynamic Qualitative Criteria Rows from project_weightings -->
-                        {% for criteria in criteria_list %}
-                        <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
-                            <td>
+                            {% for criteria in criteria_list %}
+                            <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
+                                <td>
                                     <input type="text" name="criteria_name_{{ criteria.id }}" class="form-control criteria-name-input" value="{{ criteria.criteria_name }}" title="{{ criteria.criteria_name }}" required>
-                            </td>
-                            <td>Qualitative</td>
-                            <td>
+                                </td>
+                                <td>Qualitative</td>
+                                <td>
                                     <div style="display: flex; align-items: center; gap: 4px;">
                                         <input type="text" name="criteria_weight_{{ criteria.id }}" class="form-control weight-input number-format" value="{{ criteria.weight_percent }}" required>
                                         <span>%</span>
-                                </div>
-                            </td>
-                            {% for vendor in vendors %}
-                            {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
+                                    </div>
+                                </td>
+                                {% for vendor in vendors %}
+                                {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
                                 <td class="text-center" style="text-align: center;">
-                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                                    <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
                                         <input type="text" 
-                                        name="score_{{ criteria.id }}_{{ vendor.id }}" 
+                                            name="score_{{ criteria.id }}_{{ vendor.id }}" 
                                             class="form-control score-input number-format" 
-                                        value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" 
-                                        data-vendor-id="{{ vendor.id }}" 
+                                            value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" 
+                                            data-vendor-id="{{ vendor.id }}" 
                                             style="width: 70px; text-align: center;">
-                                    
-                                    {% if score_entry.justification %}
-                                        <span class="info-tooltip">
-                                            &#9432;
-                                            <span class="tooltip-text">
-                                                <strong>AI Justification:</strong><br>
-                                                {{ score_entry.justification }}
+                                        
+                                        {% if score_entry.justification %}
+                                            <span class="info-tooltip">
+                                                &#9432;
+                                                <span class="tooltip-text">
+                                                    <strong>AI Justification:</strong><br>
+                                                    {{ score_entry.justification }}
+                                                </span>
                                             </span>
-                                        </span>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            {% endfor %}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                {% endfor %}
                                 <td class="text-center">
                                     <button type="button" class="btn-outline-danger" onclick="trackAndDeleteRow(this, 'criteria', '{{ criteria.id }}')" title="Delete Criteria">&#128465;</button>
                                 </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-              
-                    <!-- Inside the Criteria Matrix Footer (tfoot) -->
-                    <tfoot>
-                        <tr>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
                                 <th colspan="3">Final Weighted Score (/10) <small id="totalWeightDisplay" style="margin-left: 8px; font-weight: bold;"></small></th>
-                            {% for vendor in vendors %}
+                                {% for vendor in vendors %}
                                 <th style="text-align: center;">
                                     <span id="vendorTotal_{{ vendor.id }}" style="font-size: 16px; color: var(--primary-blue);">0.00</span>
-                            </th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                        <tr>
-                            <th colspan="3">Option Quantity & Unit</th>
-                            {% for vendor in vendors %}
+                                </th>
+                                {% endfor %}
+                                <th></th>
+                            </tr>
+                            <tr>
+                                <th colspan="3">Option Quantity & Unit</th>
+                                {% for vendor in vendors %}
                                 <th style="text-align: center;">
                                     <div style="display: flex; justify-content: center; gap: 4px;">
                                         <input type="text" name="total_quantity_{{ vendor.id }}" class="form-control number-format" style="width: 80px; text-align: center;" value="{{ vendor.total_quantity if vendor.total_quantity is not none else (vendor.total_quantity or 1.0) }}">
                                         <input type="text" name="option_unit_{{ vendor.id }}" class="form-control" style="width: 60px; text-align: center;" value="{{ vendor.unit_of_measure if vendor.unit_of_measure is not none else (vendor.option_unit or 'm2') }}">
-                                </div>
-                            </th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                        <tr>
-                            <th colspan="3">Total Effective Unit Rate</th>
-                            {% for vendor in vendors %}
+                                    </div>
+                                </th>
+                                {% endfor %}
+                                <th></th>
+                            </tr>
+                            <tr>
+                                <th colspan="3">Total Effective Unit Rate</th>
+                                {% for vendor in vendors %}
                                 <th style="text-align: center;" id="tableVendorUnitRate_{{ vendor.id }}">
-                                ZAR {{ "%.2f"|format(vendor.total_effective_rate or 0.0) }}
-                            </th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                        <tr>
-                            <th colspan="3">Projected 5-Year Total Cost</th>
-                            {% for vendor in vendors %}
+                                    ZAR {{ "%.2f"|format(vendor.total_effective_rate or 0.0) }}
+                                </th>
+                                {% endfor %}
+                                <th></th>
+                            </tr>
+                            <tr>
+                                <th colspan="3">Projected 5-Year Total Cost</th>
+                                {% for vendor in vendors %}
                                 <th style="text-align: center;" id="cardTotal_{{ vendor.id }}">
-                                ZAR {{ "%.2f"|format(vendor.projected_5yr_cost or 0.0) }}
-                            </th>
-                            {% endfor %}
-                            <th></th>
-                        </tr>
-                    </tfoot>
-                </table>
+                                    ZAR {{ "%.2f"|format(vendor.projected_5yr_cost or 0.0) }}
+                                </th>
+                                {% endfor %}
+                                <th></th>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
 
                 <!-- Consolidated Line Items Table -->
@@ -618,102 +608,101 @@
                 </div>
                 
                 <div class="table-responsive">
-                <table class="matrix-table" id="lineItemsMatrix">
-                    <thead>
-                        <tr>
+                    <table class="matrix-table" id="lineItemsMatrix">
+                        <thead>
+                            <tr>
                                 <th class="col-desc">Cost Component Description</th>
                                 <th class="col-cat">Category</th>
-                            {% for vendor in vendors %}
+                                {% for vendor in vendors %}
                                     <th class="col-vendor" style="text-align: center; border-left: 2px solid var(--border-color);">{{ vendor.vendor_name }}</th>
-                            {% endfor %}
+                                {% endfor %}
                                 <th class="col-actions">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Collect unique cost component names across all vendors -->
-                        {% set component_names = [] %}
-                        {% for vendor in vendors %}
-                            {% for item in vendor.pricing_items %}
-                                {% if item.cost_component_name not in component_names %}
-                                    {% set _ = component_names.append(item.cost_component_name) %}
-                                {% endif %}
-                            {% endfor %}
-                        {% endfor %}
-
-                        {% for comp_name in component_names %}
-                            {% set comp_loop = loop %}
-                            {% set ns = namespace(category='One-Off Cost', sample_id=none) %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set component_names = [] %}
                             {% for vendor in vendors %}
                                 {% for item in vendor.pricing_items %}
-                                    {% if item.cost_component_name == comp_name %}
-                                        {% if item.cost_type_category %}{% set ns.category = item.cost_type_category %}{% endif %}
-                                        {% if ns.sample_id is none %}{% set ns.sample_id = item.id %}{% endif %}
+                                    {% if item.cost_component_name not in component_names %}
+                                        {% set _ = component_names.append(item.cost_component_name) %}
                                     {% endif %}
                                 {% endfor %}
                             {% endfor %}
-                            <tr>
-                                <td>
-                                    {% if ns.sample_id %}
-                                            <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
-                                    {% else %}
-                                            <input type="text" name="pricing_name_new_{{ comp_loop.index }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if ns.sample_id %}
-                                        <select name="pricing_category_{{ ns.sample_id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                                    {% else %}
-                                        <select name="pricing_category_new_{{ comp_loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
-                                    {% endif %}
-                                        <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
-                                        <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
-                                    </select>
-                                </td>
+
+                            {% for comp_name in component_names %}
+                                {% set comp_loop = loop %}
+                                {% set ns = namespace(category='One-Off Cost', sample_id=none) %}
                                 {% for vendor in vendors %}
-                                    {% set match_item = [] %}
                                     {% for item in vendor.pricing_items %}
-                                        {% if item.cost_component_name == comp_name %}{% set _ = match_item.append(item) %}{% endif %}
+                                        {% if item.cost_component_name == comp_name %}
+                                            {% if item.cost_type_category %}{% set ns.category = item.cost_type_category %}{% endif %}
+                                            {% if ns.sample_id is none %}{% set ns.sample_id = item.id %}{% endif %}
+                                        {% endif %}
                                     {% endfor %}
-                                    <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
-                                        {% if match_item %}
-                                            {% set item = match_item[0] %}
+                                {% endfor %}
+                                <tr>
+                                    <td>
+                                        {% if ns.sample_id %}
+                                            <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
+                                        {% else %}
+                                            <input type="text" name="pricing_name_new_{{ comp_loop.index }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if ns.sample_id %}
+                                            <select name="pricing_category_{{ ns.sample_id }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                        {% else %}
+                                            <select name="pricing_category_new_{{ comp_loop.index }}" class="form-control item-category" data-comp-name="{{ comp_name }}">
+                                        {% endif %}
+                                            <option value="One-Off Cost" {% if ns.category == 'One-Off Cost' %}selected{% endif %}>One-Off Cost</option>
+                                            <option value="Annual Cost" {% if ns.category == 'Annual Cost' %}selected{% endif %}>Annual Cost</option>
+                                        </select>
+                                    </td>
+                                    {% for vendor in vendors %}
+                                        {% set match_item = [] %}
+                                        {% for item in vendor.pricing_items %}
+                                            {% if item.cost_component_name == comp_name %}{% set _ = match_item.append(item) %}{% endif %}
+                                        {% endfor %}
+                                        <td style="border-left: 2px solid var(--border-color); background: #fafbfc;">
+                                            {% if match_item %}
+                                                {% set item = match_item[0] %}
                                                 <input type="text" 
                                                     name="pricing_amount_{{ item.id }}" 
                                                     class="form-control item-amount number-format" 
-                                                data-vendor-id="{{ vendor.id }}" 
-                                                data-comp-name="{{ comp_name }}"
-                                                value="{{ item.amount }}" placeholder="Total Amount">
-                                        {% else %}
+                                                    data-vendor-id="{{ vendor.id }}" 
+                                                    data-comp-name="{{ comp_name }}"
+                                                    value="{{ item.amount }}" placeholder="Total Amount">
+                                            {% else %}
                                                 <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 2px 0 4px 0;">Not quoted</div>
-                                            <input 
+                                                <input 
                                                     type="text" 
                                                     name="pricing_amount_new_{{ vendor.id }}_{{ comp_loop.index }}" 
                                                     class="form-control item-amount number-format" 
                                                     data-vendor-id="{{ vendor.id }}"
                                                     data-comp-name="{{ comp_name }}"
-                                                value="0.00" 
-                                                placeholder="0.00">                                       
-                                        {% endif %}
+                                                    value="0.00" 
+                                                    placeholder="0.00">                                       
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                    <td class="text-center">
+                                        <button type="button" class="btn-outline-danger" onclick="trackAndDeleteRow(this, 'pricing', '{{ ns.sample_id }}')" title="Delete Item">&#128465;</button>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr class="total-row">
+                                <td colspan="2">Projected 5-Year Total Cost</td>
+                                {% for vendor in vendors %}
+                                    <td style="border-left: 2px solid var(--border-color); text-align: center; font-weight: bold; padding: 12px 14px;" id="lineItemVendorTotal_{{ vendor.id }}">
+                                        ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total if vendor.projected_5yr_total is not none else 0.0) }}
                                     </td>
                                 {% endfor %}
-                                <td class="text-center">
-                                        <button type="button" class="btn-outline-danger" onclick="trackAndDeleteRow(this, 'pricing', '{{ ns.sample_id }}')" title="Delete Item">&#128465;</button>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot>
-                        <tr class="total-row">
-                            <td colspan="2">Projected 5-Year Total Cost</td>
-                            {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color); text-align: center; font-weight: bold; padding: 12px 14px;" id="lineItemVendorTotal_{{ vendor.id }}">
-                                    ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total if vendor.projected_5yr_total is not none else 0.0) }}
-                                </td>
-                            {% endfor %}
                                 <td></td>
-                        </tr>
-                    </tfoot>
-                </table>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
 
                 <!-- Executive Recommendation Output -->
