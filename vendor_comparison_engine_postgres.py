@@ -274,7 +274,7 @@ Pre-Check Analysis: {project['analysis']}
             model=selected_model,
             contents=[*doc_parts, narrative_prompt]
         )
-        recommendation_narrative = res.text.strip()
+        recommendation_narrative = (res.text or "").strip()
 
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -286,8 +286,14 @@ Pre-Check Analysis: {project['analysis']}
             """, (lowest_bid, recommendation_narrative, project_id))
         conn.commit()
 
+    except Exception as e:
+        if conn and not conn.closed:
+            conn.rollback()
+        raise e
+
     finally:
-        conn.close()
+        if should_close_conn and conn and not conn.closed:
+            conn.close()
 
 if __name__ == "__main__":
     p_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
