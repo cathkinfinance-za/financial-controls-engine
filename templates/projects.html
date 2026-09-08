@@ -217,7 +217,7 @@
             font-weight: bold;
         }
 
-        /* Improved Matrix Table Styling */
+        /* Matrix Table Styling */
         .table-responsive {
             width: 100%;
             overflow-x: auto;
@@ -322,6 +322,8 @@
 
         .btn-phase1 { background-color: #212529; color: #ffffff; border: 1px solid #212529; }
         .btn-phase1:hover { background-color: #000000; }
+        .btn-phase2a { background-color: #0284c7; color: #ffffff; border: 1px solid #0284c7; }
+        .btn-phase2a:hover { background-color: #0369a1; }
         .btn-phase2 { background-color: #0d6efd; color: #ffffff; border: 1px solid #0d6efd; }
         .btn-phase2:hover { background-color: #0b5ed7; }
         .btn-phase3 { background-color: #e2e8f0; color: #1e293b; border: 1px solid #cbd5e1; }
@@ -383,14 +385,19 @@
                         </button>
                     </form>
                     
-                    <!-- Phase 2: Vendor Quote & Pricing Processing -->
+                    <!-- Phase 2a: Document Analysis -->
+                    <button type="button" id="phase2a-btn" class="btn btn-phase2a" onclick="triggerPhase2aAnalysis()" {% if not project or not vendors %}disabled{% endif %}>
+                        Phase 2a: Document Analysis
+                    </button>
+                    
+                    <!-- Phase 2b: Vendor Quote & Pricing Processing -->
                     <form action="/process-vendor-pricing/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
                         <button type="submit" class="btn btn-phase2" {% if not project or not vendors %}disabled{% endif %}>
-                            Phase 2: Evaluate Vendors
+                            Phase 2b: Evaluate Vendors
                         </button>
                     </form>
                     
-                    <!-- Generate Recommendation (Untouched) -->
+                    <!-- Phase 3: Executive Recommendation -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
                             <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
                                 Phase 3: Executive Recommendation
@@ -407,7 +414,6 @@
             <form id="projectForm" action="{% if project %}/update-project/{{ project.id }}{% else %}/create-project{% endif %}" method="POST" onsubmit="unformatInputsForSubmit()">
                 <input type="hidden" name="project_id" value="{{ project.id if project and project.id is not string else '' }}">
                 
-            <!-- Container to hold hidden inputs for deleted line items -->
                 <div id="deletedItemsContainer"></div>
 
                 <div class="section-header">
@@ -478,7 +484,22 @@
                                         <div class="pdf-icon">PDF</div>
                                         <span style="font-size: 12px; color: var(--text-muted); text-decoration: underline;">{{ vendor.quote_filename or 'Quote.pdf' }}</span>
                                     </a>
-                                    <!-- Delete Option Form -->
+
+                                    <!-- Standardized Analysis Link -->
+                                    {% if vendor.analysis_sheet_html %}
+                                    <a href="{{ url_for('analysis.view_analysis', option_id=vendor.id) }}" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    style="display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #2563eb; text-decoration: none;">
+                                        <span>View Analysis</span>
+                                        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                        </svg>
+                                    </a>
+                                {% else %}
+                                    <span style="font-size: 12px; color: var(--text-muted); font-style: italic;">No analysis sheet</span>
+                                {% endif %}                                 
+
                                     <button type="submit" formaction="/delete-vendor/{{ vendor.id }}" formmethod="POST" 
                                             class="btn-icon-danger" title="Delete Option"
                                             onclick="return confirm('Are you sure you want to delete option {{ vendor.vendor_name }}?');">
@@ -518,7 +539,6 @@
                         </tr>
                     </thead>
                     <tbody id="matrixTableBody">
-                        <!-- 1. Mandatory Price Weighting Row -->
                         <tr class="price-evaluation-row">
                             <td>
                                 <strong>Commercial / Price Evaluation</strong><br>
@@ -545,7 +565,6 @@
                                 <td class="text-center"></td>
                         </tr>
 
-                        <!-- 2. Dynamic Qualitative Criteria Rows from project_weightings -->
                         {% for criteria in criteria_list %}
                         <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
                             <td>
@@ -588,7 +607,6 @@
                         {% endfor %}
                     </tbody>
               
-                    <!-- Inside the Criteria Matrix Footer (tfoot) -->
                     <tfoot>
                         <tr>
                                 <th colspan="3">Final Weighted Score (/10) <small id="totalWeightDisplay" style="margin-left: 8px; font-weight: bold;"></small></th>
@@ -652,7 +670,6 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Collect unique cost component names across all vendors -->
                         {% set component_names = [] %}
                         {% for vendor in vendors %}
                             {% for item in vendor.pricing_items %}
@@ -773,7 +790,7 @@
 
             <div style="margin-bottom: 20px;">
                 <label style="display:block; margin-bottom: 6px; font-weight:600;">Quote PDF File</label>
-                <input type="file" name="quote_file" accept="application/pdf" class="form-control" required>
+                <input type="file" id="modal_files_input" name="quote_file" accept="application/pdf" class="form-control" required>
             </div>
 
             <div style="text-align:right; gap:8px; display:flex; justify-content:flex-end;">
@@ -785,6 +802,66 @@
 </div>
 
 <script>
+// Phase 2a Document Analysis Integration
+async function uploadAndAnalyzeFiles(projectId, optionId, vendorName, fileInputElement) {
+    const formData = new FormData();
+    
+    // Append form metadata expected by analysis.py
+    formData.append('project_id', projectId);
+    formData.append('option_id', optionId);
+    formData.append('vendor_name', vendorName);
+
+    // Append each selected file under the key 'files'
+    for (const file of fileInputElement.files) {
+        formData.append('files', file);
+    }
+
+    try {
+        const response = await fetch('/api/v1/analyze-documents', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            console.log('Phase 2a Analysis Complete:', result);
+            window.location.reload();
+        } else {
+            console.error('Phase 2a Error:', result.error);
+            alert('Analysis Error: ' + (result.error || 'Failed to process document analysis.'));
+        }
+    } catch (err) {
+        console.error('Network Error:', err);
+        alert('Network error while processing document analysis.');
+    }
+}
+
+// Handler triggered by the "Phase 2a: Document Analysis" control button
+function triggerPhase2aAnalysis() {
+    const projectId = "{{ project.id if project else '' }}";
+    if (!projectId) {
+        alert("Please save or select a project first.");
+        return;
+    }
+
+    const fileInput = document.getElementById('modal_files_input');
+    if (fileInput && fileInput.files.length > 0) {
+        const vendorNameInput = document.querySelector('#uploadModal input[name="vendor_name"]');
+        const vendorName = vendorNameInput ? vendorNameInput.value : '';
+        const btn = document.getElementById('phase2a-btn');
+        
+        if (btn) {
+            btn.disabled = true;
+            btn.innerText = 'Analyzing...';
+        }
+        
+        uploadAndAnalyzeFiles(projectId, '', vendorName, fileInput);
+    } else {
+        document.getElementById('uploadModal').style.display = 'block';
+    }
+}
+
 // Format raw numerical strings with thousands commas
 function formatNumberWithCommas(value) {
     if (value === null || value === undefined || value === '') return '';
@@ -808,7 +885,6 @@ function applyNumberFormatting(input) {
     if (input.dataset.formattedBound) return;
     input.dataset.formattedBound = "true";
 
-    // Format current initial value
     if (input.value) {
         input.value = formatNumberWithCommas(input.value);
     }
@@ -841,13 +917,11 @@ function calculateAll() {
     const tbody = document.getElementById('matrixTableBody');
     if (!tbody) return;
 
-    // 1. Collect quantities per vendor
     document.querySelectorAll('input[name^="total_quantity_"]').forEach(input => {
         const vendorId = input.name.split('_')[2];
         vendorQuantities[vendorId] = parseFormattedNumber(input.value) || 1.0;
     });
 
-    // 2. Loop through Table 2 line items to sum One-Off + (5 * Annual)
     document.querySelectorAll('#lineItemsMatrix tbody tr').forEach(row => {
         const categorySelect = row.querySelector('.item-category');
         const category = categorySelect ? categorySelect.value : 'One-Off Cost';
