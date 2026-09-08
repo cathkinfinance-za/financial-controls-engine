@@ -227,7 +227,7 @@ def execute_phase2(conn, project_id=None):
             cursor.execute("""
                 SELECT prompt_template, selected_model 
                 FROM system_prompts 
-                WHERE process_name = 'executive_recommendation' AND is_active = TRUE 
+                WHERE process = 'executive_recommendation' AND is_active = TRUE 
                 LIMIT 1;
             """)
             prompt_record = cursor.fetchone()
