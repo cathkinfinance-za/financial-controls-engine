@@ -124,16 +124,33 @@ def run_due_diligence_osint(conn, project_id, vendors):
             """, (v_status, findings, v_id))
         conn.commit()
 
-def execute_phase2(project_id):
-    conn = get_db_connection()
+def execute_phase2(conn, project_id=None):
+    # Handle single positional argument calls: execute_phase2(project_id)
+    if project_id is None:
+        project_id = conn
+        conn = None
+        should_close_conn = True
+    else:
+        should_close_conn = False
+
     try:
+        if conn is None:
+            conn = get_db_connection()
+
         with conn.cursor() as cursor:
+            # 1. Fetch target project record
             cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
             project = cursor.fetchone()
-            
+            if not project:
+                raise ValueError(f"Project with ID {project_id} not found.")
+
+            # 2. Fetch associated vendors/options for this project
             cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
             vendors = cursor.fetchall()
-            
+            if not vendors:
+                return {"status": "warning", "message": f"No procurement options found for project {project_id}."}
+
+            # 3. Fetch project weightings
             cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s;", (project_id,))
             weightings = cursor.fetchall()
 
