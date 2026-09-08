@@ -226,6 +226,8 @@ def execute_phase2(conn, project_id=None):
                         WHERE id = %s;
                     """, (contrib, item['line_item_id']))
 
+                    print(f"Updated rows: {cursor.rowcount}")  # Should be 1, NOT 0
+
                 final_weighted_score = round(weighted_p_score + total_np_score, 2)
 
                 if final_weighted_score > winning_score:
