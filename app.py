@@ -944,11 +944,11 @@ def handle_phase1(project_id):
 
 @app.route("/execute-phase2b/<int:project_id>", methods=["POST"])
 def execute_phase2b(project_id):
-    
+    ai_adjustments = request.form.get("ai_prompt_adjustments", "")
     conn = get_db_connection()
 
     # 1. Capture prompt adjustments from UI form if provided
-    ai_adjustments = request.form.get("ai_prompt_adjustments", "")
+    
 
     try:
         # 2. Persist adjustments and update status in database
@@ -971,12 +971,10 @@ def execute_phase2b(project_id):
         flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!", "success")
 
     except Exception as e:
-            # Check that conn exists AND is still open before rolling back
-            if conn and not conn.closed:
-                conn.rollback()
-                
-            flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
-            
+        if conn and not conn.closed:
+            conn.rollback()
+        flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
+
     finally:
         # Ensure the connection is closed cleanly at the very end
         if conn and not conn.closed:
@@ -1017,21 +1015,27 @@ def recalculate_matrix(project_id):
 
     price_weighting = raw_weight / 100.0 if raw_weight > 1.0 else raw_weight
     conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE projects 
-        SET price_weighting = %s, recalculate_matrix = TRUE 
-        WHERE id = %s;
-    """, (price_weighting, project_id))
-    conn.commit()
-    cursor.close()
-    conn.close()
-
+    
     try:
-        execute_phase2(project_id)
-        flash("Matrix recalculated with updated weightings.")
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                UPDATE projects 
+                SET price_weighting = %s, recalculate_matrix = TRUE 
+                WHERE id = %s;
+            """, (price_weighting, project_id))
+        conn.commit()
+
+        # FIXED: Pass conn along with project_id
+        execute_phase2(conn, project_id)
+        flash("Matrix recalculated with updated weightings.", "success")
     except Exception as e:
-        flash(f"Error recalculating matrix: {str(e)}")
+        if conn and not conn.closed:
+            conn.rollback()
+        flash(f"Error recalculating matrix: {str(e)}", "danger")
+
+    finally:
+        if conn and not conn.closed:
+            conn.close()
 
     return redirect(url_for("projects_page", project_id=project_id))
 
