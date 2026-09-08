@@ -845,7 +845,7 @@ function triggerPhase2aAnalysis() {
     const statusBadge = document.querySelector('.status-badge');
     if (statusBadge) statusBadge.innerHTML = 'Latest AI Status: <strong>Analyzing Documents (Phase 2a)...</strong>';
 
-    fetch(`/analysis/run/${projectId}`, {  // Replace with your exact blueprint route path
+    fetch(`/analysis/analyze-documents/${projectId}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
