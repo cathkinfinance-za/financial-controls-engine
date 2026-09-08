@@ -251,6 +251,28 @@
         .col-vendor { min-width: 160px; }
         .col-actions { width: 60px; text-align: center; }
 
+        /* Multi-line wrapping textareas for table descriptions */
+        textarea.table-desc-input {
+            min-height: 48px;
+            height: 48px;
+            resize: vertical;
+            line-height: 1.3;
+            font-family: inherit;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 6px 10px;
+        }
+
+        /* Right-align numbers in inputs and table cells */
+        .number-format, .item-amount, .weight-input {
+            text-align: right;
+        }
+
+        .text-right {
+            text-align: right !important;
+        }
+
         tr.total-row { background-color: #f8f9fa; font-weight: 700; border-top: 2px solid var(--border-color); }
 
         .flash-message {
@@ -488,9 +510,9 @@
                         <tr>
                                 <th class="col-desc">Evaluation Criteria / Line Item</th>
                                 <th class="col-cat">Category</th>
-                                <th class="col-weight">Weight (%) / Amount</th>
+                                <th class="col-weight text-right">Weight (%) / Amount</th>
                             {% for vendor in vendors %}
-                                    <th class="col-vendor" style="text-align: center;">{{ vendor.vendor_name }}</th>
+                                    <th class="col-vendor text-right">{{ vendor.vendor_name }}</th>
                             {% endfor %}
                                 <th class="col-actions">Actions</th>
                         </tr>
@@ -511,7 +533,7 @@
                                 </div>
                             </td>
                             {% for vendor in vendors %}
-                                <td class="text-center" style="text-align: center;">
+                                <td class="text-right">
                                     <span class="vendor-price-score" style="font-weight: bold; font-size: 16px;" id="priceScoreDisplay_{{ vendor.id }}" data-vendor-id="{{ vendor.id }}" data-score="{{ vendor.price_score or 0.0 }}">
                                     {{ "%.2f"|format(vendor.price_score or 0.0) }}
                                 </span><br>
@@ -527,7 +549,7 @@
                         {% for criteria in criteria_list %}
                         <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
                             <td>
-                                    <input type="text" name="criteria_name_{{ criteria.id }}" class="form-control criteria-name-input" value="{{ criteria.criteria_name }}" title="{{ criteria.criteria_name }}" required>
+                                    <textarea name="criteria_name_{{ criteria.id }}" class="form-control table-desc-input criteria-name-input" rows="2" title="{{ criteria.criteria_name }}" required>{{ criteria.criteria_name }}</textarea>
                             </td>
                             <td>Qualitative</td>
                             <td>
@@ -538,14 +560,14 @@
                             </td>
                             {% for vendor in vendors %}
                             {% set score_entry = scores_map.get(criteria.id, {}).get(vendor.id, {}) %}
-                                <td class="text-center" style="text-align: center;">
-                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+                                <td class="text-right">
+                                    <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; width: 100%;">
                                         <input type="text" 
                                         name="score_{{ criteria.id }}_{{ vendor.id }}" 
                                             class="form-control score-input number-format" 
                                         value="{{ score_entry.score if score_entry.score is not none else 0.0 }}" 
                                         data-vendor-id="{{ vendor.id }}" 
-                                            style="width: 70px; text-align: center;">
+                                            style="width: 70px;">
                                     
                                     {% if score_entry.justification %}
                                         <span class="info-tooltip">
@@ -571,7 +593,7 @@
                         <tr>
                                 <th colspan="3">Final Weighted Score (/10) <small id="totalWeightDisplay" style="margin-left: 8px; font-weight: bold;"></small></th>
                             {% for vendor in vendors %}
-                                <th style="text-align: center;">
+                                <th class="text-right">
                                     <span id="vendorTotal_{{ vendor.id }}" style="font-size: 16px; color: var(--primary-blue);">0.00</span>
                             </th>
                             {% endfor %}
@@ -580,9 +602,9 @@
                         <tr>
                             <th colspan="3">Option Quantity & Unit</th>
                             {% for vendor in vendors %}
-                                <th style="text-align: center;">
-                                    <div style="display: flex; justify-content: center; gap: 4px;">
-                                        <input type="text" name="total_quantity_{{ vendor.id }}" class="form-control number-format" style="width: 80px; text-align: center;" value="{{ vendor.total_quantity if vendor.total_quantity is not none else (vendor.total_quantity or 1.0) }}">
+                                <th class="text-right">
+                                    <div style="display: flex; justify-content: flex-end; gap: 4px;">
+                                        <input type="text" name="total_quantity_{{ vendor.id }}" class="form-control number-format" style="width: 80px;" value="{{ vendor.total_quantity if vendor.total_quantity is not none else (vendor.total_quantity or 1.0) }}">
                                         <input type="text" name="option_unit_{{ vendor.id }}" class="form-control" style="width: 60px; text-align: center;" value="{{ vendor.unit_of_measure if vendor.unit_of_measure is not none else (vendor.option_unit or 'm2') }}">
                                 </div>
                             </th>
@@ -592,8 +614,8 @@
                         <tr>
                             <th colspan="3">Total Effective Unit Rate</th>
                             {% for vendor in vendors %}
-                                <th style="text-align: center;" id="tableVendorUnitRate_{{ vendor.id }}">
-                                ZAR {{ "%.2f"|format(vendor.total_effective_rate or 0.0) }}
+                                <th class="text-right" id="tableVendorUnitRate_{{ vendor.id }}">
+                                    ZAR {{ "{:,.2f}".format(vendor.total_effective_rate or 0.0) }}
                             </th>
                             {% endfor %}
                             <th></th>
@@ -601,8 +623,8 @@
                         <tr>
                             <th colspan="3">Projected 5-Year Total Cost</th>
                             {% for vendor in vendors %}
-                                <th style="text-align: center;" id="cardTotal_{{ vendor.id }}">
-                                ZAR {{ "%.2f"|format(vendor.projected_5yr_cost or 0.0) }}
+                                <th class="text-right" id="cardTotal_{{ vendor.id }}">
+                                    ZAR {{ "{:,.2f}".format(vendor.projected_5yr_cost or 0.0) }}
                             </th>
                             {% endfor %}
                             <th></th>
@@ -624,7 +646,7 @@
                                 <th class="col-desc">Cost Component Description</th>
                                 <th class="col-cat">Category</th>
                             {% for vendor in vendors %}
-                                    <th class="col-vendor" style="text-align: center; border-left: 2px solid var(--border-color);">{{ vendor.vendor_name }}</th>
+                                    <th class="col-vendor text-right" style="border-left: 2px solid var(--border-color);">{{ vendor.vendor_name }}</th>
                             {% endfor %}
                                 <th class="col-actions">Actions</th>
                         </tr>
@@ -654,9 +676,9 @@
                             <tr>
                                 <td>
                                     {% if ns.sample_id %}
-                                            <input type="text" name="pricing_name_{{ ns.sample_id }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
+                                            <textarea name="pricing_name_{{ ns.sample_id }}" title="{{ comp_name }}" class="form-control table-desc-input" rows="2" required>{{ comp_name }}</textarea>
                                     {% else %}
-                                            <input type="text" name="pricing_name_new_{{ comp_loop.index }}" value="{{ comp_name }}" title="{{ comp_name }}" class="form-control" required>
+                                            <textarea name="pricing_name_new_{{ comp_loop.index }}" title="{{ comp_name }}" class="form-control table-desc-input" rows="2" required>{{ comp_name }}</textarea>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -684,7 +706,7 @@
                                                 data-comp-name="{{ comp_name }}"
                                                 value="{{ item.amount }}" placeholder="Total Amount">
                                         {% else %}
-                                                <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 2px 0 4px 0;">Not quoted</div>
+                                                <div style="color: var(--text-muted); font-size: 12px; font-style: italic; padding: 2px 0 4px 0; text-align: right;">Not quoted</div>
                                             <input 
                                                     type="text" 
                                                     name="pricing_amount_new_{{ vendor.id }}_{{ comp_loop.index }}" 
@@ -706,7 +728,7 @@
                         <tr class="total-row">
                             <td colspan="2">Projected 5-Year Total Cost</td>
                             {% for vendor in vendors %}
-                                    <td style="border-left: 2px solid var(--border-color); text-align: center; font-weight: bold; padding: 12px 14px;" id="lineItemVendorTotal_{{ vendor.id }}">
+                                    <td style="border-left: 2px solid var(--border-color); padding: 12px 14px;" class="text-right" id="lineItemVendorTotal_{{ vendor.id }}">
                                     ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total if vendor.projected_5yr_total is not none else 0.0) }}
                                 </td>
                             {% endfor %}
@@ -956,18 +978,20 @@ function addQualitativeRow() {
     vendors.forEach(v => {
         const vId = v.getAttribute('data-vendor-id');
         vendorCellsHtml += `
-            <td class="text-center" style="text-align: center;">
+            <td class="text-right">
+                <div style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; width: 100%;">
                 <input type="text" 
                     name="score_new_${newId}_${vId}" 
                     class="form-control score-input number-format" 
-                    value="0.0" data-vendor-id="${vId}" style="width: 70px; text-align: center;">
+                        value="0.0" data-vendor-id="${vId}" style="width: 70px;">
+                </div>
             </td>`;
     });
 
     const tr = document.createElement('tr');
     tr.className = 'qualitative-row';
     tr.innerHTML = `
-        <td><input type="text" name="criteria_name_new_${newId}" class="form-control criteria-name-input" placeholder="New Criterion" required></td>
+        <td><textarea name="criteria_name_new_${newId}" class="form-control table-desc-input criteria-name-input" rows="2" placeholder="New Criterion" required></textarea></td>
         <td>Qualitative</td>
         <td>
             <div style="display: flex; align-items: center; gap: 4px;">
@@ -1007,7 +1031,7 @@ function addPricingLineItem() {
     const newRow = document.createElement('tr');
     newRow.innerHTML = `
         <td>
-            <input type="text" name="pricing_name_new_${newIndex}" class="form-control" placeholder="Enter cost component description..." required>
+            <textarea name="pricing_name_new_${newIndex}" class="form-control table-desc-input" rows="2" placeholder="Enter cost component description..." required></textarea>
         </td>
         <td>
             <select name="pricing_category_new_${newIndex}" class="form-control item-category">
@@ -1028,7 +1052,7 @@ function addPricingLineItem() {
 }
 
 function bindTitleTooltips() {
-    document.querySelectorAll('input[type="text"]').forEach(input => {
+    document.querySelectorAll('input[type="text"], textarea').forEach(input => {
         if (!input.dataset.tooltipBound) {
             input.dataset.tooltipBound = "true";
             input.addEventListener('input', function() {
