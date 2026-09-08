@@ -755,14 +755,30 @@
                 </table>
                 </div>
 
-                <!-- Executive Recommendation Output -->
-                <div class="form-row">
-                    <label class="form-label">Executive Sourcing Recommendation</label>
-                    <textarea name="executive_sourcing_recommendation" 
-                            class="form-control" 
-                            rows="6" 
-                            placeholder="Phase 3 recommendation text will appear here after execution...">{{ project.executive_sourcing_recommendation if project and project.executive_sourcing_recommendation else '' }}</textarea>
+            <!-- Executive Recommendation Output -->
+            <div class="form-row">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 8px;">
+                    <label class="form-label" style="margin-bottom: 0;">Executive Sourcing Recommendation</label>
+                    
+                    <!-- View HTML Recommendation Link -->
+                    {% if project and project.executive_recommendation_html %}
+                    <a href="{{ url_for('view_executive_recommendation', project_id=project.id) }}" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #0d6efd; text-decoration: none;">
+                        <span>View Executive Recommendation HTML</span>
+                        <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                    </a>
+                    {% endif %}
                 </div>
+
+                <textarea name="executive_sourcing_recommendation" 
+                        class="form-control" 
+                        rows="6" 
+                        placeholder="Phase 3 recommendation text will appear here after execution...">{{ project.executive_sourcing_recommendation if project and project.executive_sourcing_recommendation else '' }}</textarea>
+            </div>
 
                 {% endif %}
 

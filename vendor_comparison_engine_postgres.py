@@ -334,6 +334,117 @@ def execute_phase2(conn, project_id=None):
         if should_close_conn and conn and not conn.closed:
             conn.close()
 
+
+def generate_executive_recommendation_html(conn, project_id: int):
+    """
+    Fetches evaluation results and generates a standalone Executive Recommendation HTML document.
+    """
+    with conn.cursor() as cursor:
+        # 1. Fetch project details
+        cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
+        project = cursor.fetchone()
+        if not project:
+            raise ValueError(f"Project ID {project_id} not found.")
+
+        # 2. Fetch ranked procurement options
+        cursor.execute("""
+            SELECT * FROM procurement_options 
+            WHERE project_id = %s 
+            ORDER BY final_weighted_score_output DESC NULLS LAST;
+        """, (project_id,))
+        vendors = cursor.fetchall()
+
+        # 3. Fetch non-pricing criteria breakdown
+        cursor.execute("""
+            SELECT np.procurement_option_id, pw.criterion_name, np.score, np.justification, np.weighted_score_contribution
+            FROM options_line_items_non_pricing np
+            JOIN project_weightings pw ON np.weighting_id = pw.id
+            WHERE pw.project_id = %s;
+        """, (project_id,))
+        non_pricing_scores = cursor.fetchall()
+
+    winner = vendors[0] if vendors else None
+    winner_name = winner.get("vendor_name", "N/A") if winner else "N/A"
+    winning_score = winner.get("final_weighted_score_output", 0.0) if winner else 0.0
+    lowest_bid = float(project.get("lowest_project_bid_floor") or 0.0)
+
+    # Construct HTML Table Rows for Vendors
+    vendor_rows_html = ""
+    for rank, v in enumerate(vendors, start=1):
+        vendor_rows_html += f"""
+        <tr>
+            <td><strong>#{rank} {v.get('vendor_name')}</strong></td>
+            <td>R{float(v.get('projected_5yr_total') or 0.0):,.2f}</td>
+            <td>{float(v.get('price_score') or 0.0):.2f}</td>
+            <td>{float(v.get('total_non_pricing_score') or 0.0):.2f}</td>
+            <td><strong>{float(v.get('final_weighted_score_output') or 0.0):.2f}</strong></td>
+            <td><span class="badge {v.get('public_dd_status', '').lower()}">{v.get('public_dd_status', 'N/A')}</span></td>
+        </tr>
+        """
+
+    # Assemble complete standalone HTML
+    recommendation_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Executive Recommendation - {project.get('name', 'Project')}</title>
+    <style>
+        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 40px; background-color: #f8fafc; color: #1e293b; }}
+        .container {{ max-width: 1000px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }}
+        h1 {{ color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; margin-top: 0; }}
+        .winner-card {{ background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #a7f3d0; padding: 24px; border-radius: 8px; margin: 24px 0; }}
+        .winner-title {{ color: #065f46; font-size: 1.25rem; font-weight: bold; margin-bottom: 8px; }}
+        table {{ width: 100%; border-collapse: collapse; margin-top: 24px; }}
+        th, td {{ border: 1px solid #cbd5e1; padding: 12px; text-align: left; }}
+        th {{ background-color: #f1f5f9; font-weight: 600; color: #334155; }}
+        .badge {{ padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; }}
+        .badge.passed {{ background-color: #dcfce7; color: #166534; }}
+        .badge.caution {{ background-color: #fef9c3; color: #854d0e; }}
+        .badge.high {{ background-color: #fee2e2; color: #991b1b; }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Executive Procurement Recommendation</h1>
+        <p><strong>Project:</strong> {project.get('name')}</p>
+        
+        <div class="winner-card">
+            <div class="winner-title">Top Recommended Vendor: {winner_name}</div>
+            <p><strong>Final Weighted Score:</strong> {winning_score:.2f} / 10.00</p>
+            <p><strong>Lowest 5-Year Cost Floor:</strong> R{lowest_bid:,.2f}</p>
+        </div>
+
+        <h3>Vendor Comparison Summary</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Vendor</th>
+                    <th>5-Year Cost</th>
+                    <th>Price Score</th>
+                    <th>Non-Pricing Score</th>
+                    <th>Final Weighted Score</th>
+                    <th>Due Diligence</th>
+                </tr>
+            </thead>
+            <tbody>
+                {vendor_rows_html}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>"""
+
+    # 4. Save HTML output directly to database
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            UPDATE projects 
+            SET executive_recommendation_html = %s 
+            WHERE id = %s;
+        """, (recommendation_html, project_id))
+    conn.commit()
+
+    return recommendation_html
+
 if __name__ == "__main__":
     p_id = (int(sys.argv[1]),) if len(sys.argv) > 1 else (1,)
     execute_phase2(p_id)

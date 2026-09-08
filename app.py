@@ -14,13 +14,13 @@ from werkzeug.utils import secure_filename
 # Phase 1: Assessment criteria formulation
 from ai_matrix_drafter_postgres import execute_phase1
 # Phase 2: Vendor evaluation & pricing comparison (supports HTML analysis & fallback PDF)
-from vendor_comparison_engine_postgres import execute_phase2
+from vendor_comparison_engine_postgres import execute_phase2, generate_executive_recommendation_html
 from collections import defaultdict
 from flask import send_file, abort
 from flask import session
 from werkzeug.security import check_password_hash
 from routes.analysis import analysis_bp
-
+from flask import Flask, flash, redirect, request, url_for
 
 try:
     from google import genai
@@ -1390,6 +1390,8 @@ Project Objectives: {project.get('project_objective', '')}
                     latest_ai_status = 'Recommendation Generated' 
                 WHERE id = %s;
             """, (generated_text, project_id))
+
+            generate_executive_recommendation_html(conn, project_id)
             
             conn.commit()
             flash('Executive sourcing recommendation successfully generated!')
@@ -1979,6 +1981,34 @@ def cron_check_escalations():
         return {"status": "error", "message": str(e)}, 500
     finally:
         conn.close()
+
+@app.route("/project/<int:project_id>/executive-recommendation")
+def view_executive_recommendation(project_id):
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT executive_recommendation_html 
+                FROM projects 
+                WHERE id = %s;
+            """, (project_id,))
+            row = cursor.fetchone()
+
+        # Handle dictionary or tuple row formats safely
+        html_content = None
+        if row:
+            html_content = row.get("executive_recommendation_html") if isinstance(row, dict) else row[0]
+
+        if not html_content:
+            flash("Executive recommendation HTML has not been generated yet.", "warning")
+            return redirect(url_for("projects_page", project_id=project_id))
+
+        # Render direct HTML content in browser
+        return html_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+
+    finally:
+        if conn and not conn.closed:
+            conn.close()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
