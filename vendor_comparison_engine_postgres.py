@@ -195,8 +195,12 @@ def execute_phase2(conn, project_id=None):
                 p_score = round(10.0 * (lowest_bid / v_cost), 2) if v_cost > 0 else 0.0
                 weighted_p_score = p_score * price_weight
 
+                # Join to fetch id for updating, raw score, and criteria weight
                 cursor.execute("""
-                    SELECT np.score, pw.weight_percent 
+                    SELECT 
+                        np.id AS line_item_id,
+                        np.score, 
+                        pw.weight_percent 
                     FROM options_line_items_non_pricing np
                     JOIN project_weightings pw ON np.weighting_id = pw.id
                     WHERE np.procurement_option_id = %s;
@@ -205,9 +209,22 @@ def execute_phase2(conn, project_id=None):
 
                 total_np_score = 0.0
                 for item in np_items:
-                    w_pct = float(item['weight_percent']) / 100.0 if float(item['weight_percent']) > 1 else float(item['weight_percent'])
-                    contrib = round(float(item['score']) * w_pct, 2)
+                    raw_score = float(item['score'] or 0.0)
+                    weight_pct = float(item['weight_percent'] or 0.0)
+                    
+                    # Normalize percentage if stored as 0-100 instead of 0-1
+                    w_factor = weight_pct / 100.0 if weight_pct > 1 else weight_pct
+                    
+                    # Calculate contribution for this specific non-pricing criterion
+                    contrib = round(raw_score * w_factor, 2)
                     total_np_score += contrib
+
+                    # Update weighted_score_contribution directly in options_line_items_non_pricing
+                    cursor.execute("""
+                        UPDATE options_line_items_non_pricing
+                        SET weighted_score_contribution = %s
+                        WHERE id = %s;
+                    """, (contrib, item['line_item_id']))
 
                 final_weighted_score = round(weighted_p_score + total_np_score, 2)
 

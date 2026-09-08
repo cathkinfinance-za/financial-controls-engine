@@ -1243,7 +1243,7 @@ def update_project(project_id):
         conn.commit()
 
         # 4. Instantly Recalculate 5-Year Totals & Inverse Pricing Scores
-        cursor.execute("SELECT id, total_quantity, total_quantity FROM procurement_options WHERE project_id = %s;", (project_id,))
+        cursor.execute("SELECT id, total_quantity FROM procurement_options WHERE project_id = %s;", (project_id,))
         project_vendors = cursor.fetchall()
 
         vendor_rates = {}
