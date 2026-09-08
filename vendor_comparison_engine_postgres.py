@@ -159,7 +159,7 @@ def execute_phase2(conn, project_id=None):
         with conn.cursor() as cursor:
             for v in vendors:
                 cursor.execute("""
-                    SELECT amount, cost_type_category FROM option_line_items_pricing 
+                    SELECT amount, cost_type_category FROM options_line_items_pricing 
                     WHERE procurement_option_id = %s;
                 """, (v['id'],))
                 lines = cursor.fetchall()
@@ -190,7 +190,7 @@ def execute_phase2(conn, project_id=None):
 
                 cursor.execute("""
                     SELECT np.score, pw.weighting_percent 
-                    FROM option_line_items_non_pricing np
+                    FROM options_line_items_non_pricing np
                     JOIN project_weightings pw ON np.project_weighting_id = pw.id
                     WHERE np.procurement_option_id = %s;
                 """, (v['id'],))
