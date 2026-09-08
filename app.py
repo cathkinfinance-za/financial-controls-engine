@@ -17,7 +17,7 @@ from collections import defaultdict
 from flask import send_file, abort
 from flask import session
 from werkzeug.security import check_password_hash
-from routes import analyze_documents
+from routes.analysis import analysis_bp
 
 
 try:
@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
-app.register_blueprint(analyze_documents)
+app.register_blueprint(analysis_bp)
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 
