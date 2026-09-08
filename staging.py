@@ -40,6 +40,112 @@ def build_vendor_payload_part(vendor: dict) -> types.Part | None:
     
     return None
 
+def process_vendor_quote_pricing(project_id: int, vendor_options: list[dict], db_connection=None):
+    """
+    Phase 2b Evaluation Engine with Conditional Vendor Content Payload.
+    Parses line items via Gemini and inserts direct entries into database tables.
+    """
+    if not db_connection:
+        return
+
+    # Fetch project weightings to pair non-pricing line items with weighting IDs
+    with db_connection.cursor() as cursor:
+        cursor.execute("SELECT id, criterion_name FROM project_weightings WHERE project_id = %s;", (project_id,))
+        weightings = cursor.fetchall()
+
+    for vendor in vendor_options:
+        v_id = vendor['id']
+        v_name = vendor.get('vendor_name', 'Unknown')
+        content_part = build_vendor_payload_part(vendor)
+        
+        if not content_part:
+            continue
+
+        prompt = f"""
+        Analyze quote document for Vendor ID {v_id} ({v_name}).
+        Extract all pricing components and non-pricing evaluation criteria score ratings (0-10 scale).
+
+        Return JSON in this structure:
+        {{
+          "pricing_items": [
+            {{
+              "cost_component_name": "string",
+              "cost_type_category": "Annual Cost" or "One-Time Cost",
+              "amount": float
+            }}
+          ],
+          "non_pricing_items": [
+            {{
+              "criterion_name": "string matching weightings if possible",
+              "score": float (0-10),
+              "comments": "string"
+            }}
+          ]
+        }}
+        """
+
+        try:
+            res = ai_client.models.generate_content(
+                model='gemini-3.5-flash-lite',
+                contents=[content_part, prompt],
+                config=types.GenerateContentConfig(response_mime_type="application/json")
+            )
+            parsed_data = json.loads(res.text or "{}")
+
+            with db_connection.cursor() as cursor:
+                # Clear existing items for re-run idempotent state
+                cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
+                cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (v_id,))
+
+                # Insert Pricing Line Items
+                pricing_items = parsed_data.get("pricing_items", [])
+                for item in pricing_items:
+                    item_name = item.get("cost_component_name", "Uncategorized Item")
+                    category = item.get("cost_type_category", "One-Time Cost")
+                    amount = float(item.get("amount", 0.0))
+
+                    cursor.execute(
+                        """
+                        INSERT INTO options_line_items_pricing (procurement_option_id, cost_component_name, cost_type_category, amount)
+                        VALUES (%s, %s, %s, %s);
+                        """,
+                        (v_id, item_name, category, amount)
+                    )
+
+                # Insert Non-Pricing Line Items matched with Weighting IDs
+                non_pricing_items = parsed_data.get("non_pricing_items", [])
+                for np_item in non_pricing_items:
+                    c_name = np_item.get("criterion_name", "")
+                    score = float(np_item.get("score", 0.0))
+                    comments = np_item.get("comments", "")
+
+                    # Attempt to match criterion name to project_weightings entry
+                    weighting_id = None
+                    for w in weightings:
+                        if w['criterion_name'].lower() in c_name.lower() or c_name.lower() in w['criterion_name'].lower():
+                            weighting_id = w['id']
+                            break
+
+                    # Fallback to first weighting criterion if unmatched
+                    if not weighting_id and weightings:
+                        weighting_id = weightings[0]['id']
+
+                    if weighting_id:
+                        cursor.execute(
+                            """
+                            INSERT INTO options_line_items_non_pricing (procurement_option_id, weighting_id, score, evaluation_notes)
+                            VALUES (%s, %s, %s, %s);
+                            """,
+                            (v_id, weighting_id, score, comments)
+                        )
+
+            db_connection.commit()
+
+        except Exception as err:
+            print(f"Error parsing/inserting pricing items for vendor {v_id}: {err}")
+            db_connection.rollback()
+
+
 def run_due_diligence_osint(conn, project_id, vendors):
     for v in vendors:
         v_id = v['id']
@@ -97,10 +203,8 @@ def run_due_diligence_osint(conn, project_id, vendors):
             """, (v_status, findings, v_id))
         conn.commit()
 
-# vendor_comparison_engine_postgres.py
 
 def execute_phase2(conn, project_id=None):
-    # Handle single positional argument calls: execute_phase2(project_id)
     if project_id is None:
         project_id = conn
         conn = None
@@ -125,114 +229,16 @@ def execute_phase2(conn, project_id=None):
             if not vendors:
                 return {"status": "warning", "message": f"No procurement options found for project {project_id}."}
 
-            # 3. Fetch project weightings (non-pricing criteria)
+            # 3. Fetch project weightings
             cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s;", (project_id,))
             weightings = cursor.fetchall()
 
-            # 4. Fetch dynamic system prompt template from system_prompts table
-            cursor.execute("""
-                SELECT prompt_template, selected_model 
-                FROM system_prompts 
-                WHERE process = %s AND is_active = true
-                LIMIT 1;
-            """, ('project evaluation',))
-            prompt_row = cursor.fetchone()
-
-        if not prompt_row:
-            raise ValueError("No active system prompt found in system_prompts where process = 'project evaluation'.")
-
-        prompt_template = prompt_row['prompt_template'] if isinstance(prompt_row, dict) else prompt_row[0]
-        selected_model = (prompt_row['selected_model'] if isinstance(prompt_row, dict) else prompt_row[1]) or 'gemini-3.5-flash'
-
-        # Format assessment criteria array into formatted JSON text for insertion into prompt
-        criteria_list = [
-            {
-                "id": w["id"],
-                "criterion_name": w["criterion_name"],
-                "description": w.get("description", ""),
-                "weight_percent": float(w.get("weight_percent", 0.0))
-            }
-            for w in weightings
-        ]
-        assessment_criteria_str = json.dumps(criteria_list, indent=2)
-        ai_adjustments_str = str(project.get("ai_prompt_adjustments") or "None")
-
         # -------------------------------------------------------------------------
-        # STEP 1: GEMINI EVALUATION & POPULATION OF BOTH PRICING & NON-PRICING TABLES
+        # STEP 2b PRE-PROCESSING: Single call execution to populate line items
         # -------------------------------------------------------------------------
-        for v in vendors:
-            v_id = v["id"]
-            v_name = v.get("vendor_name", "Unknown Vendor")
+        process_vendor_quote_pricing(project_id, vendors, conn)
 
-            content_part = build_vendor_payload_part(v)
-            if not content_part:
-                continue
-
-            # Populate placeholder parameters into the fetched prompt template
-            formatted_prompt = prompt_template.format(
-                vendor_name=v_name,
-                ai_prompt_adjustments=ai_adjustments_str,
-                assessment_criteria=assessment_criteria_str
-            )
-
-            try:
-                res = ai_client.models.generate_content(
-                    model=selected_model,
-                    contents=[content_part, formatted_prompt],
-                    config=types.GenerateContentConfig(response_mime_type="application/json")
-                )
-                data = json.loads(res.text or "{}")
-
-                pricing_items = data.get("pricing_line_items", [])
-                non_pricing_evals = data.get("non_pricing_evaluations", [])
-
-                with conn.cursor() as cursor:
-                    # Clear previous entries for vendor to prevent duplication
-                    cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
-                    cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (v_id,))
-
-                    # Populating options_line_items_pricing
-                    for p_item in pricing_items:
-                        cursor.execute("""
-                            INSERT INTO options_line_items_pricing 
-                            (procurement_option_id, cost_component_name, cost_type_category, amount)
-                            VALUES (%s, %s, %s, %s);
-                        """, (
-                            v_id,
-                            p_item.get("cost_component_name", "Uncategorized Item"),
-                            p_item.get("cost_type_category", "One-Off Cost"),
-                            float(p_item.get("amount", 0.0))
-                        ))
-
-                    # Populating options_line_items_non_pricing
-                    for np_item in non_pricing_evals:
-                        weighting_id = np_item.get("weighting_id")
-                        if weighting_id:
-                            score = float(np_item.get("score", 0.0))
-                            justification = np_item.get("justification", "")
-                            line_item_id = f"np_{weighting_id}_{v_id}"
-
-                            cursor.execute("""
-                                INSERT INTO options_line_items_non_pricing 
-                                (line_item_id, procurement_option_id, weighting_id, score, justification, weighted_score_contribution)
-                                VALUES (%s, %s, %s, %s, %s, %s);
-                            """, (
-                                line_item_id,
-                                v_id,
-                                weighting_id,
-                                score,
-                                justification,
-                                0.0
-                            ))
-
-                conn.commit()
-
-            except Exception as e:
-                print(f"Error executing Gemini evaluation for vendor '{v_name}' (ID: {v_id}): {e}")
-
-        # -------------------------------------------------------------------------
-        # STEP 2: CALCULATE 5-YEAR TOTALS PER VENDOR
-        # -------------------------------------------------------------------------
+        # 1. Update 5-Year Totals per Vendor
         vendor_totals = {}
         with conn.cursor() as cursor:
             for v in vendors:
@@ -254,11 +260,9 @@ def execute_phase2(conn, project_id=None):
         conn.commit()
 
         lowest_bid = min(vendor_totals.values()) if vendor_totals else 0.0
-        price_weight = float(project.get('price_weighting') or 0.50)
+        price_weight = float(project['price_weighting'] or 0.50)
 
-        # -------------------------------------------------------------------------
-        # STEP 3: SCORE NON-PRICING AND CALCULATE COMBINED WEIGHTS
-        # -------------------------------------------------------------------------
+        # 2. Score Non-Pricing and Combined Weights
         winning_score = -1.0
         winner_name = ""
 
@@ -294,6 +298,8 @@ def execute_phase2(conn, project_id=None):
                         WHERE id = %s;
                     """, (contrib, item['line_item_id']))
 
+                    print(f"Updated rows: {cursor.rowcount}")
+
                 final_weighted_score = round(weighted_p_score + total_np_score, 2)
 
                 if final_weighted_score > winning_score:
@@ -311,11 +317,10 @@ def execute_phase2(conn, project_id=None):
 
         conn.commit()
 
-        # -------------------------------------------------------------------------
-        # STEP 4: OSINT DUE DILIGENCE & PROJECT MATRIX FLAGS
-        # -------------------------------------------------------------------------
+        # 3. OSINT Due Diligence
         run_due_diligence_osint(conn, project_id, vendors)
 
+        # 4. Update lowest bid floor and clear recalculate flag
         with conn.cursor() as cursor:
             cursor.execute("""
                 UPDATE projects 
@@ -335,5 +340,5 @@ def execute_phase2(conn, project_id=None):
             conn.close()
 
 if __name__ == "__main__":
-    p_id = (int(sys.argv[1]),) if len(sys.argv) > 1 else (1,)
+    p_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
     execute_phase2(p_id)
