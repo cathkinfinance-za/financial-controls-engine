@@ -225,7 +225,7 @@ def execute_phase2(conn, project_id=None):
         # Fetch active system prompt template from DB
         with conn.cursor() as cursor:
             cursor.execute("""
-                SELECT prompt_template, model_name 
+                SELECT prompt_template, selected_model 
                 FROM system_prompts 
                 WHERE process_name = 'executive_recommendation' AND is_active = TRUE 
                 LIMIT 1;
@@ -236,7 +236,7 @@ def execute_phase2(conn, project_id=None):
             raise ValueError("Active system prompt for 'executive_recommendation' not found in system_prompts table.")
 
         template = prompt_record['prompt_template']
-        selected_model = prompt_record.get('model_name') or 'gemini-3.5-flash-lite'
+        selected_model = prompt_record.get('selected_model') or 'gemini-3.5-flash-lite'
 
         # Find cheapest vendor name for template formatting
         cheapest_vendor_name = next(
