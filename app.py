@@ -982,6 +982,29 @@ def execute_phase2b(project_id):
         if conn and not conn.closed:
             conn.close()
 
+    # 2. Run engine execution (let execute_phase2 manage its own fresh connection)
+    try:
+        execute_phase2(project_id=project_id)
+    
+    # 3. Mark phase complete using a fresh connection
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "UPDATE projects SET latest_ai_status = 'Phase 2 Complete' WHERE id = %s;", 
+                (project_id,)
+            )
+        conn.commit()
+
+        flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!", "success")
+
+    except Exception as e:
+        flash(f"Error during Phase 2 evaluation: {str(e)}", "danger")
+
+    finally:
+        if conn and not conn.closed:
+            conn.close()
+
+
     return redirect(url_for("projects_page", project_id=project_id))
 
 

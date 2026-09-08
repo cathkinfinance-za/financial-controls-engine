@@ -242,6 +242,7 @@ def execute_phase2(conn, project_id=None):
                         final_weighted_score_output = %s
                     WHERE id = %s;
                 """, (lowest_bid, p_score, total_np_score, final_weighted_score, v['id']))
+
         conn.commit()
 
         # 3. OSINT Due Diligence
