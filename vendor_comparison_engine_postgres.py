@@ -189,16 +189,16 @@ def execute_phase2(conn, project_id=None):
                 weighted_p_score = p_score * price_weight
 
                 cursor.execute("""
-                    SELECT np.score, pw.weighting_percent 
+                    SELECT np.score, pw.weight_percent 
                     FROM options_line_items_non_pricing np
-                    JOIN project_weightings pw ON np.project_weighting_id = pw.id
+                    JOIN project_weightings pw ON np.weighting_id = pw.id
                     WHERE np.procurement_option_id = %s;
                 """, (v['id'],))
                 np_items = cursor.fetchall()
 
                 total_np_score = 0.0
                 for item in np_items:
-                    w_pct = float(item['weighting_percent']) / 100.0 if float(item['weighting_percent']) > 1 else float(item['weighting_percent'])
+                    w_pct = float(item['weight_percent']) / 100.0 if float(item['weight_percent']) > 1 else float(item['weight_percent'])
                     contrib = round(float(item['score']) * w_pct, 2)
                     total_np_score += contrib
 

@@ -944,10 +944,12 @@ def handle_phase1(project_id):
 
 @app.route("/process-vendor-pricing/<int:project_id>", methods=["POST"])
 def process_vendor_pricing(project_id):
+    
+    conn = get_db_connection()
+
     # 1. Capture prompt adjustments from UI form if provided
     ai_adjustments = request.form.get("ai_prompt_adjustments", "")
 
-    conn = get_db_connection()
     try:
         # 2. Persist adjustments and update status in database
         with conn.cursor() as cursor:
