@@ -159,7 +159,7 @@ def execute_phase2(conn, project_id=None):
             # -------------------------------------------------------------------------
             for v in vendors:
                 # Parse quote/analysis sheet data and populate pricing/non-pricing line items
-                process_vendor_quote_pricing(conn, project_id, v['id'])
+                process_vendor_quote_pricing(project_id, vendors, conn)
 
         # 1. Update 5-Year Totals per Vendor
         vendor_totals = {}
@@ -248,5 +248,5 @@ def execute_phase2(conn, project_id=None):
             conn.close()
 
 if __name__ == "__main__":
-    p_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+    p_id = (int(sys.argv[1]),) if len(sys.argv) > 1 else (1,)
     execute_phase2(p_id)
