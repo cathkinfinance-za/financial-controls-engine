@@ -123,6 +123,63 @@ def analyze_documents():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@analysis_bp.route('/analyze-documents/<int:project_id>', methods=['POST'])
+def analyze_project_documents(project_id):
+    if not client:
+        return jsonify({'error': 'Gemini API client is not configured'}), 500
+
+    from app import get_db_connection
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    try:
+        # Fetch options for this project that have quote PDF bytes
+        cursor.execute(
+            "SELECT id, vendor_name, quote_file_bytes FROM procurement_options WHERE project_id = %s;",
+            (project_id,)
+        )
+        options = cursor.fetchall()
+
+        if not options:
+            return jsonify({'error': 'No procurement options/quotes found for this project'}), 400
+
+        prompt_template, model_name = get_system_prompt('multi_document_analysis')
+
+        for opt in options:
+            if not opt['quote_file_bytes']:
+                continue
+
+            contents = [
+                types.Part.from_bytes(
+                    data=bytes(opt['quote_file_bytes']),
+                    mime_type='application/pdf'
+                ),
+                prompt_template
+            ]
+
+            response = client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=types.GenerateContentConfig(temperature=0.1)
+            )
+
+            raw_html = response.text.strip()
+            cleaned_html = re.sub(r'^```html\s*|^```\s*|\s*```$', '', raw_html, flags=re.MULTILINE).strip()
+
+            cursor.execute(
+                "UPDATE procurement_options SET analysis_sheet_html = %s WHERE id = %s;",
+                (cleaned_html, opt['id'])
+            )
+
+        conn.commit()
+        return jsonify({"status": "success", "message": "Phase 2a document analysis complete"}), 200
+
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cursor.close()
+        conn.close()
 
 @analysis_bp.route('/view-analysis/<int:option_id>', methods=['GET'])
 def view_analysis(option_id):

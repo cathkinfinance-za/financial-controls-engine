@@ -845,7 +845,7 @@ function triggerPhase2aAnalysis() {
     const statusBadge = document.querySelector('.status-badge');
     if (statusBadge) statusBadge.innerHTML = 'Latest AI Status: <strong>Analyzing Documents (Phase 2a)...</strong>';
 
-    fetch(`/analysis/analyze-documents/${projectId}`, {
+    fetch(`/api/v1/analyze-documents/${projectId}`, {  // Updated to match /api/v1 prefix
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
@@ -853,7 +853,7 @@ function triggerPhase2aAnalysis() {
     })
     .then(response => response.json())
     .then(data => {
-        if (data.success || response.ok) {
+        if (data.status === 'success' || response.ok) {
             window.location.reload();
         } else {
             alert('Analysis failed: ' + (data.error || 'Unknown error'));
