@@ -1139,18 +1139,18 @@ def update_project(project_id):
                         """, (v_id, cost_name, category, amount_val))
 
             # Newly Added Qualitative Criteria Definitions
-            elif key.startswith("criteria_name_new_"):
-                suffix = key.replace("criteria_name_new_", "")
-                criteria_name = value.strip()
+            elif key.startswith("criterion_name_new_"):
+                suffix = key.replace("criterion_name_new_", "")
+                criterion_name = value.strip()
                 
-                if criteria_name:
+                if criterion_name:
                     weight_val = float(request.form.get(f"criteria_weight_new_{suffix}", 0.0))
                     
                     cursor.execute("""
-                        INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
+                        INSERT INTO project_weightings (project_id, criterion_name, weight_percent)
                         VALUES (%s, %s, %s)
                         RETURNING id;
-                    """, (project_id, criteria_name, weight_val))
+                    """, (project_id, criterion_name, weight_val))
                     
                     new_criteria_id = cursor.fetchone()["id"]
 
@@ -1169,12 +1169,12 @@ def update_project(project_id):
                         """, (line_item_id, v_id, new_criteria_id, score_val, weighted_contrib))
             
             # Qualitative Criteria Names & Weightings
-            elif key.startswith("criteria_name_"):
-                criteria_id = key.replace("criteria_name_", "")
+            elif key.startswith("criterion_name_"):
+                criteria_id = key.replace("criterion_name_", "")
                 if criteria_id.isdigit():
                     cursor.execute("""
                         UPDATE project_weightings 
-                        SET criteria_name = %s 
+                        SET criterion_name = %s 
                         WHERE id = %s;
                     """, (value, int(criteria_id)))
 

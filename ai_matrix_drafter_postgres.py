@@ -168,18 +168,18 @@ def execute_phase1(conn, project_id):
         cursor.execute("DELETE FROM project_weightings WHERE project_id = %s;", (project_id,))
         
         for item in criteria_list:
-            criteria_name = item.get('criteria_name') or item.get('component_name')
+            criterion_name = item.get('criterion_name') or item.get('component_name')
             
             # Handle weight_percent key extraction safely
             weight_val = item.get('weight_percent')
             if weight_val is None:
                 weight_val = item.get('weighting', 0.0)
 
-            if criteria_name and str(criteria_name).strip():
+            if criterion_name and str(criterion_name).strip():
                 cursor.execute("""
-                    INSERT INTO project_weightings (project_id, criteria_name, weight_percent)
+                    INSERT INTO project_weightings (project_id, criterion_name, weight_percent)
                     VALUES (%s, %s, %s);
-                """, (project_id, str(criteria_name).strip(), float(weight_val)))
+                """, (project_id, str(criterion_name).strip(), float(weight_val)))
 
     conn.commit()
     return {"status": "success", "project_id": project_id}
@@ -217,7 +217,7 @@ def process_vendor_quote_pricing(conn, vendor_record, project_id):
         project = cursor.fetchone()
         
         cursor.execute("""
-            SELECT id, criteria_name, weight_percent 
+            SELECT id, criterion_name, weight_percent 
             FROM project_weightings 
             WHERE project_id = %s;
         """, (project_id,))

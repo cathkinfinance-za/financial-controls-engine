@@ -568,7 +568,7 @@
                         {% for criteria in criteria_list %}
                         <tr class="qualitative-row" data-criteria-id="{{ criteria.id }}">
                             <td>
-                                    <textarea name="criteria_name_{{ criteria.id }}" class="form-control table-desc-input criteria-name-input" rows="2" title="{{ criteria.criteria_name }}" required>{{ criteria.criteria_name }}</textarea>
+                                    <textarea name="criterion_name_{{ criteria.id }}" class="form-control table-desc-input criteria-name-input" rows="2" title="{{ criteria.criterion_name }}" required>{{ criteria.criterion_name }}</textarea>
                             </td>
                             <td>Qualitative</td>
                             <td>
@@ -1068,7 +1068,7 @@ function addQualitativeRow() {
     const tr = document.createElement('tr');
     tr.className = 'qualitative-row';
     tr.innerHTML = `
-        <td><textarea name="criteria_name_new_${newId}" class="form-control table-desc-input criteria-name-input" rows="2" placeholder="New Criterion" required></textarea></td>
+        <td><textarea name="criterion_name_new_${newId}" class="form-control table-desc-input criteria-name-input" rows="2" placeholder="New Criterion" required></textarea></td>
         <td>Qualitative</td>
         <td>
             <div style="display: flex; align-items: center; gap: 4px;">
