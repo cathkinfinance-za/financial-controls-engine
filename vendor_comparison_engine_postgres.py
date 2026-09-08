@@ -154,20 +154,61 @@ def execute_phase2(project_id):
         # 3. OSINT Due Diligence
         run_due_diligence_osint(conn, project_id, vendors)
 
-        # 4. Executive Recommendation Synthesis
+       # 4. Executive Recommendation Synthesis
+        # Fetch active system prompt template from DB
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT prompt_template, model_name 
+                FROM system_prompts 
+                WHERE process_name = 'executive_recommendation' AND is_active = TRUE 
+                LIMIT 1;
+            """)
+            prompt_record = cursor.fetchone()
+
+        if not prompt_record or not prompt_record.get('prompt_template'):
+            raise ValueError("Active system prompt for 'executive_recommendation' not found in system_prompts table.")
+
+        template = prompt_record['prompt_template']
+        selected_model = prompt_record.get('model_name') or 'gemini-3.5-flash-lite'
+
+        # Find cheapest vendor name for template formatting
+        cheapest_vendor_name = next(
+            (v['vendor_name'] for v in vendors if vendor_totals.get(v['id']) == lowest_bid), 
+            "N/A"
+        )
+
+        # Format prompt template with dynamic variables
+        formatted_prompt = template.format(
+            winner_name=winner_name,
+            winning_score=winning_score,
+            cheapest_vendor=cheapest_vendor_name,
+            min_cost=f"{lowest_bid:,.2f}"
+        )
+
+        # Append project context details
         narrative_prompt = f"""
-        Cathkin Estates Project Ref: {project['project_reference']}
-        Project Scope: {project['project_description']}
-        Pre-Check Gap Analysis: {project['analysis']}
+Cathkin Estates Project Ref: {project['project_reference']}
+Project Description: {project['project_description']}
+Project Objectives: {project.get('project_objectives', 'N/A')}
+Pre-Check Analysis: {project['analysis']}
 
-        Winner: {winner_name} (Score: {winning_score}/10.0). Lowest Bid Floor: ZAR {lowest_bid:,.2f}.
-        
-        Write a professional 4-paragraph board recommendation. Highlight trade-offs, scope gaps, and risk conditions prior to award.
-        Append this exact final line:
-        *Disclaimer: This analysis and recommendation summary was programmatically AI-generated based on an in-depth analytical review of the uploaded vendor quotes.*
-        """
+{formatted_prompt}
+""".strip()
 
-        res = ai_client.models.generate_content(model='gemini-3.5-flash-lite', contents=[narrative_prompt])
+        # Build PDF attachment parts
+        pdf_parts = []
+        for v in vendors:
+            file_bytes = v.get('quote_file_bytes')
+            if file_bytes:
+                pdf_parts.append(
+                    types.Part.from_bytes(data=bytes(file_bytes), mime_type="application/pdf")
+                )
+
+        # Execute call with dynamic DB prompt + PDF attachments
+        res = ai_client.models.generate_content(
+            model=selected_model,
+            contents=[*pdf_parts, narrative_prompt]
+        )
         recommendation_narrative = res.text.strip()
 
         with conn.cursor() as cursor:
