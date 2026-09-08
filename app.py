@@ -877,6 +877,29 @@ def view_quote(option_id):
             )
 
 
+@app.route('/delete-vendor/<int:vendor_id>', methods=['POST'])
+def delete_vendor(vendor_id):
+    # Fetch project_id before deletion so you can redirect back properly
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT project_id, vendor_name FROM procurement_options WHERE id = %s;", (vendor_id,))
+            record = cursor.fetchone()
+
+    if not record:
+        flash("Vendor option not found.", "danger")
+        return redirect(url_for('dashboard'))
+
+    project_id, vendor_name = record
+
+    # Delete the record from procurement_options
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM procurement_options WHERE id = %s;", (vendor_id,))
+    conn.commit()
+
+    flash(f"Vendor option '{vendor_name}' deleted successfully.", "success")
+    return redirect(url_for('view_project', project_id=project_id))
+
+
 @app.route("/execute-phase1/<int:project_id>", methods=["POST"])
 def handle_phase1(project_id):
     # Retrieve Phase 1 dynamic adjustments from form submission
