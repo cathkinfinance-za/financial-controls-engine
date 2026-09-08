@@ -154,6 +154,13 @@ def execute_phase2(conn, project_id=None):
             cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s;", (project_id,))
             weightings = cursor.fetchall()
 
+            # -------------------------------------------------------------------------
+            # STEP 2b PRE-PROCESSING: Parse quotes & populate line items per vendor
+            # -------------------------------------------------------------------------
+            for v in vendors:
+                # Parse quote/analysis sheet data and populate pricing/non-pricing line items
+                process_vendor_quote_pricing(conn, project_id, v['id'])
+
         # 1. Update 5-Year Totals per Vendor
         vendor_totals = {}
         with conn.cursor() as cursor:
@@ -221,69 +228,14 @@ def execute_phase2(conn, project_id=None):
         # 3. OSINT Due Diligence
         run_due_diligence_osint(conn, project_id, vendors)
 
-       # 4. Executive Recommendation Synthesis
-        # Fetch active system prompt template from DB
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT prompt_template, selected_model 
-                FROM system_prompts 
-                WHERE process = 'executive_recommendation' AND is_active = TRUE 
-                LIMIT 1;
-            """)
-            prompt_record = cursor.fetchone()
-
-        if not prompt_record or not prompt_record.get('prompt_template'):
-            raise ValueError("Active system prompt for 'executive_recommendation' not found in system_prompts table.")
-
-        template = prompt_record['prompt_template']
-        selected_model = prompt_record.get('selected_model') or 'gemini-3.5-flash-lite'
-
-        # Find cheapest vendor name for template formatting
-        cheapest_vendor_name = next(
-            (v['vendor_name'] for v in vendors if vendor_totals.get(v['id']) == lowest_bid), 
-            "N/A"
-        )
-
-        # Format prompt template with dynamic variables
-        formatted_prompt = template.format(
-            winner_name=winner_name,
-            winning_score=winning_score,
-            cheapest_vendor=cheapest_vendor_name,
-            min_cost=f"{lowest_bid:,.2f}"
-        )
-
-        # Append project context details
-        narrative_prompt = f"""
-Cathkin Estates Project Ref: {project['project_reference']}
-Project Description: {project['project_description']}
-Project Objectives: {project.get('project_objectives', 'N/A')}
-Pre-Check Analysis: {project['analysis']}
-
-{formatted_prompt}
-""".strip()
-
-        # Build document attachment parts (HTML or PDF per vendor)
-        doc_parts = []
-        for v in vendors:
-            part = build_vendor_payload_part(v)
-            if part:
-                doc_parts.append(part)
-
-        # Execute call with dynamic DB prompt + attachment parts
-        res = ai_client.models.generate_content(
-            model=selected_model,
-            contents=[*doc_parts, narrative_prompt]
-        )
-        recommendation_narrative = (res.text or "").strip()
-
+       # 4. Update lowest bid floor and clear recalculate flag
         with conn.cursor() as cursor:
             cursor.execute("""
                 UPDATE projects 
                 SET lowest_project_bid_floor = %s,
-                    executive_sourcing_recommendation = %s,
                     recalculate_matrix = FALSE
                 WHERE id = %s;
-            """, (lowest_bid, recommendation_narrative, project_id))
+            """, (lowest_bid, project_id))
         conn.commit()
 
     except Exception as e:

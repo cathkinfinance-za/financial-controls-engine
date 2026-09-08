@@ -942,8 +942,8 @@ def handle_phase1(project_id):
     return redirect(url_for("projects_page", project_id=project_id))
 
 
-@app.route("/process-vendor-pricing/<int:project_id>", methods=["POST"])
-def process_vendor_pricing(project_id):
+@app.route("/execute-phase2b/<int:project_id>", methods=["POST"])
+def execute_phase2b(project_id):
     
     conn = get_db_connection()
 
