@@ -839,27 +839,30 @@ async function uploadAndAnalyzeFiles(projectId, optionId, vendorName, fileInputE
 
 // Handler triggered by the "Phase 2a: Document Analysis" control button
 function triggerPhase2aAnalysis() {
-    const projectId = "{{ project.id if project else '' }}";
-    if (!projectId) {
-        alert("Please save or select a project first.");
-        return;
-    }
+    const projectId = "{{ project.id if project else 1 }}";
+    
+    // Show loading indicator or status
+    const statusBadge = document.querySelector('.status-badge');
+    if (statusBadge) statusBadge.innerHTML = 'Latest AI Status: <strong>Analyzing Documents (Phase 2a)...</strong>';
 
-    const fileInput = document.getElementById('modal_files_input');
-    if (fileInput && fileInput.files.length > 0) {
-        const vendorNameInput = document.querySelector('#uploadModal input[name="vendor_name"]');
-        const vendorName = vendorNameInput ? vendorNameInput.value : '';
-        const btn = document.getElementById('phase2a-btn');
-        
-        if (btn) {
-            btn.disabled = true;
-            btn.innerText = 'Analyzing...';
+    fetch(`/analysis/run/${projectId}`, {  // Replace with your exact blueprint route path
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
         }
-        
-        uploadAndAnalyzeFiles(projectId, '', vendorName, fileInput);
-    } else {
-        document.getElementById('uploadModal').style.display = 'block';
-    }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success || response.ok) {
+            window.location.reload();
+        } else {
+            alert('Analysis failed: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        console.error('Error executing Phase 2a:', err);
+        alert('Error triggering Phase 2a analysis.');
+    });
 }
 
 // Format raw numerical strings with thousands commas
