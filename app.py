@@ -849,7 +849,7 @@ def upload_quote():
     finally:
         conn.close()
 
-    return redirect(url_for("view_project", project_id=project_id))
+    return redirect(url_for("projects_page", project_id=project_id))
 
 
 @app.route('/view-quote/<int:option_id>')
@@ -982,7 +982,7 @@ def process_vendor_pricing(project_id):
         if conn and not conn.closed:
             conn.close()
 
-    return redirect(url_for("view_project", id=project_id))
+    return redirect(url_for("projects_page", project_id=project_id))
 
 
 @app.route("/recalculate-matrix/<int:project_id>", methods=["POST"])
