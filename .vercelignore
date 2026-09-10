@@ -1,0 +1,21 @@
+# Python virtual environments & bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# Uploads & local data caches
+*.pdf
+*.bin
+*.db
+*.sqlite3
+quotes/
+uploads/
+
+# Documentation and Git
+.git/
+.gitignore
+README.md
