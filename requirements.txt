@@ -5,6 +5,7 @@ openpyxl
 pandas
 Flask
 werkzeug
+duckduckgo-search>=6.0.0
 python-dotenv
 requests
 psycopg2-binary
