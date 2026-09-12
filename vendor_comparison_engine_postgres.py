@@ -545,8 +545,10 @@ def generate_executive_recommendation_html(conn, project_id: int):
         <div class="form-row"><div class="form-label">Name</div><div class="form-value">{project.get("name") or "N/A"}</div></div>
         <div class="form-row"><div class="form-label">Project Description</div><div class="form-value">{project.get("project_description") or "N/A"}</div></div>
         <div class="form-row"><div class="form-label">Project Objective</div><div class="form-value">{project.get("project_objective") or "N/A"}</div></div>
+        <!--
         <div class="form-row"><div class="form-label">Phase 1 AI Prompt Adjustments</div><div class="form-value">{project.get("phase1_prompt_adjustments") or "None"}</div></div>
         <div class="form-row"><div class="form-label">Phase 2 Prompt Adjustments</div><div class="form-value">{project.get("ai_prompt_adjustments") or "None"}</div></div>
+        -->
         <div class="form-row"><div class="form-label">GL Code</div><div class="form-value">{project.get("gl_code") or "N/A"}</div></div>
         
         <div class="section-header">Procurement Options</div>
