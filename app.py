@@ -1279,8 +1279,39 @@ def update_project(project_id):
                 WHERE id = %s;
             """, (round(price_score, 2), v_id))
 
+
+        # 5. Calculate and Update Final Weighted Scores
+        for v_id, rate in vendor_rates.items():
+            # Get current vendor's price score
+            cursor.execute("SELECT price_score FROM procurement_options WHERE id = %s;", (v_id,))
+            p_res = cursor.fetchone()
+            p_score = float(p_res[0]) if p_res and p_res[0] is not None else 0.0
+
+            # Start weighted score with price component contribution
+            final_weighted_score = p_score * (price_weighting / 100.0) if price_weighting else 0.0
+
+            # Fetch qualitative criteria scores for this vendor
+            cursor.execute("""
+                SELECT qs.score, pw.weight 
+                FROM qualitative_scores qs
+                JOIN project_weightings pw ON qs.criteria_id = pw.id
+                WHERE qs.vendor_id = %s;
+            """, (v_id,))
+            qual_scores = cursor.fetchall()
+
+            for score, weight in qual_scores:
+                if score is not None and weight is not None:
+                    final_weighted_score += float(score) * (float(weight) / 100.0)
+
+            # Save the final weighted score back to the database
+            cursor.execute("""
+                UPDATE procurement_options 
+                SET final_weighted_score_output = %s 
+                WHERE id = %s;
+            """, (round(final_weighted_score, 2), v_id))
+
         conn.commit()
-        flash("Project definitions, line items, and price weightings saved successfully.")
+        flash("Project definitions, line items, price weightings and scores saved successfully.")
 
     except Exception as e:
         conn.rollback()
