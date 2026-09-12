@@ -476,7 +476,10 @@
                                     <strong style="font-size: 16px; display: block; margin-bottom: 6px;">{{ vendor.vendor_name }}</strong>
                                     <div class="vendor-info">
                                         <span style="color: var(--text-muted); font-size: 13px;">Selected Option: <strong>A</strong></span>
-                                        <span style="font-size: 13px;">Projected Total: <strong id="cardTotal_{{ vendor.id }}">ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}</strong></span>
+                                        <span style="font-size: 13px;">
+                                            <span class="total-cost-label-short">Projected Total</span>: 
+                                            <strong id="cardTotal_{{ vendor.id }}">ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total) if vendor.projected_5yr_total else '0.00' }}</strong>
+                                        </span>
                                     </div>
                                 </div>
                                 <div style="display: flex; align-items: center; gap: 16px;">
@@ -639,7 +642,7 @@
                             <th></th>
                         </tr>
                         <tr>
-                            <th colspan="3">Projected 5-Year Total Cost</th>
+                            <th colspan="3" class="total-cost-label">Projected 5-Year Total Cost</th>
                             {% for vendor in vendors %}
                                 <th class="text-right" id="cardTotal_{{ vendor.id }}">
                                     ZAR {{ "{:,.2f}".format(vendor.projected_5yr_cost or 0.0) }}
@@ -743,7 +746,7 @@
                     </tbody>
                     <tfoot>
                         <tr class="total-row">
-                            <td colspan="2">Projected 5-Year Total Cost</td>
+                            <td colspan="2" class="total-cost-label">Projected 5-Year Total Cost</td>
                             {% for vendor in vendors %}
                                     <td style="border-left: 2px solid var(--border-color); padding: 12px 14px;" class="text-right" id="lineItemVendorTotal_{{ vendor.id }}">
                                     ZAR {{ "{:,.2f}".format(vendor.projected_5yr_total if vendor.projected_5yr_total is not none else 0.0) }}
@@ -944,6 +947,27 @@ function calculateAll() {
     const vendorQuantities = {};
     const tbody = document.getElementById('matrixTableBody');
     if (!tbody) return;
+
+    // --- Dynamic Header Label Calculation ---
+    let hasAnnualCosts = false;
+    document.querySelectorAll('#lineItemsMatrix .item-category').forEach(select => {
+        if (select.value === 'Annual Cost') {
+            hasAnnualCosts = true;
+        }
+    });
+
+    const fullLabelText = hasAnnualCosts ? "Projected 5-Year Total Cost" : "Total Cost";
+    const shortLabelText = hasAnnualCosts ? "Projected Total" : "Total Cost";
+
+    // Update table footer labels
+    document.querySelectorAll('.total-cost-label').forEach(el => {
+        el.innerText = fullLabelText;
+    });
+
+    // Update procurement vendor card labels
+    document.querySelectorAll('.total-cost-label-short').forEach(el => {
+        el.innerText = shortLabelText;
+    });
 
     document.querySelectorAll('input[name^="total_quantity_"]').forEach(input => {
         const vendorId = input.name.split('_')[2];
