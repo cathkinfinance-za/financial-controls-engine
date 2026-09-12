@@ -533,7 +533,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Recommendation (AI Generated) - {project.get("name", "Project")}</title>
+    <title>Recommendation - {project.get("name", "Project")}</title>
     <style>{css_styles}</style>
 </head>
 <body>
