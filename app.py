@@ -1285,7 +1285,7 @@ def update_project(project_id):
             # Get current vendor's price score
             cursor.execute("SELECT price_score FROM procurement_options WHERE id = %s;", (v_id,))
             p_res = cursor.fetchone()
-            p_score = float(p_res[0]) if p_res and p_res[0] is not None else 0.0
+            p_score = float(p_res['price_score']) if p_res and p_res.get('price_score') is not None else 0.0
 
             # Start weighted score with price component contribution
             final_weighted_score = p_score * (price_weighting / 100.0) if price_weighting else 0.0
@@ -1309,7 +1309,7 @@ def update_project(project_id):
                 SET final_weighted_score_output = %s 
                 WHERE id = %s;
             """, (round(final_weighted_score, 2), v_id))
-            
+
         conn.commit()
         flash("Project definitions, line items, price weightings and scores saved successfully.")
 
