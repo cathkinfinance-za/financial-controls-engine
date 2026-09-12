@@ -1440,6 +1440,23 @@ Project Objectives: {project.get('project_objective', '')}
     return redirect(url_for('projects_page', project_id=project_id))
 
 
+@app.route('/generate-recommendation-html/<int:project_id>', methods=['POST'])
+def handle_generate_recommendation_html(project_id):
+    conn = get_db_connection()
+    try:
+        generate_executive_recommendation_html(conn, project_id)
+        flash('Executive recommendation HTML generated successfully!', 'success')
+    except Exception as e:
+        if conn and not conn.closed:
+            conn.rollback()
+        flash(f'Error generating recommendation HTML: {str(e)}', 'danger')
+    finally:
+        if conn and not conn.closed:
+            conn.close()
+
+    return redirect(url_for('projects_page', project_id=project_id))
+
+
 @app.route('/minutes', methods=['GET', 'POST'])
 def finance_minutes():
     conn = get_db_connection()

@@ -1,0 +1,68 @@
+Table	Column	Data Type	Nullable
+options_line_items_non_pricing	id	integer	NO
+options_line_items_non_pricing	line_item_id	character varying	YES
+options_line_items_non_pricing	procurement_option_id	integer	YES
+options_line_items_non_pricing	weighting_id	integer	YES
+options_line_items_non_pricing	score	numeric	YES
+options_line_items_non_pricing	weighted_score_contribution	numeric	YES
+options_line_items_non_pricing	justification	text	YES
+options_line_items_pricing	id	integer	NO
+options_line_items_pricing	line_item_id	character varying	YES
+options_line_items_pricing	procurement_option_id	integer	YES
+options_line_items_pricing	cost_component_name	character varying	NO
+options_line_items_pricing	cost_type_category	character varying	YES
+options_line_items_pricing	amount	numeric	NO
+options_line_items_pricing	projected_5yr_total_cost	numeric	YES
+options_line_items_pricing	uom_id	integer	YES
+procurement_options	id	integer	NO
+procurement_options	project_id	integer	YES
+procurement_options	vendor_name	character varying	NO
+procurement_options	vendor_solution	character varying	YES
+procurement_options	projected_5yr_total	numeric	YES
+procurement_options	lowest_bid_lookup	numeric	YES
+procurement_options	price_score	numeric	YES
+procurement_options	total_non_pricing_score	numeric	YES
+procurement_options	final_weighted_score_output	numeric	YES
+procurement_options	public_dd_status	character varying	YES
+procurement_options	public_search_findings	text	YES
+procurement_options	quote_file_bytes	bytea	YES
+procurement_options	quote_filename	character varying	YES
+procurement_options	total_quantity	numeric	YES
+procurement_options	unit_of_measure	character varying	YES
+procurement_options	total_effective_rate	numeric	YES
+procurement_options	projected_5yr_cost	numeric	YES
+procurement_options_evaluated	procurement_option_id	integer	YES
+procurement_options_evaluated	project_reference	text	YES
+procurement_options_evaluated	vendor_name	character varying	YES
+procurement_options_evaluated	projected_5yr_total	numeric	YES
+procurement_options_evaluated	price_weighting	numeric	YES
+procurement_options_evaluated	lowest_project_bid_floor	numeric	YES
+procurement_options_evaluated	calculated_price_score	numeric	YES
+procurement_options_evaluated	calculated_non_pricing_score	numeric	YES
+procurement_options_evaluated	calculated_final_score	numeric	YES
+project_weightings	id	integer	NO
+project_weightings	project_id	integer	YES
+project_weightings	criteria_name	character varying	NO
+project_weightings	weight_percent	numeric	NO
+projects	id	integer	NO
+projects	project_reference	character varying	NO
+projects	name	character varying	NO
+projects	price_weighting	numeric	YES
+projects	lowest_project_bid_floor	numeric	YES
+projects	total_authorised_project_budget	numeric	YES
+projects	cumulative_total_committed	numeric	YES
+projects	recalculate_matrix	boolean	YES
+projects	executive_sourcing_recommendation	text	YES
+projects	procurement_matrix_summary_chart	text	YES
+projects	project_description	text	YES
+projects	project_objective	text	YES
+projects	analysis	text	YES
+projects	latest_ai_status	text	YES
+projects	draft_matrix_via_ai	character varying	YES
+projects	final_authorised_vendor	character varying	YES
+projects	gl_code	character varying	YES
+projects	gl_title	character varying	YES
+projects	gl_sub	character varying	YES
+projects	ai_prompt_adjustments	text	YES
+projects	project_scopes	jsonb	YES
+projects	phase1_prompt_adjustments	text	YES

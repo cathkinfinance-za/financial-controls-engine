@@ -403,6 +403,11 @@
                                 Phase 3: Executive Recommendation
                             </button>
                         </form>
+                        <form action="/generate-recommendation-html/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                            <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
+                                Generate Recommendation HTML
+                            </button>
+                        </form>
 
                     <span class="status-badge">
                         Latest AI Status: <strong>{{ project.latest_ai_status if project and project.latest_ai_status else 'Ready' }}</strong>
