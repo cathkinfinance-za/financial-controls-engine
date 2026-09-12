@@ -1280,17 +1280,18 @@ def update_project(project_id):
             """, (round(price_score, 2), v_id))
 
 
-        # 5. Calculate and Update Final Weighted Scores
+       # 5. Calculate and Update Final Weighted Scores
         for v_id, rate in vendor_rates.items():
             # Get current vendor's price score
             cursor.execute("SELECT price_score FROM procurement_options WHERE id = %s;", (v_id,))
             p_res = cursor.fetchone()
             p_score = float(p_res['price_score']) if p_res and p_res.get('price_score') is not None else 0.0
 
-            # Start weighted score with price component contribution
-            final_weighted_score = p_score * (price_weighting / 100.0) if price_weighting else 0.0
+            # Start weighted score with price component contribution 
+            # (price_weighting is already a decimal like 0.71, so multiply directly)
+            final_weighted_score = p_score * price_weighting if price_weighting else 0.0
 
-            # Fetch qualitative criteria scores using correct column name weight_percent
+            # Fetch qualitative criteria scores using correct dictionary keys
             cursor.execute("""
                 SELECT n.score, w.weight_percent 
                 FROM options_line_items_non_pricing n
@@ -1303,9 +1304,10 @@ def update_project(project_id):
                 score_val = row.get('score')
                 weight_val = row.get('weight_percent')
                 if score_val is not None and weight_val is not None:
+                    # weight_percent is stored as a percentage (e.g., 5.0 for 5%), so divide by 100
                     final_weighted_score += float(score_val) * (float(weight_val) / 100.0)
 
-            # Save the final weighted score back to the database
+            # Save the corrected final weighted score back to the database
             cursor.execute("""
                 UPDATE procurement_options 
                 SET final_weighted_score_output = %s 
