@@ -1299,9 +1299,11 @@ def update_project(project_id):
             """, (v_id,))
             qual_scores = cursor.fetchall()
 
-            for score, weight in qual_scores:
-                if score is not None and weight is not None:
-                    final_weighted_score += float(score) * (float(weight) / 100.0)
+            for row in qual_scores:
+                score_val = row.get('score')
+                weight_val = row.get('weight_percent')
+                if score_val is not None and weight_val is not None:
+                    final_weighted_score += float(score_val) * (float(weight_val) / 100.0)
 
             # Save the final weighted score back to the database
             cursor.execute("""
