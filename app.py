@@ -944,6 +944,7 @@ def handle_phase1(project_id):
 
 @app.route("/execute-phase2b/<int:project_id>", methods=["POST"])
 def execute_phase2b(project_id):
+
     ai_adjustments = request.form.get("ai_prompt_adjustments", "")
     conn = get_db_connection()
 
@@ -965,7 +966,7 @@ def execute_phase2b(project_id):
             cursor.execute("UPDATE projects SET latest_ai_status = 'Phase 2 Complete' WHERE id = %s;", (project_id,))
         conn.commit()
 
-        flash("Phase 2: Vendor Pricing & Evaluation Completed Successfully!", "success")
+        flash("Phase 2b: Vendor Pricing & Evaluation Completed Successfully!", "success")
 
     except Exception as e:
         if conn and not conn.closed:

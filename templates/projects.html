@@ -391,12 +391,13 @@
                     </button>
                     
                     <!-- Phase 2b: Vendor Quote & Pricing Processing -->
-                    <form action="/execute-phase2b/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
+                    <form id="phase2b-form" action="/execute-phase2b/{{ project.id if project else 1 }}" method="POST" style="display:inline;" onsubmit="syncPhase2Text()">
+                        <input type="hidden" name="ai_prompt_adjustments" id="hidden_phase2_adjustments">
                         <button type="submit" class="btn btn-phase2" {% if not project or not vendors %}disabled{% endif %}>
                             Phase 2b: Evaluate Vendors
                         </button>
                     </form>
-                    
+                                        
                     <!-- Phase 3: Executive Recommendation -->
                     <form action="/generate-recommendation/{{ project.id if project else 1 }}" method="POST" style="display:inline;">
                             <button type="submit" class="btn btn-phase3" {% if not project %}disabled{% endif %}>
@@ -447,7 +448,7 @@
 
                 <div class="form-row">
                     <label class="form-label">Phase 2 Prompt Adjustments</label>
-                    <textarea name="ai_prompt_adjustments" class="form-control">{{ project.ai_prompt_adjustments if project else '' }}</textarea>
+                    <textarea id="phase2_prompt_adjustments" name="ai_prompt_adjustments" class="form-control">{{ project.ai_prompt_adjustments if project else '' }}</textarea>
                 </div>
 
                 <div class="form-row">
@@ -1211,6 +1212,12 @@ function syncPhase1Text() {
     var sourceText = document.getElementById('phase1_prompt_adjustments').value;
     document.getElementById('hidden_phase1_adjustments').value = sourceText;
 }
+
+function syncPhase2Text() {
+    var sourceText = document.getElementById('phase2_prompt_adjustments').value;
+    document.getElementById('hidden_phase2_adjustments').value = sourceText;
+}
+
 </script>
 
 </body>
