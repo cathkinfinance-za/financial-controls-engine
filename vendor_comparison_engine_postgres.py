@@ -383,8 +383,8 @@ def generate_executive_recommendation_html(conn, project_id: int):
 
     price_cells_html = ""
     for v in vendors:
-        score = v.get("price_score") or 0.0
-        rate = v.get("total_effective_rate") or 0.0
+        score = float(v.get("price_score") or 0.0)
+        rate = float(v.get("total_effective_rate") or 0.0)
         price_cells_html += (
             f'<td class="text-right">'
             f'<div class="score-value">{score:.2f}</div>'
@@ -437,7 +437,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
     # Build Procurement Cards HTML
     procurement_cards_html = ""
     for v in vendors:
-        cost = v.get("projected_5yr_cost") or v.get("projected_5yr_total") or 0.0
+        cost = float(v.get("projected_5yr_cost")) or float(v.get("projected_5yr_total")) or 0.0
         filename = v.get("quote_filename") or "Quote.pdf"
         procurement_cards_html += f'''
         <div class="vendor-card">
