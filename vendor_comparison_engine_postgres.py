@@ -526,6 +526,14 @@ def generate_executive_recommendation_html(conn, project_id: int):
     .info-tooltip:hover .tooltip-text { visibility: visible; opacity: 1; } 
     .recommendation-box { background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid var(--primary-blue); border-radius: 6px; padding: 24px; margin-top: 12px; line-height: 1.6; font-size: 15px; } 
     .text-muted { color: var(--text-muted); }
+
+    @media print {
+        body { background-color: #ffffff; padding: 0; }
+        .dashboard-container { border: none; box-shadow: none; padding: 0; max-width: 100%; }
+        .no-print { display: none !important; }
+        .info-tooltip .tooltip-text { display: none !important; }
+    }
+
     """
 
     # Assemble HTML Output
@@ -538,6 +546,18 @@ def generate_executive_recommendation_html(conn, project_id: int):
 </head>
 <body>
     <div class="dashboard-container">
+
+        <!-- Export to PDF Button -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;" class="no-print">
+            <h1 style="margin: 0;">Recommendation (AI Generated)</h1>
+            <button onclick="window.print()" class="btn-export-pdf">
+                <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 002-2H5a2 2 0 002 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 002-2H9a2 2 0 002 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
+                </svg>
+                Export to PDF / Print
+            </button>
+        </div>
+        
         <h1>Analysis & Recommendation</h1>
         
         <div class="section-header">Project Definitions</div>
