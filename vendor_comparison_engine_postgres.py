@@ -433,7 +433,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
 
             vendor_score_cells += f'<td class="text-right"><span class="score-value">{score_display}</span>{tooltip_html}</td>'
 
-        c_name = criteria.get("criteria_name", "")
+        c_name = criteria.get("criterion_name", "")
         c_cat = criteria.get("category", "Qualitative")
         qualitative_rows_html += (
             f'<tr>'
