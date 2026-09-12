@@ -1309,19 +1309,15 @@ def update_project(project_id):
                 SET final_weighted_score_output = %s 
                 WHERE id = %s;
             """, (round(final_weighted_score, 2), v_id))
-
+            
         conn.commit()
         flash("Project definitions, line items, price weightings and scores saved successfully.")
 
-   except Exception as e:
+    except Exception as e:
         conn.rollback()
         import traceback
-        err_msg = traceback.format_exc()
-        print("=== FULL TRACEBACK ===")
-        print(err_msg)
-        print("======================")
+        traceback.print_exc()
         flash(f"Error updating project: {str(e)}")
-
     finally:
         cursor.close()
         conn.close()
