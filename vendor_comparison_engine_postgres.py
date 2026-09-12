@@ -8,6 +8,7 @@ from psycopg2.extras import RealDictCursor
 from google import genai
 from google.genai import types
 from duckduckgo_search import DDGS
+from flask import url_for
 
 
 GEMINI_KEY = os.getenv("GEMINI_API_KEY")
@@ -437,16 +438,49 @@ def generate_executive_recommendation_html(conn, project_id: int):
     # Build Procurement Cards HTML
     procurement_cards_html = ""
     for v in vendors:
-        cost = float(v.get("projected_5yr_cost")) or float(v.get("projected_5yr_total")) or 0.0
+        # Safely parse cost numeric values
+        cost = float(v.get("projected_5yr_cost") or v.get("projected_5yr_total") or 0.0)
         filename = v.get("quote_filename") or "Quote.pdf"
+        
+        # 1. Analysis Link Setup
+        if v.get("analysis_sheet_html"):
+            analysis_url = url_for('analysis.view_analysis', option_id=v['id'])
+            analysis_link_html = f'''
+            <a href="{analysis_url}" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style="display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: #2563eb; text-decoration: none;">
+                <span>View Analysis</span>
+                <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+            </a>
+            '''
+        else:
+            analysis_link_html = '<span style="font-size: 12px; color: #6b7280; font-style: italic;">No analysis sheet</span>'
+
+        # 2. Quote PDF URL (Matches /view-quote/<vendor_id>)
+        quote_file_url = f"/view-quote/{v['id']}"
+
+        # 3. Card HTML Generation (PDF icon removed, text converted to working link)
         procurement_cards_html += f'''
-        <div class="vendor-card">
-            <div class="vendor-info">
-                <strong>{v["vendor_name"]}</strong>
-                <span>Selected Option: Projected Total: ZAR {cost:,.2f}</span>
+        <div class="vendor-card" style="display: flex; align-items: center; justify-content: space-between; padding: 12px 16px;">
+            <div>
+                <strong style="font-size: 16px; display: block; margin-bottom: 6px;">{v["vendor_name"]}</strong>
+                <div class="vendor-info" style="display: flex; gap: 12px; align-items: center;">
+                    <span style="font-size: 13px;">Projected Total: <strong>ZAR {cost:,.2f}</strong></span>
+                    <span>•</span>
+                    {analysis_link_html}
+                </div>
             </div>
-            <div class="pdf-icon">PDF</div>
-            <div class="text-muted">{filename}</div>
+            <div>
+                <a href="{quote_file_url}" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                style="font-size: 13px; color: #4b5563; text-decoration: underline; font-weight: 500;">
+                    {filename}
+                </a>
+            </div>
         </div>
         '''
 
