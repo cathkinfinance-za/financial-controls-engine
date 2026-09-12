@@ -557,7 +557,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
             </button>
         </div>
 
-        <h1>Analysis & Recommendation</h1>
+        <h1>Cathkin Estates HOA Project Evaluation: Analysis & Recommendation</h1>
         
         <div class="section-header">Project Definitions</div>
         <div class="form-row"><div class="form-label">Project Reference</div><div class="form-value">{project.get("project_reference") or "N/A"}</div></div>
