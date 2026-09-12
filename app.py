@@ -1912,8 +1912,11 @@ def expenditure_expose():
                 )
 
                 model_name = prompt_row.get('selected_model') or 'gemini-3.6-flash'
-                model = genai.GenerativeModel(model_name)
-                response = model.generate_content(formatted_prompt)
+                client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=formatted_prompt
+                )
                 ai_analysis = response.text
 
                 cur_ai.execute("""
