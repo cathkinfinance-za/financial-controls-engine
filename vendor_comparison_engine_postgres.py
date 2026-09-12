@@ -378,8 +378,8 @@ def generate_executive_recommendation_html(conn, project_id: int):
     vendor_headers_html = "".join([f'<th class="text-right">{v["vendor_name"]}</th>' for v in vendors])
 
     # Build Price Evaluation Row
-    pw = project.get("price_weighting", 0.3) or 0.3
-    price_weight_pct = pw * 100.0 if pw <= 1.0 else float(pw)
+    pw = float(project.get("price_weighting", 0.3) or 0.3)
+    price_weight_pct = pw * 100.0 if pw <= 1.0 else pw
 
     price_cells_html = ""
     for v in vendors:
