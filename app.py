@@ -1290,9 +1290,9 @@ def update_project(project_id):
             # Start weighted score with price component contribution
             final_weighted_score = p_score * (price_weighting / 100.0) if price_weighting else 0.0
 
-            # Fetch qualitative criteria scores for this vendor using correct table and column names
+            # Fetch qualitative criteria scores using correct column name weight_percent
             cursor.execute("""
-                SELECT n.score, w.weight 
+                SELECT n.score, w.weight_percent 
                 FROM options_line_items_non_pricing n
                 JOIN project_weightings w ON n.weighting_id = w.id
                 WHERE n.procurement_option_id = %s;
@@ -1309,7 +1309,7 @@ def update_project(project_id):
                 SET final_weighted_score_output = %s 
                 WHERE id = %s;
             """, (round(final_weighted_score, 2), v_id))
-
+            
         conn.commit()
         flash("Project definitions, line items, price weightings and scores saved successfully.")
 
