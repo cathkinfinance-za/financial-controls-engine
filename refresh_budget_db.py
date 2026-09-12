@@ -79,16 +79,16 @@ def fetch_and_sync_weconnectu_budget():
                     "gl_code": gl_code,
                     "description": description,
                     "mar_2026": 0.0,
-                    "apr_2026": vals[0],
-                    "may_2026": vals[1],
-                    "jun_2026": vals[2],
-                    "jul_2026": vals[3],
-                    "aug_2026": vals[4],
-                    "ytd": vals[5],
-                    "budget_ytd": vals[6],
-                    "variance": vals[7],
-                    "total_budget": vals[8]
-                })
+                    "apr_2026": 0.0,
+                    "may_2026": vals[0],  # May 2026
+                    "jun_2026": vals[1],  # Jun 2026
+                    "jul_2026": vals[2],  # Jul 2026
+                    "aug_2026": vals[3],  # Aug 2026
+                    "ytd": vals[4],        # YTD
+                    "budget_ytd": vals[5], # Budget YTD
+                    "variance": vals[6],   # Variance
+                    "total_budget": vals[7]# Total Budget
+                                })
 
     df = pd.DataFrame(financial_data)
     if not df.empty:
@@ -108,8 +108,6 @@ def fetch_and_sync_weconnectu_budget():
         )
         ON CONFLICT (gl_code) DO UPDATE SET
             description = EXCLUDED.description,
-            mar_2026 = EXCLUDED.mar_2026,
-            apr_2026 = EXCLUDED.apr_2026,
             may_2026 = EXCLUDED.may_2026,
             jun_2026 = EXCLUDED.jun_2026,
             jul_2026 = EXCLUDED.jul_2026,

@@ -613,7 +613,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
             </table>
         </div>
 
-        <div class="section-header">Executive Sourcing Recommendation</div>
+        <div class="section-header">Analysis & Recommendation</div>
         <div class="recommendation-box">
             {rec_html_content}
         </div>
