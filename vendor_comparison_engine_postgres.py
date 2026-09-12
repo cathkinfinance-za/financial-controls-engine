@@ -363,6 +363,17 @@ def generate_executive_recommendation_html(conn, project_id: int):
         """, (project_id,))
         scores_raw = cursor.fetchall()
 
+        # 5. Fetch Pricing Line Items to Check for "Annual Cost" categories
+        cursor.execute("""
+            SELECT cost_type_category 
+            FROM options_line_items_pricing 
+            WHERE procurement_option_id IN (SELECT id FROM procurement_options WHERE project_id = %s);
+        """, (project_id,))
+        pricing_items = cursor.fetchall()
+
+        # Check if any pricing item has the "Annual Cost" category
+        has_annual_costs = any(item.get("cost_type_category") == "Annual Cost" for item in pricing_items)
+
         scores_map = {}
         for row in scores_raw:
             w_id = row["weighting_id"]
@@ -370,6 +381,10 @@ def generate_executive_recommendation_html(conn, project_id: int):
             if w_id not in scores_map:
                 scores_map[w_id] = {}
             scores_map[w_id][v_id] = row
+
+    # Define dynamic labels based on presence of Annual Costs
+    total_cost_label = "Projected 5-Year Total Cost" if has_annual_costs else "Total Cost"
+    short_cost_label = "Projected Total" if has_annual_costs else "Total Cost"
 
     # Format Executive Recommendation Markdown to HTML
     rec_markdown = project.get("executive_sourcing_recommendation") or "No recommendation generated."
@@ -570,7 +585,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
                         {unit_rate_cells}
                     </tr>
                     <tr>
-                        <td colspan="3"><strong>Projected 5-Year Total Cost</strong></td>
+                        <td colspan="3"><strong>{total_cost_label}</strong></td>
                         {total_cost_cells}
                     </tr>
                 </tbody>
