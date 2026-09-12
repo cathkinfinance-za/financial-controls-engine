@@ -549,7 +549,6 @@ def generate_executive_recommendation_html(conn, project_id: int):
 
         <!-- Export to PDF Button -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;" class="no-print">
-            <h1 style="margin: 0;">Recommendation (AI Generated)</h1>
             <button onclick="window.print()" class="btn-export-pdf">
                 <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 002-2H5a2 2 0 002 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 002-2H9a2 2 0 002 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4h14z" />
@@ -557,7 +556,7 @@ def generate_executive_recommendation_html(conn, project_id: int):
                 Export to PDF / Print
             </button>
         </div>
-        
+
         <h1>Analysis & Recommendation</h1>
         
         <div class="section-header">Project Definitions</div>
