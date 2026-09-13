@@ -1783,6 +1783,19 @@ def expenditure_expose():
         cur.execute(query)
         all_items = cur.fetchall()
 
+        # Extract year and month safely
+        selected_month_clean = selected_month.lower().strip()
+        month_str, year_str = selected_month_clean.split('_')
+
+        MONTH_MAP = {
+            'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+            'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        }
+
+        target_month = MONTH_MAP.get(month_str)
+        target_year = int(year_str)
+
+        # Filter by extracted month and year
         cur.execute("""
             SELECT 
                 transaction_date,
@@ -1796,8 +1809,11 @@ def expenditure_expose():
                 quotes_attached,
                 compliance_verdict
             FROM vw_cashbook_compliance_audit
+            WHERE EXTRACT(MONTH FROM transaction_date) = %s
+            AND EXTRACT(YEAR FROM transaction_date) = %s
             ORDER BY transaction_date DESC;
-        """)
+        """, (target_month, target_year))
+
         raw_audit_rows = cur.fetchall()
 
         grouped_audit_raw = defaultdict(list)
