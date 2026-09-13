@@ -1,17 +1,16 @@
 from flask import Blueprint, request, jsonify, flash, render_template
 
-# Define the blueprint
 approved_vendors_bp = Blueprint('approved_vendors', __name__)
 
 # 1. API: Get list of all approved vendors
 @approved_vendors_bp.route('/api/approved_vendors', methods=['GET'])
 def get_approved_vendors():
-    from app import get_db_connection  # <--- Imported inside function
+    from app import get_db_connection
     try:
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
-            SELECT id, vendor_name, supplier_code, gl_code, 
+            SELECT id, vendor_name, match_pattern, supplier_code, gl_code, 
                    monthly_threshold_amount, last_approval_date, 
                    expiry_date, approval_reference, is_active, notes
             FROM public.approved_vendors
@@ -28,31 +27,35 @@ def get_approved_vendors():
 # 2. API: Create a new approved vendor whitelist entry
 @approved_vendors_bp.route('/api/approved_vendors/add', methods=['POST'])
 def add_approved_vendor():
-    from app import get_db_connection  # <--- Imported inside function
+    from app import get_db_connection
     try:
         data = request.form if request.form else request.get_json()
         
         vendor_name = data.get('vendor_name')
-        supplier_code = data.get('supplier_code', '').strip().upper()
-        gl_code = data.get('gl_code')
+        match_pattern = data.get('match_pattern', '').strip()  # Key text match (e.g., 'Eskom', 'Municipality')
+        supplier_code = data.get('supplier_code', '').strip().upper() or None
+        gl_code = data.get('gl_code', '').strip() or None
         monthly_threshold_amount = float(data.get('monthly_threshold_amount', 0.0))
         last_approval_date = data.get('last_approval_date')
         expiry_date = data.get('expiry_date') or None
         approval_reference = data.get('approval_reference')
         notes = data.get('notes')
 
-        if not vendor_name or not supplier_code or not last_approval_date:
-            return jsonify({'status': 'error', 'message': 'Vendor name, supplier code, and approval date are required.'}), 400
+        if not vendor_name or not match_pattern or not last_approval_date:
+            return jsonify({
+                'status': 'error', 
+                'message': 'Vendor name, transaction description match pattern, and approval date are required.'
+            }), 400
 
         conn = get_db_connection()
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO public.approved_vendors (
-                vendor_name, supplier_code, gl_code, monthly_threshold_amount,
+                vendor_name, match_pattern, supplier_code, gl_code, monthly_threshold_amount,
                 last_approval_date, expiry_date, approval_reference, is_active, notes
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, TRUE, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE, %s)
             RETURNING id;
-        """, (vendor_name, supplier_code, gl_code, monthly_threshold_amount, 
+        """, (vendor_name, match_pattern, supplier_code, gl_code, monthly_threshold_amount, 
               last_approval_date, expiry_date, approval_reference, notes))
         
         new_id = cur.fetchone()['id']
@@ -60,16 +63,65 @@ def add_approved_vendor():
         cur.close()
         conn.close()
 
-        flash(f"Vendor '{vendor_name}' successfully white-listed.", "success")
+        flash(f"Vendor '{vendor_name}' successfully whitelisted.", "success")
         return jsonify({'status': 'success', 'id': new_id, 'message': 'Vendor added successfully.'})
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# 3. API: Toggle Active/Suspended Status
+# 3. API: Edit an existing approved vendor
+@approved_vendors_bp.route('/api/approved_vendors/<int:vendor_id>/edit', methods=['POST'])
+def edit_approved_vendor(vendor_id):
+    from app import get_db_connection
+    try:
+        data = request.form if request.form else request.get_json()
+        
+        vendor_name = data.get('vendor_name')
+        match_pattern = data.get('match_pattern', '').strip()
+        supplier_code = data.get('supplier_code', '').strip().upper() or None
+        gl_code = data.get('gl_code', '').strip() or None
+        monthly_threshold_amount = float(data.get('monthly_threshold_amount', 0.0))
+        last_approval_date = data.get('last_approval_date')
+        expiry_date = data.get('expiry_date') or None
+        approval_reference = data.get('approval_reference')
+        notes = data.get('notes')
+
+        if not vendor_name or not match_pattern or not last_approval_date:
+            return jsonify({
+                'status': 'error', 
+                'message': 'Vendor name, transaction description match pattern, and approval date are required.'
+            }), 400
+
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE public.approved_vendors
+            SET vendor_name = %s,
+                match_pattern = %s,
+                supplier_code = %s,
+                gl_code = %s,
+                monthly_threshold_amount = %s,
+                last_approval_date = %s,
+                expiry_date = %s,
+                approval_reference = %s,
+                notes = %s
+            WHERE id = %s;
+        """, (vendor_name, match_pattern, supplier_code, gl_code, monthly_threshold_amount, 
+              last_approval_date, expiry_date, approval_reference, notes, vendor_id))
+        
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        return jsonify({'status': 'success', 'message': 'Vendor details updated successfully.'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+# 4. API: Toggle Active/Suspended Status
 @approved_vendors_bp.route('/api/approved_vendors/<int:vendor_id>/toggle', methods=['POST'])
 def toggle_vendor_status(vendor_id):
-    from app import get_db_connection  # <--- Imported inside function
+    from app import get_db_connection
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -92,7 +144,7 @@ def toggle_vendor_status(vendor_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
-# 4. View Route: Render Management UI
+# 5. View Route: Render Management UI
 @approved_vendors_bp.route('/approved_vendors_ui')
 def approved_vendors_ui():
     """Renders the dedicated Whitelist Management Dashboard page."""

@@ -61,13 +61,6 @@
             margin-bottom: 16px;
         }
 
-        .section-title {
-            font-size: 16px;
-            font-weight: 600;
-            margin: 0;
-            color: var(--text-main);
-        }
-
         .btn-action {
             background-color: var(--accent-blue);
             color: #ffffff;
@@ -89,8 +82,8 @@
             background-color: #ffffff;
             color: var(--text-main);
             border: 1px solid var(--border-color);
-            padding: 6px 12px;
-            border-radius: 6px;
+            padding: 4px 8px;
+            border-radius: 4px;
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
@@ -98,7 +91,7 @@
 
         .btn-secondary:hover { background-color: #f1f5f9; }
 
-        /* Collapsible Form Card */
+        /* Form Layout */
         .form-card {
             background: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -154,6 +147,31 @@
             margin-top: 12px;
         }
 
+        /* Modal Backdrop & Dialog */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.4);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal-dialog {
+            background: #ffffff;
+            border-radius: 8px;
+            width: 100%;
+            max-width: 640px;
+            padding: 24px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
         /* Data Tables */
         .table-container {
             background: var(--card-bg);
@@ -194,7 +212,6 @@
         .text-right { text-align: right; }
         .text-center { text-align: center; }
 
-        /* Badges */
         .badge-pct {
             font-weight: 600;
             color: #334155;
@@ -323,11 +340,59 @@
         </div>
     </div>
 
+    <!-- Edit Vendor Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal-dialog">
+            <div style="font-size: 16px; font-weight: 700; margin-bottom: 16px; color: var(--text-main);">
+                Edit Approved Vendor Details
+            </div>
+            <form id="editApprovedVendorForm">
+                <input type="hidden" id="edit_vendor_id" name="vendor_id">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Vendor Name</label>
+                        <input type="text" id="edit_vendor_name" name="vendor_name" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier Code</label>
+                        <input type="text" id="edit_supplier_code" name="supplier_code" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>GL Account Code</label>
+                        <input type="text" id="edit_gl_code" name="gl_code" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label>Monthly Spend Limit (R)</label>
+                        <input type="number" step="0.01" id="edit_monthly_threshold_amount" name="monthly_threshold_amount" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Approval Date</label>
+                        <input type="date" id="edit_last_approval_date" name="last_approval_date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date</label>
+                        <input type="date" id="edit_expiry_date" name="expiry_date" class="form-control">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Approval / Minute Reference</label>
+                        <input type="text" id="edit_approval_reference" name="approval_reference" class="form-control">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                    <button type="submit" class="btn-action">Update Vendor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
+    let vendorsCache = [];
+
     document.addEventListener("DOMContentLoaded", function () {
         fetchApprovedVendors();
 
-        // Load data from Blueprint API
+        // Load vendor data
         function fetchApprovedVendors() {
             fetch('/api/approved_vendors')
                 .then(res => res.json())
@@ -336,7 +401,9 @@
                     tbody.innerHTML = '';
 
                     if (data.status === 'success') {
-                        if (data.data.length === 0) {
+                        vendorsCache = data.data; // Store for edit lookup
+
+                        if (vendorsCache.length === 0) {
                             tbody.innerHTML = `
                                 <tr>
                                     <td colspan="9" class="empty-state">
@@ -346,7 +413,7 @@
                             return;
                         }
 
-                        data.data.forEach(v => {
+                        vendorsCache.forEach(v => {
                             const statusBadge = v.is_active 
                                 ? `<span class="badge-compliance badge-compliant">Active</span>`
                                 : `<span class="badge-compliance badge-non-compliant">Suspended</span>`;
@@ -363,10 +430,9 @@
                                     <td>${v.expiry_date || '<span style="color: var(--text-muted);">No Expiry</span>'}</td>
                                     <td><span style="font-size: 12px; color: var(--text-muted);">${v.approval_reference || '-'}</span></td>
                                     <td>${statusBadge}</td>
-                                    <td class="text-center">
-                                        <button class="btn-secondary" onclick="toggleVendor(${v.id})">
-                                            ${toggleBtnText}
-                                        </button>
+                                    <td class="text-center" style="white-space: nowrap;">
+                                        <button class="btn-secondary" onclick="openEditModal(${v.id})">Edit</button>
+                                        <button class="btn-secondary" onclick="toggleVendor(${v.id})">${toggleBtnText}</button>
                                     </td>
                                 </tr>
                             `;
@@ -376,20 +442,38 @@
                 .catch(err => console.error('Error fetching vendors:', err));
         }
 
-        // Toggle add form visibility
+        // Toggle Add Form Visibility
         window.toggleForm = function() {
-            const formCard = document.getElementById('addVendorFormCard');
-            formCard.classList.toggle('open');
+            document.getElementById('addVendorFormCard').classList.toggle('open');
         };
 
-        // Form submit handler
+        // Open Edit Modal & Populate Fields
+        window.openEditModal = function(vendorId) {
+            const vendor = vendorsCache.find(v => v.id === vendorId);
+            if (!vendor) return;
+
+            document.getElementById('edit_vendor_id').value = vendor.id;
+            document.getElementById('edit_vendor_name').value = vendor.vendor_name || '';
+            document.getElementById('edit_supplier_code').value = vendor.supplier_code || '';
+            document.getElementById('edit_gl_code').value = vendor.gl_code || '';
+            document.getElementById('edit_monthly_threshold_amount').value = vendor.monthly_threshold_amount || '';
+            document.getElementById('edit_last_approval_date').value = vendor.last_approval_date || '';
+            document.getElementById('edit_expiry_date').value = vendor.expiry_date || '';
+            document.getElementById('edit_approval_reference').value = vendor.approval_reference || '';
+
+            document.getElementById('editModal').classList.add('open');
+        };
+
+        window.closeEditModal = function() {
+            document.getElementById('editModal').classList.remove('open');
+        };
+
+        // Submit New Vendor Form
         document.getElementById('addApprovedVendorForm').addEventListener('submit', function (e) {
             e.preventDefault();
-            const formData = new FormData(this);
-
             fetch('/api/approved_vendors/add', {
                 method: 'POST',
-                body: formData
+                body: new FormData(this)
             })
             .then(res => res.json())
             .then(data => {
@@ -400,11 +484,30 @@
                 } else {
                     alert('Error adding vendor: ' + data.message);
                 }
-            })
-            .catch(err => console.error('Error adding vendor:', err));
+            });
         });
 
-        // Toggle active/suspended state
+        // Submit Edit Vendor Form
+        document.getElementById('editApprovedVendorForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const vendorId = document.getElementById('edit_vendor_id').value;
+
+            fetch(`/api/approved_vendors/${vendorId}/edit`, {
+                method: 'POST',
+                body: new FormData(this)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    closeEditModal();
+                    fetchApprovedVendors();
+                } else {
+                    alert('Error updating vendor: ' + data.message);
+                }
+            });
+        });
+
+        // Toggle Status
         window.toggleVendor = function (vendorId) {
             fetch(`/api/approved_vendors/${vendorId}/toggle`, { method: 'POST' })
                 .then(res => res.json())
