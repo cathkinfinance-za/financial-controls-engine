@@ -3,13 +3,10 @@ from flask import Blueprint, request, jsonify, flash, render_template
 # Define the blueprint
 approved_vendors_bp = Blueprint('approved_vendors', __name__)
 
-# Import your database connection function from your main module or db module
-from app import get_db_connection
-
-
 # 1. API: Get list of all approved vendors
 @approved_vendors_bp.route('/api/approved_vendors', methods=['GET'])
 def get_approved_vendors():
+    from app import get_db_connection  # <--- Imported inside function
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -31,6 +28,7 @@ def get_approved_vendors():
 # 2. API: Create a new approved vendor whitelist entry
 @approved_vendors_bp.route('/api/approved_vendors/add', methods=['POST'])
 def add_approved_vendor():
+    from app import get_db_connection  # <--- Imported inside function
     try:
         data = request.form if request.form else request.get_json()
         
@@ -71,6 +69,7 @@ def add_approved_vendor():
 # 3. API: Toggle Active/Suspended Status
 @approved_vendors_bp.route('/api/approved_vendors/<int:vendor_id>/toggle', methods=['POST'])
 def toggle_vendor_status(vendor_id):
+    from app import get_db_connection  # <--- Imported inside function
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -93,6 +92,7 @@ def toggle_vendor_status(vendor_id):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+# 4. View Route: Render Management UI
 @approved_vendors_bp.route('/approved_vendors_ui')
 def approved_vendors_ui():
     """Renders the dedicated Whitelist Management Dashboard page."""
