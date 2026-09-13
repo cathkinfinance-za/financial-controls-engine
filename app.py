@@ -21,6 +21,8 @@ from flask import session
 from werkzeug.security import check_password_hash
 from routes.analysis import analysis_bp
 from flask import Flask, flash, redirect, request, url_for
+from approved_vendors import approved_vendors_bp
+
 
 try:
     from google import genai
@@ -33,7 +35,9 @@ except ModuleNotFoundError:
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
 app.register_blueprint(analysis_bp)
+app.register_blueprint(approved_vendors_bp)
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 
 def get_db_connection():
@@ -1826,12 +1830,17 @@ def expenditure_expose():
 
         VERDICT_ORDER = {
             'NON-COMPLIANT: Missing Approved PO': 1,
-            'FLAGGED: Unbudgeted / Suspense Allocation': 2,
-            'FLAGGED: Anti-Splitting Suspected': 3,
-            'COMPLIANT: Petty/Minor Spend (No PO Required)': 4,
-            'COMPLIANT': 5,
-            'COMPLIANT: Exempt (Payroll Spend)': 6
-        }
+            'NON-COMPLIANT: PO Not Approved': 2,
+            'NON-COMPLIANT: Insufficient Quotes': 3,
+            'FLAGGED: Unbudgeted / Suspense Allocation': 4,
+            'FLAGGED: Anti-Splitting Suspected': 5,
+            'FLAGGED: Approved Vendor Threshold Exceeded': 6,
+            'FLAGGED: Approved Vendor Authorization Expired': 7,
+            'COMPLIANT: Approved Regular Vendor': 8,
+            'COMPLIANT: Petty/Minor Spend (No PO Required)': 9,
+            'COMPLIANT': 10,
+            'COMPLIANT: Exempt (Payroll Spend)': 11
+        }                                               
 
         sorted_categories = sorted(
             grouped_audit_raw.keys(),

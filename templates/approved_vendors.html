@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approved Regular Vendors Whitelist - Cathkin Estates</title>
+    <style>
+        :root {
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --danger-bg: #fef2f2;
+            --danger-text: #dc2626;
+            --danger-border: #fecaca;
+            --success-bg: #f0fdf4;
+            --success-text: #15803d;
+            --success-border: #bbf7d0;
+            --accent-blue: #2563eb;
+            --ai-bg: #f0f9ff;
+            --ai-border: #bae6fd;
+            --ai-text: #0369a1;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 32px 16px;
+        }
+
+        .container {
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        .top-nav { margin-bottom: 16px; }
+
+        .back-link {
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .back-link:hover { text-decoration: underline; }
+
+        .header-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 8px 0 24px 0;
+            letter-spacing: -0.02em;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .btn-action {
+            background-color: var(--accent-blue);
+            color: #ffffff;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-action:hover { opacity: 0.9; }
+
+        .btn-secondary {
+            background-color: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover { background-color: #f1f5f9; }
+
+        /* Collapsible Form Card */
+        .form-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+            display: none;
+        }
+
+        .form-card.open { display: block; }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted);
+        }
+
+        .form-control {
+            padding: 8px 12px;
+            font-size: 13px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #ffffff;
+            color: var(--text-main);
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        /* Data Tables */
+        .table-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            margin-bottom: 24px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: #f1f5f9;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.04em;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-main);
+        }
+
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background-color: #f8fafc; }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        /* Badges */
+        .badge-pct {
+            font-weight: 600;
+            color: #334155;
+            background-color: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .badge-compliance {
+            display: inline-block;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-compliant {
+            background-color: #d1e7dd;
+            color: #0f5132;
+            border: 1px solid #badbcc;
+        }
+
+        .badge-non-compliant {
+            background-color: #f8d7da;
+            color: #842029;
+            border: 1px solid #f5c2c7;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 32px;
+        }
+    </style>
+</head>
+<body>
+    {% include 'navbar.html' %}
+    
+    <div class="container">
+        <!-- Top Navigation Header -->
+        <div class="top-nav">
+            <a href="/expenditure_expose" class="back-link">← Back to Financial Expose</a>
+            <h1 class="header-title">Approved Regular Vendors Whitelist</h1>
+        </div>
+
+        <!-- Section Title & Action Bar -->
+        <div class="section-header">
+            <div style="font-size: 13px; color: var(--text-muted);">
+                Authorized recurring vendors (e.g. utilities) exempt from single-transaction PO rules within set limits.
+            </div>
+            <button type="button" class="btn-action" onclick="toggleForm()">
+                + Register New Vendor
+            </button>
+        </div>
+
+        <!-- Collapsible Register Vendor Form Card -->
+        <div class="form-card" id="addVendorFormCard">
+            <div style="font-size: 14px; font-weight: 600; margin-bottom: 16px; color: var(--text-main);">
+                Add Whitelisted Vendor Entry
+            </div>
+            <form id="addApprovedVendorForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Vendor Name</label>
+                        <input type="text" name="vendor_name" class="form-control" placeholder="e.g. Eskom Direct" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier Code (Matches Cashbook)</label>
+                        <input type="text" name="supplier_code" class="form-control" placeholder="e.g. VEN-ESKOM-01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>GL Account Code (Optional)</label>
+                        <input type="text" name="gl_code" class="form-control" placeholder="e.g. 4000/010">
+                    </div>
+                    <div class="form-group">
+                        <label>Monthly Spend Limit (R)</label>
+                        <input type="number" step="0.01" name="monthly_threshold_amount" class="form-control" value="50000.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Approval Date</label>
+                        <input type="date" name="last_approval_date" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Expiry Date (Optional)</label>
+                        <input type="date" name="expiry_date" class="form-control">
+                    </div>
+                    <div class="form-group" style="grid-column: span 2;">
+                        <label>Approval / Minute Reference</label>
+                        <input type="text" name="approval_reference" class="form-control" placeholder="e.g. BOARD-MIN-2026-04">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="toggleForm()">Cancel</button>
+                    <button type="submit" class="btn-action">Save Vendor</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Main Whitelist Vendor Table -->
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Vendor Name</th>
+                        <th>Supplier Code</th>
+                        <th>GL Code</th>
+                        <th class="text-right">Monthly Threshold</th>
+                        <th>Approval Date</th>
+                        <th>Expiry Date</th>
+                        <th>Reference</th>
+                        <th>Status</th>
+                        <th class="text-center">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="approvedVendorsList">
+                    <tr>
+                        <td colspan="9" class="empty-state">
+                            Loading whitelisted vendors register...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        fetchApprovedVendors();
+
+        // Load data from Blueprint API
+        function fetchApprovedVendors() {
+            fetch('/api/approved_vendors')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('approvedVendorsList');
+                    tbody.innerHTML = '';
+
+                    if (data.status === 'success') {
+                        if (data.data.length === 0) {
+                            tbody.innerHTML = `
+                                <tr>
+                                    <td colspan="9" class="empty-state">
+                                        No whitelisted regular vendors registered.
+                                    </td>
+                                </tr>`;
+                            return;
+                        }
+
+                        data.data.forEach(v => {
+                            const statusBadge = v.is_active 
+                                ? `<span class="badge-compliance badge-compliant">Active</span>`
+                                : `<span class="badge-compliance badge-non-compliant">Suspended</span>`;
+
+                            const toggleBtnText = v.is_active ? 'Suspend' : 'Activate';
+
+                            tbody.innerHTML += `
+                                <tr>
+                                    <td><strong>${v.vendor_name}</strong></td>
+                                    <td><span class="badge-pct">${v.supplier_code}</span></td>
+                                    <td><span class="badge-pct">${v.gl_code || '-'}</span></td>
+                                    <td class="text-right"><strong>R ${parseFloat(v.monthly_threshold_amount).toLocaleString('en-ZA', {minimumFractionDigits: 2})}</strong></td>
+                                    <td>${v.last_approval_date || '-'}</td>
+                                    <td>${v.expiry_date || '<span style="color: var(--text-muted);">No Expiry</span>'}</td>
+                                    <td><span style="font-size: 12px; color: var(--text-muted);">${v.approval_reference || '-'}</span></td>
+                                    <td>${statusBadge}</td>
+                                    <td class="text-center">
+                                        <button class="btn-secondary" onclick="toggleVendor(${v.id})">
+                                            ${toggleBtnText}
+                                        </button>
+                                    </td>
+                                </tr>
+                            `;
+                        });
+                    }
+                })
+                .catch(err => console.error('Error fetching vendors:', err));
+        }
+
+        // Toggle add form visibility
+        window.toggleForm = function() {
+            const formCard = document.getElementById('addVendorFormCard');
+            formCard.classList.toggle('open');
+        };
+
+        // Form submit handler
+        document.getElementById('addApprovedVendorForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+
+            fetch('/api/approved_vendors/add', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    this.reset();
+                    toggleForm();
+                    fetchApprovedVendors();
+                } else {
+                    alert('Error adding vendor: ' + data.message);
+                }
+            })
+            .catch(err => console.error('Error adding vendor:', err));
+        });
+
+        // Toggle active/suspended state
+        window.toggleVendor = function (vendorId) {
+            fetch(`/api/approved_vendors/${vendorId}/toggle`, { method: 'POST' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        fetchApprovedVendors();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+        };
+    });
+    </script>
+</body>
+</html>
