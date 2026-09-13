@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, flash
+from flask import Blueprint, request, jsonify, flash, render_template
 
 # Define the blueprint
 approved_vendors_bp = Blueprint('approved_vendors', __name__)
