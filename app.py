@@ -1752,6 +1752,7 @@ ALLOWED_MONTHS = {
 
 @app.route('/expenditure_expose')
 def expenditure_expose():
+    
     selected_month = request.args.get('month', 'aug_2026')
     if selected_month not in ALLOWED_MONTHS:
         selected_month = 'aug_2026'
