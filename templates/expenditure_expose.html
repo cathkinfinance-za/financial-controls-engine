@@ -468,9 +468,6 @@
             </a>
         </div>
 
-        <!-- 3. Cashbook Compliance Audit Register (Priority View) -->
-        <div class="section-title">Cashbook Compliance Audit Register (Priority View)</div>
-
         {% for category, items in grouped_audit.items() %}
         <details class="audit-group" {% if 'NON-COMPLIANT' in category or 'FLAGGED' in category %}open{% endif %}>
             <summary>
