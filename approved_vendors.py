@@ -27,12 +27,12 @@ def get_approved_vendors():
 # 2. API: Create a new approved vendor whitelist entry
 @approved_vendors_bp.route('/api/approved_vendors/add', methods=['POST'])
 def add_approved_vendor():
-    from app import get_db_connection  # <--- Imported inside function
+    from app import get_db_connection  
     try:
         data = request.form if request.form else request.get_json()
         
-        vendor_name = data.get('vendor_name')
-        match_pattern = data.get('match_pattern', '').strip()
+        vendor_name = data.get('vendor_name', '').strip()
+        match_pattern = data.get('match_pattern', '').strip() or vendor_name
         supplier_code = data.get('supplier_code', '').strip().upper() or None
         gl_code = data.get('gl_code', '').strip() or None
         monthly_threshold_amount = float(data.get('monthly_threshold_amount', 0.0))
@@ -76,8 +76,8 @@ def edit_approved_vendor(vendor_id):
     try:
         data = request.form if request.form else request.get_json()
         
-        vendor_name = data.get('vendor_name')
-        match_pattern = data.get('match_pattern', '').strip()
+        vendor_name = data.get('vendor_name', '').strip()
+        match_pattern = data.get('match_pattern', '').strip() or vendor_name
         supplier_code = data.get('supplier_code', '').strip().upper() or None
         gl_code = data.get('gl_code', '').strip() or None
         monthly_threshold_amount = float(data.get('monthly_threshold_amount', 0.0))
