@@ -1758,6 +1758,8 @@ def expenditure_expose():
         selected_month = 'aug_2026'
 
     all_items = []
+    grouped_audit = {}
+    category_totals = {}
     cached_analysis = None
 
     try:
