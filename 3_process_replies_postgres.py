@@ -74,7 +74,7 @@ def fetch_approval_replies():
         mail.select("inbox")
 
         # Pull the latest emails and let your Python logic filter them:
-        status, messages = mail.search(None, 'ALL')
+        status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
             log("No matching approval emails found in inbox.")
             mail.logout()
@@ -150,6 +150,9 @@ def fetch_approval_replies():
                         final_rejections[po_id] = {"sender": sender_clean}
                     elif "APPROVED" in full_payload or "APPROVE" in full_payload:
                         final_approvals[po_id] = {"sender": sender_clean}
+
+                    # Mark this email as read so it isn't fetched again on future runs:
+                    mail.store(e_id, '+FLAGS', '\\Seen')
 
         mail.logout()
         return recommendations_approval, recommendations_rejection, final_approvals, final_rejections
@@ -257,6 +260,12 @@ def process_replies():
 
                 record = po_id_map.get(po_id)
                 if record:
+                    
+                    # ---> IDEMPOTENCY CHECK <---
+                    if record.get('submission_status') == 'Approved':
+                        log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
+                        continue
+
                     # ---> AUTHORIZATION CHECK <---
                     if verify_approver_authority(cursor, meta["sender"], 'Approval Authority'):
                         cursor.execute("""
@@ -281,6 +290,11 @@ def process_replies():
 
                 record = po_id_map.get(po_id)
                 if record:
+                    # ---> IDEMPOTENCY CHECK <---
+                    if record.get('submission_status') == 'Rejected':
+                        log(f"PO ID '{record['id']}' is already REJECTED. Skipping.")
+                        continue
+
                     cursor.execute("""
                         UPDATE po_log 
                         SET submission_status = 'Rejected',
