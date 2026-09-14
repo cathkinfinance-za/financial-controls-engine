@@ -49,6 +49,13 @@ def extract_po_id(subject, body):
     match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
+def parse_incoming_reply(email_subject, email_body):
+    text_to_search = f"{email_subject} {email_body}"
+    match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return None
+
 def fetch_approval_replies():
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
@@ -64,7 +71,6 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        # 1. Search UNSEEN (unread) emails only
         status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
             log("No new unread approval emails found in inbox.")
@@ -131,10 +137,8 @@ def fetch_approval_replies():
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    # Save 'notes' along with sender
                     payload_meta = {"sender": sender_clean, "notes": clean_reply_notes}
 
-                    # Categorize reply
                     if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
                         recommendations_rejection[po_id] = payload_meta
                     elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
@@ -144,7 +148,6 @@ def fetch_approval_replies():
                     elif "APPROVED" in full_payload or "APPROVE" in full_payload:
                         final_approvals[po_id] = payload_meta
 
-                    # 2. Mark email as read in IMAP
                     mail.store(e_id, '+FLAGS', '\\Seen')
 
         mail.logout()
@@ -155,21 +158,54 @@ def fetch_approval_replies():
         return {}, {}, {}, {}
 
 def verify_approver_authority(cursor, sender_email, required_permission):
+    """
+    Checks approvers table to verify user permissions.
+    Returns dictionary with boolean authorization flags.
+    """
     cursor.execute(
-        "SELECT approval_permission FROM approvers WHERE LOWER(email) = LOWER(%s);",
+        """
+        SELECT approval_permission 
+        FROM approvers 
+        WHERE LOWER(email) = LOWER(%s) AND active = 'YES';
+        """,
         (sender_email,)
     )
     row = cursor.fetchone()
     if not row:
-        return False
+        return {"authorized": False, "is_chair": False, "permission": None}
     
-    user_permission = row.get('approval_permission')
-    if required_permission == 'Approval Authority' and user_permission == 'Approval Authority':
-        return True
-    if required_permission == 'Finance Review' and user_permission in ['Finance Review', 'Approval Authority']:
-        return True
+    user_permission = row.get('approval_permission') or ''
+    is_chair = 'Chair' in user_permission
+    
+    if required_permission == 'Approval Authority':
+        authorized = ('Approval Authority' in user_permission or is_chair)
+    elif required_permission == 'Finance Review':
+        authorized = ('Finance Review' in user_permission or 'Approval Authority' in user_permission or is_chair)
+    else:
+        authorized = False
         
-    return False
+    return {"authorized": authorized, "is_chair": is_chair, "permission": user_permission}
+
+def get_required_approval_criteria(record):
+    """
+    Evaluates matrix tiers based on estimated cost, expense type, and budget status.
+    Returns (required_approvals_count, requires_chair_signoff).
+    """
+    estimated_cost = float(record.get('estimated_cost') or 0.0)
+    expense_type = record.get('expense_type') or ''
+    is_budgeted = record.get('is_budgeted') or ''
+
+    # Operational Budgeted Tiers
+    if is_budgeted == 'Yes' and expense_type == 'Operational':
+        if estimated_cost <= 10000:
+            return 1, False  # Estate Manager only
+        elif estimated_cost <= 50000:
+            return 2, True   # Chair + 1 Board Member
+        else:
+            return 3, True   # Chair + 2 Board Members
+
+    # Capital, Service Contracts, Maintenance, or Unbudgeted Tiers
+    return 3, True
 
 def process_replies():
     log("Starting Inbox Reply Processor...")
@@ -219,7 +255,6 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
                     
-                    # Capture actual email notes
                     notes = meta.get("notes") or "Finance Committee recommended for approval."
                     write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
                     log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE RECOMMENDED.")
@@ -245,7 +280,7 @@ def process_replies():
                     write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), notes)
                     log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE REJECTED.")
 
-            # 2. PROCESS FINAL APPROVALS & REJECTIONS
+            # 2. PROCESS FINAL APPROVALS WITH MULTI-SIGNATORY & CHAIR LOGIC
             for raw_po_id, meta in final_approvals.items():
                 try:
                     po_id = int(raw_po_id)
@@ -253,28 +288,75 @@ def process_replies():
                     continue
 
                 record = po_id_map.get(po_id)
-                if record:
-                    if record.get('submission_status') == 'Approved':
-                        log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
-                        continue
+                if not record:
+                    continue
 
-                    if verify_approver_authority(cursor, meta["sender"], 'Approval Authority'):
-                        cursor.execute("""
-                            UPDATE po_log 
-                            SET submission_status = 'Approved',
-                                actioned_by = %s,
-                                actioned_date = %s
-                            WHERE id = %s;
-                        """, (meta.get("sender"), current_timestamp, record['id']))
-                        conn.commit()
-                        
-                        notes = meta.get("notes") or "Marked as approved via email reply."
-                        write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), notes)
-                        log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
-                    else:
-                        log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {record['po_number']}", "WARNING")
-                        write_control_log(conn, record['po_number'], "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
+                po_number = record['po_number']
 
+                if record.get('submission_status') == 'Approved':
+                    log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
+                    continue
+
+                auth_info = verify_approver_authority(cursor, meta["sender"], 'Approval Authority')
+                if not auth_info["authorized"]:
+                    log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {po_number}", "WARNING")
+                    write_control_log(conn, po_number, "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
+                    continue
+
+                # Fetch prior valid approval actions from audit log for this PO
+                cursor.execute("""
+                    SELECT actor_email 
+                    FROM workflow_control_log 
+                    WHERE po_number = %s AND action_type IN ('Inbound Approval', 'Board Approval');
+                """, (po_number,))
+                prior_logs = cursor.fetchall()
+
+                # Collect distinct set of approved email addresses
+                approved_emails = set(row['actor_email'].lower() for row in prior_logs if row.get('actor_email'))
+                approved_emails.add(meta["sender"].lower())
+
+                # Query database to check if Chair has signed off among all recorded approvers
+                cursor.execute("""
+                    SELECT count(*) as chair_count 
+                    FROM approvers 
+                    WHERE LOWER(email) = ANY(%s) 
+                      AND approval_permission LIKE '%%Chair%%' 
+                      AND active = 'YES';
+                """, (list(approved_emails),))
+                chair_approved = (cursor.fetchone()['chair_count'] > 0)
+
+                required_count, requires_chair = get_required_approval_criteria(record)
+                current_count = len(approved_emails)
+
+                # Determine target submission status
+                if current_count >= required_count and (not requires_chair or chair_approved):
+                    new_status = 'Approved'
+                    log_action = 'Inbound Approval'
+                    notes = meta.get("notes") or f"Fully approved ({current_count}/{required_count} sign-offs received)."
+                else:
+                    new_status = 'Partially Approved'
+                    log_action = 'Inbound Partial Approval'
+                    missing_reasons = []
+                    if current_count < required_count:
+                        missing_reasons.append(f"{current_count}/{required_count} approvals")
+                    if requires_chair and not chair_approved:
+                        missing_reasons.append("Chair approval pending")
+                    
+                    notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
+
+                cursor.execute("""
+                    UPDATE po_log 
+                    SET submission_status = %s,
+                        actioned_by = %s,
+                        actioned_date = %s
+                    WHERE id = %s;
+                """, (new_status, meta.get("sender"), current_timestamp, record['id']))
+                conn.commit()
+
+                write_control_log(conn, po_number, log_action, meta.get("sender"), notes)
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Approvals: {current_count}/{required_count}, Chair Signed: {chair_approved}).")
+
+            # 3. PROCESS REJECTIONS
             for raw_po_id, meta in final_rejections.items():
                 try:
                     po_id = int(raw_po_id)
