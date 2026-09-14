@@ -194,27 +194,6 @@ def verify_approver_authority(cursor, sender_email, required_permission):
         
     return {"authorized": authorized, "is_chair": is_chair, "permission": user_permission}
 
-def get_required_approval_criteria(record):
-    """
-    Evaluates matrix tiers based on estimated cost, expense type, and budget status.
-    Returns (required_approvals_count, requires_chair_signoff).
-    """
-    estimated_cost = float(record.get('estimated_cost') or 0.0)
-    expense_type = record.get('expense_type') or ''
-    is_budgeted = record.get('is_budgeted') or ''
-
-    # Operational Budgeted Tiers
-    if is_budgeted == 'Yes' and expense_type == 'Operational':
-        if estimated_cost <= 10000:
-            return 1, False  # Estate Manager only
-        elif estimated_cost <= 50000:
-            return 2, True   # Chair + 1 Board Member
-        else:
-            return 3, True   # Chair + 2 Board Members
-
-    # Capital, Service Contracts, Maintenance, or Unbudgeted Tiers
-    return 3, True
-
 def process_replies():
     log("Starting Inbox Reply Processor...")
     recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
@@ -239,7 +218,7 @@ def process_replies():
 
         with conn.cursor() as cursor:
             cursor.execute(
-                "SELECT * FROM po_log WHERE id = ANY(%s);",
+                "SELECT * FROM po_log_with_status WHERE id = ANY(%s);",
                 (all_po_ids,)
             )
             records = cursor.fetchall()
@@ -332,12 +311,13 @@ def process_replies():
                     SELECT count(*) as chair_count 
                     FROM approvers 
                     WHERE LOWER(email) = ANY(%s) 
-                      AND approval_permission LIKE '%%Chair%%' 
-                      AND active = 'YES';
+                      AND approval_permission LIKE '%%Chair%%';
                 """, (list(approved_emails),))
                 chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                required_count, requires_chair = get_required_approval_criteria(record)
+                # Pull thresholds directly from the SQL view columns (replacing Python logic)
+                required_count = record.get('required_approval_count', 1)
+                requires_chair = record.get('requires_chair_approval', False)
                 current_count = len(approved_emails)
 
                 # Determine target submission status
