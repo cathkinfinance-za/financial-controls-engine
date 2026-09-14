@@ -552,7 +552,9 @@
                             <thead>
                                 <tr style="background: #f8f9fa; border-bottom: 1px solid var(--border-color); text-align: left;">
                                     <th style="padding: 8px;">Timestamp</th>
-                                    <th style="padding: 8px;">Actor</th>
+                                    <th style="padding: 8px;">Email</th>
+                                    <th style="padding: 8px;">Name</th>
+                                    <th style="padding: 8px;">Authority</th>
                                     <th style="padding: 8px;">Action / Status</th>
                                     <th style="padding: 8px;">Notes</th>
                                 </tr>
@@ -563,6 +565,8 @@
                                     <tr style="border-bottom: 1px solid var(--border-color);">
                                         <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
                                         <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                        <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
+                                        <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
                                         <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
                                         <td style="padding: 8px;">{{ log.notes or '-' }}</td>
                                     </tr>

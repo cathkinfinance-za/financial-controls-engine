@@ -432,14 +432,22 @@ def po_form():
                         target_po = str(selected_po.get('po_number', '')).strip()
                         cur.execute(
                             """
-                            SELECT timestamp AS action_timestamp, actor_email, action_type, system_notes AS notes 
-                            FROM workflow_control_log 
-                            WHERE TRIM(po_number) ILIKE TRIM(%s) 
-                            ORDER BY timestamp DESC
+                            SELECT 
+                                l.timestamp AS action_timestamp, 
+                                l.actor_email, 
+                                l.action_type, 
+                                l.system_notes AS notes,
+                                a.approval_permission,
+                                NULLIF(TRIM(CONCAT_WS(' ', a."Name", a."Surname")), '') AS full_name
+                            FROM workflow_control_log l
+                            LEFT JOIN approvers a ON LOWER(TRIM(l.actor_email)) = LOWER(TRIM(a.email))
+                            WHERE TRIM(l.po_number) ILIKE TRIM(%s) 
+                            ORDER BY l.timestamp DESC;
                             """,
                             (target_po,)
                         )
                         audit_logs = cur.fetchall()
+                        
                     except Exception as audit_err:
                         print(f"Error fetching audit logs: {audit_err}")
                         audit_logs = []
