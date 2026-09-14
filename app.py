@@ -419,7 +419,7 @@ def po_form():
             saved_pos = cur.fetchall()
             
             if selected_po_num:
-                cur.execute("SELECT * FROM po_log WHERE po_number = %s;", (selected_po_num,))
+                cur.execute("SELECT * FROM po_log_with_status WHERE po_number = %s;", (selected_po_num,))
                 selected_po = cur.fetchone()
 
                 if selected_po:

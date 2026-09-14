@@ -545,6 +545,18 @@
                     </select>
                 </div>
 
+                <div class="form-row">
+                    <label class="form-label">Approval Status</label>
+                    <input 
+                        type="text" 
+                        id="calculated_approval_status" 
+                        name="calculated_approval_status" 
+                        value="{{ selected_po.calculated_approval_status if selected_po and selected_po.calculated_approval_status else '' }}" 
+                        readonly 
+                        class="form-control"
+                    >
+                </div>
+
 
                 <div class="section-header">Procurement & Audit History Log</div>
                     <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
