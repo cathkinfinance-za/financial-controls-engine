@@ -1,344 +1,311 @@
 import os
-import sys
-import json
 import re
+import imaplib
+import email
+from email.header import decode_header
+import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from google import genai
-from google.genai import types
-from duckduckgo_search import DDGS
 
-
-GEMINI_KEY = os.getenv("GEMINI_API_KEY")
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-ai_client = genai.Client(api_key=GEMINI_KEY)
+def log(msg, level="INFO"):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] [{level}] {msg}")
 
 def get_db_connection():
-    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+    return psycopg2.connect(
+        os.getenv("DATABASE_URL"),
+        cursor_factory=RealDictCursor
+    )
 
-def build_vendor_payload_part(vendor: dict) -> types.Part | None:
-    """
-    Selects HTML analysis text over PDF raw bytes if available.
-    """
-    analysis_html = vendor.get("analysis_sheet_html")
-    quote_bytes = vendor.get("quote_file_bytes")
-
-    if analysis_html and str(analysis_html).strip():
-        # Pass HTML analysis document as text content
-        return types.Part.from_bytes(
-            data=str(analysis_html).encode("utf-8"),
-            mime_type="text/html",
-        )
-    elif quote_bytes:
-        # Fallback to binary PDF quote
-        raw_data = bytes(quote_bytes) if not isinstance(quote_bytes, bytes) else quote_bytes
-        return types.Part.from_bytes(
-            data=raw_data,
-            mime_type="application/pdf",
-        )
-    
-    return None
-
-def process_vendor_quote_pricing(project_id: int, vendor_options: list[dict], db_connection=None):
-    """
-    Phase 2b Evaluation Engine with Conditional Vendor Content Payload.
-    Parses line items via Gemini and inserts direct entries into database tables.
-    """
-    if not db_connection:
-        return
-
-    # Fetch project weightings to pair non-pricing line items with weighting IDs
-    with db_connection.cursor() as cursor:
-        cursor.execute("SELECT id, criterion_name FROM project_weightings WHERE project_id = %s;", (project_id,))
-        weightings = cursor.fetchall()
-
-    for vendor in vendor_options:
-        v_id = vendor['id']
-        v_name = vendor.get('vendor_name', 'Unknown')
-        content_part = build_vendor_payload_part(vendor)
-        
-        if not content_part:
-            continue
-
-        prompt = f"""
-        Analyze quote document for Vendor ID {v_id} ({v_name}).
-        Extract all pricing components and non-pricing evaluation criteria score ratings (0-10 scale).
-
-        Return JSON in this structure:
-        {{
-          "pricing_items": [
-            {{
-              "cost_component_name": "string",
-              "cost_type_category": "Annual Cost" or "One-Time Cost",
-              "amount": float
-            }}
-          ],
-          "non_pricing_items": [
-            {{
-              "criterion_name": "string matching weightings if possible",
-              "score": float (0-10),
-              "comments": "string"
-            }}
-          ]
-        }}
-        """
-
-        try:
-            res = ai_client.models.generate_content(
-                model='gemini-3.5-flash-lite',
-                contents=[content_part, prompt],
-                config=types.GenerateContentConfig(response_mime_type="application/json")
-            )
-            parsed_data = json.loads(res.text or "{}")
-
-            with db_connection.cursor() as cursor:
-                # Clear existing items for re-run idempotent state
-                cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
-                cursor.execute("DELETE FROM options_line_items_non_pricing WHERE procurement_option_id = %s;", (v_id,))
-
-                # Insert Pricing Line Items
-                pricing_items = parsed_data.get("pricing_items", [])
-                for item in pricing_items:
-                    item_name = item.get("cost_component_name", "Uncategorized Item")
-                    category = item.get("cost_type_category", "One-Time Cost")
-                    amount = float(item.get("amount", 0.0))
-
-                    cursor.execute(
-                        """
-                        INSERT INTO options_line_items_pricing (procurement_option_id, cost_component_name, cost_type_category, amount)
-                        VALUES (%s, %s, %s, %s);
-                        """,
-                        (v_id, item_name, category, amount)
-                    )
-
-                # Insert Non-Pricing Line Items matched with Weighting IDs
-                non_pricing_items = parsed_data.get("non_pricing_items", [])
-                for np_item in non_pricing_items:
-                    c_name = np_item.get("criterion_name", "")
-                    score = float(np_item.get("score", 0.0))
-                    comments = np_item.get("comments", "")
-
-                    # Attempt to match criterion name to project_weightings entry
-                    weighting_id = None
-                    for w in weightings:
-                        if w['criterion_name'].lower() in c_name.lower() or c_name.lower() in w['criterion_name'].lower():
-                            weighting_id = w['id']
-                            break
-
-                    # Fallback to first weighting criterion if unmatched
-                    if not weighting_id and weightings:
-                        weighting_id = weightings[0]['id']
-
-                    if weighting_id:
-                        cursor.execute(
-                            """
-                            INSERT INTO options_line_items_non_pricing (procurement_option_id, weighting_id, score, evaluation_notes)
-                            VALUES (%s, %s, %s, %s);
-                            """,
-                            (v_id, weighting_id, score, comments)
-                        )
-
-            db_connection.commit()
-
-        except Exception as err:
-            print(f"Error parsing/inserting pricing items for vendor {v_id}: {err}")
-            db_connection.rollback()
-
-
-def run_due_diligence_osint(conn, project_id, vendors):
-    for v in vendors:
-        v_id = v['id']
-        v_name = v['vendor_name']
-
-        legal_name = v_name
-        cipc_num = "N/A"
-        vat_num = "N/A"
-
-        doc_part = build_vendor_payload_part(v)
-        if doc_part:
-            parse_prompt = "Extract legal_name, cipc_number, vat_number from document as JSON."
-            try:
-                res = ai_client.models.generate_content(
-                    model='gemini-3.5-flash-lite',
-                    contents=[doc_part, parse_prompt],
-                    config=types.GenerateContentConfig(response_mime_type="application/json")
-                )
-                meta = json.loads(res.text or "{}")
-                legal_name = meta.get("legal_name") or v_name
-                cipc_num = meta.get("cipc_number") or "N/A"
-                vat_num = meta.get("vat_number") or "N/A"
-            except Exception:
-                pass
-
-        # DuckDuckGo OSINT search
-        search_context = ""
-        try:
-            with DDGS() as ddgs:
-                results = list(ddgs.text(f"{legal_name} {cipc_num} South Africa risk compliance", max_results=4))
-                for r in results:
-                    search_context += f"- Title: {r.get('title')}\n  Snippet: {r.get('body')}\n"
-        except Exception:
-            search_context = "No direct web search records returned."
-
-        dd_prompt = f"""
-        Audit vendor '{legal_name}' (CIPC: {cipc_num}, VAT: {vat_num}) in South Africa.
-        Context: {search_context}
-        Evaluate operational footprint, statutory registrations, and compliance risks.
-        End response with 'DD_STATUS: Passed', 'DD_STATUS: Caution', or 'DD_STATUS: High Risk'.
-        """
-
-        dd_res = ai_client.models.generate_content(model='gemini-3.5-flash-lite', contents=[dd_prompt])
-        raw_text = (dd_res.text or "").strip()
-        
-        status_match = re.search(r'DD_STATUS:\s*(Passed|Caution|High Risk)', raw_text, re.IGNORECASE)
-        v_status = status_match.group(1).title() if status_match else "Caution"
-        findings = re.sub(r'DD_STATUS:.*', '', raw_text, flags=re.IGNORECASE).strip()
-
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                UPDATE procurement_options 
-                SET public_dd_status = %s, public_search_findings = %s 
-                WHERE id = %s;
-            """, (v_status, findings, v_id))
+def ensure_audit_log_table(conn):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS workflow_control_log (
+                id SERIAL PRIMARY KEY,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                po_number VARCHAR(100),
+                action_type VARCHAR(100),
+                actor_email VARCHAR(255),
+                actor_operator VARCHAR(255),
+                system_notes TEXT
+            );
+        """)
         conn.commit()
 
-
-def execute_phase2(conn, project_id=None):
-    if project_id is None:
-        project_id = conn
-        conn = None
-        should_close_conn = True
-    else:
-        should_close_conn = False
-
+def write_control_log(conn, po_number, action_type, user_email, notes=""):
     try:
-        if conn is None:
-            conn = get_db_connection()
-
-        with conn.cursor() as cursor:
-            # 1. Fetch target project record
-            cursor.execute("SELECT * FROM projects WHERE id = %s;", (project_id,))
-            project = cursor.fetchone()
-            if not project:
-                raise ValueError(f"Project with ID {project_id} not found.")
-
-            # 2. Fetch associated vendors/options for this project
-            cursor.execute("SELECT * FROM procurement_options WHERE project_id = %s;", (project_id,))
-            vendors = cursor.fetchall()
-            if not vendors:
-                return {"status": "warning", "message": f"No procurement options found for project {project_id}."}
-
-            # 3. Fetch project weightings
-            cursor.execute("SELECT * FROM project_weightings WHERE project_id = %s;", (project_id,))
-            weightings = cursor.fetchall()
-
-        # -------------------------------------------------------------------------
-        # STEP 2b PRE-PROCESSING: Single call execution to populate line items
-        # -------------------------------------------------------------------------
-        process_vendor_quote_pricing(project_id, vendors, conn)
-
-        # 1. Update 5-Year Totals per Vendor
-        vendor_totals = {}
-        with conn.cursor() as cursor:
-            for v in vendors:
-                cursor.execute("""
-                    SELECT amount, cost_type_category FROM options_line_items_pricing 
-                    WHERE procurement_option_id = %s;
-                """, (v['id'],))
-                lines = cursor.fetchall()
-                
-                total_5yr = sum(
-                    (float(l['amount']) * 5 if l['cost_type_category'] == 'Annual Cost' else float(l['amount']))
-                    for l in lines
-                )
-                vendor_totals[v['id']] = total_5yr
-                
-                cursor.execute("""
-                    UPDATE procurement_options SET projected_5yr_total = %s WHERE id = %s;
-                """, (total_5yr, v['id']))
-        conn.commit()
-
-        lowest_bid = min(vendor_totals.values()) if vendor_totals else 0.0
-        price_weight = float(project['price_weighting'] or 0.50)
-
-        # 2. Score Non-Pricing and Combined Weights
-        winning_score = -1.0
-        winner_name = ""
-
-        with conn.cursor() as cursor:
-            for v in vendors:
-                v_cost = vendor_totals[v['id']]
-                p_score = round(10.0 * (lowest_bid / v_cost), 2) if v_cost > 0 else 0.0
-                weighted_p_score = p_score * price_weight
-
-                cursor.execute("""
-                    SELECT 
-                        np.id AS line_item_id,
-                        np.score, 
-                        pw.weight_percent 
-                    FROM options_line_items_non_pricing np
-                    JOIN project_weightings pw ON np.weighting_id = pw.id
-                    WHERE np.procurement_option_id = %s;
-                """, (v['id'],))
-                np_items = cursor.fetchall()
-
-                total_np_score = 0.0
-                for item in np_items:
-                    raw_score = float(item['score'] or 0.0)
-                    weight_pct = float(item['weight_percent'] or 0.0)
-                    
-                    w_factor = weight_pct / 100.0 if weight_pct > 1 else weight_pct
-                    contrib = round(raw_score * w_factor, 2)
-                    total_np_score += contrib
-
-                    cursor.execute("""
-                        UPDATE options_line_items_non_pricing
-                        SET weighted_score_contribution = %s
-                        WHERE id = %s;
-                    """, (contrib, item['line_item_id']))
-
-                    print(f"Updated rows: {cursor.rowcount}")
-
-                final_weighted_score = round(weighted_p_score + total_np_score, 2)
-
-                if final_weighted_score > winning_score:
-                    winning_score = final_weighted_score
-                    winner_name = v['vendor_name']
-
-                cursor.execute("""
-                    UPDATE procurement_options 
-                    SET lowest_bid_lookup = %s,
-                        price_score = %s,
-                        total_non_pricing_score = %s,
-                        final_weighted_score_output = %s
-                    WHERE id = %s;
-                """, (lowest_bid, p_score, total_np_score, final_weighted_score, v['id']))
-
-        conn.commit()
-
-        # 3. OSINT Due Diligence
-        run_due_diligence_osint(conn, project_id, vendors)
-
-        # 4. Update lowest bid floor and clear recalculate flag
         with conn.cursor() as cursor:
             cursor.execute("""
-                UPDATE projects 
-                SET lowest_project_bid_floor = %s,
-                    recalculate_matrix = FALSE
-                WHERE id = %s;
-            """, (lowest_bid, project_id))
-        conn.commit()
+                INSERT INTO workflow_control_log (po_number, action_type, actor_email, system_notes)
+                VALUES (%s, %s, %s, %s);
+            """, (po_number, action_type, user_email, notes))
+            conn.commit()
+            log(f"Control log recorded in DB for PO '{po_number}'.")
+    except Exception as e:
+        log(f"Failed to write control log: {e}", "WARNING")
+
+def extract_po_id(subject, body):
+    text_to_search = f"{subject or ''} {body or ''}"
+    match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+def fetch_approval_replies():
+    imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
+    email_account = os.getenv("SENDER_EMAIL")
+    email_password = os.getenv("SENDER_PASSWORD")
+
+    if not email_account or not email_password:
+        log("SENDER_EMAIL or SENDER_PASSWORD missing.", "ERROR")
+        return {}, {}, {}, {}
+
+    log(f"Connecting to IMAP inbox at {imap_server}...")
+    try:
+        mail = imaplib.IMAP4_SSL(imap_server, 993)
+        mail.login(email_account, email_password)
+        mail.select("inbox")
+
+        # 1. Search UNSEEN (unread) emails only
+        status, messages = mail.search(None, 'UNSEEN')
+        if status != "OK" or not messages or messages == [b'']:
+            log("No new unread approval emails found in inbox.")
+            mail.logout()
+            return {}, {}, {}, {}
+
+        raw_data = messages[0]
+        email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
+        
+        latest_email_ids = email_ids[-20:]
+        log(f"Scanning latest {len(latest_email_ids)} unread workflow email(s)...")
+
+        recommendations_approval = {}
+        recommendations_rejection = {}
+        final_approvals = {}
+        final_rejections = {}
+
+        for e_id in latest_email_ids:
+            res, msg_data = mail.fetch(e_id, '(RFC822)')
+            for response_part in msg_data:
+                if isinstance(response_part, tuple) and len(response_part) > 1:
+                    raw_bytes = response_part[1]
+                    if not isinstance(raw_bytes, bytes):
+                        continue
+
+                    msg = email.message_from_bytes(raw_bytes)
+                    subject_header = msg.get('Subject', '')
+                    
+                    decoded_subject = ""
+                    if subject_header:
+                        for text, encoding in decode_header(subject_header):
+                            if isinstance(text, bytes):
+                                decoded_subject += text.decode(encoding if encoding else 'utf-8', errors='ignore')
+                            else:
+                                decoded_subject += str(text)
+
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                payload = part.get_payload(decode=True)
+                                if isinstance(payload, bytes):
+                                    body = payload.decode(errors='ignore')
+                                break
+                    else:
+                        payload = msg.get_payload(decode=True)
+                        if isinstance(payload, bytes):
+                            body = payload.decode(errors='ignore')
+                    
+                    po_id = extract_po_id(decoded_subject, body)
+                    log(f"Inspecting Subject: '{decoded_subject}' | Extracted PO-ID: {po_id}")
+                    if not po_id:
+                        continue
+
+                    top_reply = body.strip()
+                    reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
+                    for splitter in reply_splitters:
+                        if splitter in top_reply:
+                            top_reply = top_reply.split(splitter)[0]
+
+                    clean_reply_notes = top_reply.strip()
+                    full_payload = f"{decoded_subject} {top_reply}".upper()
+                    sender = str(msg.get('From', '')).lower()
+                    sender_match = re.search(r'<([^>]+)>', sender)
+                    sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
+
+                    # Save 'notes' along with sender
+                    payload_meta = {"sender": sender_clean, "notes": clean_reply_notes}
+
+                    # Categorize reply
+                    if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
+                        recommendations_rejection[po_id] = payload_meta
+                    elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
+                        recommendations_approval[po_id] = payload_meta
+                    elif "REJECTED" in full_payload or "REJECT" in full_payload:
+                        final_rejections[po_id] = payload_meta
+                    elif "APPROVED" in full_payload or "APPROVE" in full_payload:
+                        final_approvals[po_id] = payload_meta
+
+                    # 2. Mark email as read in IMAP
+                    mail.store(e_id, '+FLAGS', '\\Seen')
+
+        mail.logout()
+        return recommendations_approval, recommendations_rejection, final_approvals, final_rejections
 
     except Exception as e:
-        if conn and not conn.closed:
-            conn.rollback()
-        raise e
+        log(f"IMAP Processing Error: {e}", "ERROR")
+        return {}, {}, {}, {}
 
+def verify_approver_authority(cursor, sender_email, required_permission):
+    cursor.execute(
+        "SELECT approval_permission FROM approvers WHERE LOWER(email) = LOWER(%s);",
+        (sender_email,)
+    )
+    row = cursor.fetchone()
+    if not row:
+        return False
+    
+    user_permission = row.get('approval_permission')
+    if required_permission == 'Approval Authority' and user_permission == 'Approval Authority':
+        return True
+    if required_permission == 'Finance Review' and user_permission in ['Finance Review', 'Approval Authority']:
+        return True
+        
+    return False
+
+def process_replies():
+    log("Starting Inbox Reply Processor...")
+    recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
+    
+    if not any([recommendations_approval, recommendations_rejection, final_approvals, final_rejections]):
+        log("No actionable email replies detected. Processing complete.")
+        return
+
+    try:
+        conn = get_db_connection()
+        ensure_audit_log_table(conn)
+        
+        all_po_ids = list(set(
+            list(recommendations_approval.keys()) + 
+            list(recommendations_rejection.keys()) + 
+            list(final_approvals.keys()) + 
+            list(final_rejections.keys())
+        ))
+        log(f"Found replies for PO IDs: {all_po_ids}")
+
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM po_log WHERE id = ANY(%s);",
+                (all_po_ids,)
+            )
+            records = cursor.fetchall()
+            po_id_map = {row['id']: row for row in records if row.get('id')}
+
+            current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
+
+            # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
+            for raw_po_id, meta in recommendations_approval.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id_map.get(po_id)
+                if record and record.get('submission_status') == 'Finance Review':
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Finance Recommended',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    
+                    # Capture actual email notes
+                    notes = meta.get("notes") or "Finance Committee recommended for approval."
+                    write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
+                    log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE RECOMMENDED.")
+
+            for raw_po_id, meta in recommendations_rejection.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id_map.get(po_id)
+                if record and record.get('submission_status') == 'Finance Review':
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Finance Rejected',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+
+                    notes = meta.get("notes") or "Finance Committee recommended for rejection."
+                    write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), notes)
+                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE REJECTED.")
+
+            # 2. PROCESS FINAL APPROVALS & REJECTIONS
+            for raw_po_id, meta in final_approvals.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id_map.get(po_id)
+                if record:
+                    if record.get('submission_status') == 'Approved':
+                        log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
+                        continue
+
+                    if verify_approver_authority(cursor, meta["sender"], 'Approval Authority'):
+                        cursor.execute("""
+                            UPDATE po_log 
+                            SET submission_status = 'Approved',
+                                actioned_by = %s,
+                                actioned_date = %s
+                            WHERE id = %s;
+                        """, (meta.get("sender"), current_timestamp, record['id']))
+                        conn.commit()
+                        
+                        notes = meta.get("notes") or "Marked as approved via email reply."
+                        write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), notes)
+                        log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
+                    else:
+                        log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {record['po_number']}", "WARNING")
+                        write_control_log(conn, record['po_number'], "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
+
+            for raw_po_id, meta in final_rejections.items():
+                try:
+                    po_id = int(raw_po_id)
+                except (ValueError, TypeError):
+                    continue
+
+                record = po_id_map.get(po_id)
+                if record:
+                    if record.get('submission_status') == 'Rejected':
+                        log(f"PO ID '{record['id']}' is already REJECTED. Skipping.")
+                        continue
+
+                    cursor.execute("""
+                        UPDATE po_log 
+                        SET submission_status = 'Rejected',
+                            actioned_by = %s,
+                            actioned_date = %s
+                        WHERE id = %s;
+                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    conn.commit()
+                    
+                    notes = meta.get("notes") or "Marked as rejected via email reply."
+                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
+                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to REJECTED.")
+
+    except Exception as db_err:
+        log(f"Database sync error: {db_err}", "CRITICAL")
     finally:
-        if should_close_conn and conn and not conn.closed:
+        if 'conn' in locals() and conn:
             conn.close()
+            log("PostgreSQL connection closed.")
 
 if __name__ == "__main__":
-    p_id = int(sys.argv[1]) if len(sys.argv) > 1 else 1
-    execute_phase2(p_id)
+    process_replies()

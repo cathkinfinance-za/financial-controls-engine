@@ -26,6 +26,7 @@ def ensure_audit_log_table(conn):
                 po_number VARCHAR(100),
                 action_type VARCHAR(100),
                 actor_email VARCHAR(255),
+                actor_operator VARCHAR(255),
                 system_notes TEXT
             );
         """)
@@ -76,7 +77,7 @@ def fetch_approval_replies():
         # Pull the latest emails and let your Python logic filter them:
         status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
-            log("No matching approval emails found in inbox.")
+            log("No new unread approval emails found in inbox.")
             mail.logout()
             return {}, {}, {}, {}
 
@@ -84,7 +85,7 @@ def fetch_approval_replies():
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
         
         latest_email_ids = email_ids[-20:]
-        log(f"Scanning latest {len(latest_email_ids)} workflow email(s)...")
+        log(f"Scanning latest {len(latest_email_ids)} unread workflow email(s)...")
 
         # 1. Initialize all 4 response categories
         recommendations_approval = {}
@@ -135,21 +136,24 @@ def fetch_approval_replies():
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    # 2. Define full_payload BEFORE performing keyword checks
+                    clean_reply_notes = top_reply.strip()
                     full_payload = f"{decoded_subject} {top_reply}".upper()
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    # 3. Categorize reply
+                    # Save 'notes' along with sender
+                    payload_meta = {"sender": sender_clean, "notes": clean_reply_notes}
+
+                    # Categorize reply
                     if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
-                        recommendations_rejection[po_id] = {"sender": sender_clean}
+                        recommendations_rejection[po_id] = payload_meta
                     elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
-                        recommendations_approval[po_id] = {"sender": sender_clean}
+                        recommendations_approval[po_id] = payload_meta
                     elif "REJECTED" in full_payload or "REJECT" in full_payload:
-                        final_rejections[po_id] = {"sender": sender_clean}
+                        final_rejections[po_id] = payload_meta
                     elif "APPROVED" in full_payload or "APPROVE" in full_payload:
-                        final_approvals[po_id] = {"sender": sender_clean}
+                        final_approvals[po_id] = payload_meta
 
                     # Mark this email as read so it isn't fetched again on future runs:
                     mail.store(e_id, '+FLAGS', '\\Seen')
@@ -163,7 +167,11 @@ def fetch_approval_replies():
 
 def verify_approver_authority(cursor, sender_email, required_permission):
     cursor.execute(
-        "SELECT approval_permission FROM approvers WHERE LOWER(email) = LOWER(%s);",
+        """
+        SELECT approval_permission 
+        FROM approvers 
+        WHERE LOWER(email) = LOWER(%s) AND active = 'YES';
+        """,
         (sender_email,)
     )
     row = cursor.fetchone()
@@ -228,7 +236,10 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-                    write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), "Finance Committee recommended for approval.")
+                    
+                    # Capture actual email notes
+                    notes = meta.get("notes") or "Finance Committee recommended for approval."
+                    write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
                     log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE RECOMMENDED.")
 
             for raw_po_id, meta in recommendations_rejection.items():
@@ -248,7 +259,8 @@ def process_replies():
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
 
-                    write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), "Finance Committee recommended for rejection.")
+                    notes = meta.get("notes") or "Finance Committee recommended for rejection."
+                    write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), notes)
                     log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE REJECTED.")
 
             # 4. PROCESS FINAL APPROVALS & REJECTIONS
@@ -276,7 +288,9 @@ def process_replies():
                             WHERE id = %s;
                         """, (meta.get("sender"), current_timestamp, record['id']))
                         conn.commit()
-                        write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), "Marked as approved via email reply.")
+                        
+                        notes = meta.get("notes") or "Marked as approved via email reply."
+                        write_control_log(conn, record['po_number'], "Inbound Approval", meta.get("sender"), notes)
                         log(f"✅ PO '{record['po_number']}' updated to APPROVED.")
                     else:
                         log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {record['po_number']}", "WARNING")
@@ -303,7 +317,9 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), "Marked as rejected via email reply.")
+                    
+                    notes = meta.get("notes") or "Marked as rejected via email reply."
+                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
                     log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to REJECTED.")
 
     except Exception as db_err:
