@@ -1511,7 +1511,7 @@ def finance_minutes():
         conn.close()
         return redirect(url_for('finance_minutes'))
 
-    # GET request: Fetch all meetings and global pending/in-progress actions
+    # GET request: Fetch all meetings and filter action items accordingly
     with conn.cursor() as cursor:
         # 1. Fetch all meetings
         cursor.execute("""
@@ -1521,20 +1521,40 @@ def finance_minutes():
         """)
         meetings = cursor.fetchall()
         
-        # 2. Fetch ALL open/pending actions globally across all meetings
+        # 2. Fetch all action items with their associated meeting's date
         cursor.execute("""
-            SELECT id, meeting_id, action_description, responsible_person, target_date, status, action_notes 
-            FROM meeting_action_items 
-            ORDER BY target_date ASC;
+            SELECT a.id, a.meeting_id, a.action_description, a.responsible_person, 
+                   a.target_date, a.status, a.action_notes, m.meeting_date AS created_meeting_date
+            FROM meeting_action_items a
+            JOIN meeting_minutes m ON a.meeting_id = m.id
+            ORDER BY a.target_date ASC;
         """)
-        global_pending_actions = cursor.fetchall()
+        all_actions = cursor.fetchall()
 
-        # 3. Attach the global pending actions to each meeting card so they render as "Matters Arising"
+        # 3. Filter actions for each selected meeting
         for m in meetings:
-            m['action_items'] = global_pending_actions
+            m_id = m['id'] if isinstance(m, dict) else m[0]
+            m_date = m['meeting_date'] if isinstance(m, dict) else m[1]
+
+            relevant_actions = []
+            for act in all_actions:
+                act_meeting_id = act['meeting_id'] if isinstance(act, dict) else act[1]
+                act_status = act['status'] if isinstance(act, dict) else act[5]
+                act_created_date = act['created_meeting_date'] if isinstance(act, dict) else act[7]
+
+                # Include: 
+                # 1. Action items natively created in this meeting
+                # 2. Completed items created on or after this meeting's date
+                if act_meeting_id == m_id:
+                    relevant_actions.append(act)
+                elif act_status == 'Completed' and act_created_date >= m_date:
+                    relevant_actions.append(act)
+
+            m['action_items'] = relevant_actions
 
     conn.close()
-    return render_template('minutes.html', meetings=meetings, global_pending_actions=global_pending_actions)
+    return render_template('minutes.html', meetings=meetings)
+
 
 @app.route('/delete_meeting', methods=['POST'])
 def delete_meeting():
