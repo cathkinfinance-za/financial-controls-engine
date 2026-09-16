@@ -1525,7 +1525,6 @@ def finance_minutes():
         cursor.execute("""
             SELECT id, meeting_id, action_description, responsible_person, target_date, status, action_notes 
             FROM meeting_action_items 
-            WHERE status != 'Completed' 
             ORDER BY target_date ASC;
         """)
         global_pending_actions = cursor.fetchall()
@@ -1635,6 +1634,22 @@ def update_meeting_minutes():
 
     return redirect(url_for('finance_minutes'))
 
+@app.route('/delete_action_item', methods=['POST'])
+def delete_action_item():
+    action_id = request.form.get('action_id')
+    if action_id:
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (action_id,))
+            conn.commit()
+            flash("Action item deleted successfully.")
+        except Exception as e:
+            conn.rollback()
+            flash(f"Error deleting action item: {str(e)}")
+        finally:
+            conn.close()
+    return redirect(url_for('finance_minutes'))
 
 @app.route('/update_authority_matrix', methods=['POST'])
 def update_authority_matrix():
@@ -1736,22 +1751,7 @@ def update_authority_matrix():
     return redirect(url_for('render_guide_page'))
 
 
-@app.route('/delete_action_item', methods=['POST'])
-def delete_action_item():
-    action_id = request.form.get('action_id')
-    if action_id:
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (action_id,))
-            conn.commit()
-            flash("Action item deleted successfully.")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Error deleting action item: {str(e)}")
-        finally:
-            conn.close()
-    return redirect(url_for('finance_minutes'))
+
 
 
 ALLOWED_MONTHS = {
