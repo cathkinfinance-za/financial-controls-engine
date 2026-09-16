@@ -1511,7 +1511,7 @@ def finance_minutes():
         conn.close()
         return redirect(url_for('finance_minutes'))
 
-    # GET request: Fetch all meetings and filter action items accordingly
+    # GET request: Fetch all meetings and group appropriate action items
     with conn.cursor() as cursor:
         # 1. Fetch all meetings
         cursor.execute("""
@@ -1521,7 +1521,7 @@ def finance_minutes():
         """)
         meetings = cursor.fetchall()
         
-        # 2. Fetch all action items with their associated meeting's date
+        # 2. Fetch ALL action items with their originating meeting's date
         cursor.execute("""
             SELECT a.id, a.meeting_id, a.action_description, a.responsible_person, 
                    a.target_date, a.status, a.action_notes, m.meeting_date AS created_meeting_date
@@ -1531,21 +1531,18 @@ def finance_minutes():
         """)
         all_actions = cursor.fetchall()
 
-        # 3. Filter actions for each selected meeting
+        # 3. Filter actions per meeting: ALL open items + ONLY relevant completed items
         for m in meetings:
-            m_id = m['id'] if isinstance(m, dict) else m[0]
             m_date = m['meeting_date'] if isinstance(m, dict) else m[1]
 
             relevant_actions = []
             for act in all_actions:
-                act_meeting_id = act['meeting_id'] if isinstance(act, dict) else act[1]
                 act_status = act['status'] if isinstance(act, dict) else act[5]
                 act_created_date = act['created_meeting_date'] if isinstance(act, dict) else act[7]
 
-                # Include: 
-                # 1. Action items natively created in this meeting
-                # 2. Completed items created on or after this meeting's date
-                if act_meeting_id == m_id:
+                # Condition 1: Include ALL open/in-progress items regardless of meeting origin
+                # Condition 2: Include completed items ONLY if created on or after this meeting's date
+                if act_status != 'Completed':
                     relevant_actions.append(act)
                 elif act_status == 'Completed' and act_created_date >= m_date:
                     relevant_actions.append(act)
