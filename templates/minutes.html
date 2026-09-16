@@ -401,8 +401,15 @@
 
             <!-- ACTION ITEMS READ-ONLY & EDIT TABLE -->
             {% if m.action_items and m.action_items != '[]' %}
+            <!-- GLOBAL OPEN / PENDING ACTION ITEMS TABLE -->
             <hr style="margin: 24px 0 16px 0; border: none; border-top: 1px solid var(--border-color);">
-            <div style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">Assigned Action Items Status</div>
+            <div style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">
+                Matters Arising & Open Action Items (All Meetings)
+            </div>
+
+            {% set current_actions = m.action_items if m.action_items else global_pending_actions %}
+
+            {% if current_actions %}
             <table>
                 <thead>
                     <tr>
@@ -415,7 +422,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for act in m.action_items %}
+                    {% for act in current_actions %}
                     {% set act_id = act.id if act.id is defined else act['id'] %}
                     {% set act_desc = act.action_description if act.action_description is defined else act['action_description'] %}
                     {% set act_resp = act.responsible_person if act.responsible_person is defined else act['responsible_person'] %}
@@ -429,6 +436,66 @@
                     {% elif act_status == 'In Progress' %}
                         {% set status_class = 'in-progress' %}
                     {% endif %}
+
+                    <!-- DISPLAY ROW -->
+                    <tr id="action-row-view-{{ act_id }}">
+                        <td>{{ act_desc }}</td>
+                        <td>{{ act_resp }}</td>
+                        <td>{{ act_date or '' }}</td>
+                        <td>
+                            <span class="status-badge {{ status_class }}">
+                                {{ act_status or 'Pending' }}
+                            </span>
+                        </td>
+                        <td>{{ act_notes or '' }}</td>
+                        <td>
+                            <div class="action-btns">
+                                <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="toggleActionItemEdit('{{ act_id }}', true)">✏️ Edit</button>
+                                <form method="POST" action="/delete_action_item" style="display: inline;" onsubmit="return confirm('Delete this action item?');">
+                                    <input type="hidden" name="action_id" value="{{ act_id }}">
+                                    <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;" title="Delete Action Item">✕</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- EDIT ROW -->
+                    <tr id="action-row-edit-{{ act_id }}" style="display: none; background: var(--bg-color);">
+                        <form method="POST" action="/update_action_item">
+                            <input type="hidden" name="action_id" value="{{ act_id }}">
+                            <td>
+                                <input type="text" name="action_description" value="{{ act_desc }}" required>
+                            </td>
+                            <td>
+                                <input type="text" name="responsible_person" value="{{ act_resp }}" required>
+                            </td>
+                            <td>
+                                <input type="date" name="target_date" value="{{ act_date or '' }}">
+                            </td>
+                            <td>
+                                <select name="status">
+                                    <option value="Pending" {% if act_status == 'Pending' %}selected{% endif %}>Pending</option>
+                                    <option value="In Progress" {% if act_status == 'In Progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="Completed" {% if act_status == 'Completed' %}selected{% endif %}>Completed</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" name="action_notes" value="{{ act_notes or '' }}" placeholder="Add progress notes...">
+                            </td>
+                            <td>
+                                <div class="action-btns">
+                                    <button type="submit" class="btn" style="padding: 4px 8px; font-size: 12px;">Save</button>
+                                    <button type="button" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;" onclick="toggleActionItemEdit('{{ act_id }}', false)">Cancel</button>
+                                </div>
+                            </td>
+                        </form>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">No outstanding action items.</p>
+            {% endif %}
 
                     <!-- DISPLAY ROW -->
                     <tr id="action-row-view-{{ act_id }}">

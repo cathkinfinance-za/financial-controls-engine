@@ -1511,7 +1511,9 @@ def finance_minutes():
         conn.close()
         return redirect(url_for('finance_minutes'))
 
+    # GET request: Fetch all meetings and global pending/in-progress actions
     with conn.cursor() as cursor:
+        # 1. Fetch all meetings
         cursor.execute("""
             SELECT id, meeting_date, chairperson, attendees, apologies, notes_summary 
             FROM meeting_minutes 
@@ -1519,17 +1521,21 @@ def finance_minutes():
         """)
         meetings = cursor.fetchall()
         
+        # 2. Fetch ALL open/pending actions globally across all meetings
+        cursor.execute("""
+            SELECT id, meeting_id, action_description, responsible_person, target_date, status, action_notes 
+            FROM meeting_action_items 
+            WHERE status != 'Completed' 
+            ORDER BY target_date ASC;
+        """)
+        global_pending_actions = cursor.fetchall()
+
+        # 3. Attach the global pending actions to each meeting card so they render as "Matters Arising"
         for m in meetings:
-            cursor.execute("""
-                SELECT id, action_description, responsible_person, target_date, status, action_notes 
-                FROM meeting_action_items 
-                WHERE meeting_id = %s ORDER BY id ASC;
-            """, (m['id'],))
-            m['action_items'] = cursor.fetchall()
+            m['action_items'] = global_pending_actions
 
     conn.close()
-    return render_template('minutes.html', meetings=meetings)
-
+    return render_template('minutes.html', meetings=meetings, global_pending_actions=global_pending_actions)
 
 @app.route('/delete_meeting', methods=['POST'])
 def delete_meeting():
