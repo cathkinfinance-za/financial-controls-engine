@@ -406,9 +406,15 @@
                 Matters Arising & Open Action Items (All Meetings)
             </div>
 
-            {% set current_actions = m.action_items if m.action_items else global_pending_actions %}
+            <!-- ACTION ITEMS ASSOCIATED WITH THIS MEETING -->
+            <hr style="margin: 24px 0 16px 0; border: none; border-top: 1px solid var(--border-color);">
+            <div style="font-size: 15px; font-weight: 600; color: var(--text-main); margin-bottom: 8px;">
+                Action Items & Matters Arising
+            </div>
 
-            {% if current_actions %}
+            {% set current_actions = m.action_items %}
+
+            {% if current_actions and current_actions != '[]' %}
             <table>
                 <thead>
                     <tr>
@@ -438,7 +444,7 @@
 
                     <!-- DISPLAY ROW -->
                     <tr id="action-row-view-{{ act_id }}">
-                        <td>{{ act_desc }}</td>
+                        <td {% if act_status == 'Completed' %}style="text-decoration: line-through; color: var(--text-muted);"{% endif %}>{{ act_desc }}</td>
                         <td>{{ act_resp }}</td>
                         <td>{{ act_date or '' }}</td>
                         <td>
@@ -497,8 +503,9 @@
                 </tbody>
             </table>
             {% else %}
-            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">No outstanding action items.</p>
+            <p style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">No action items recorded for this meeting.</p>
             {% endif %}
+            
         </div>
         {% endfor %}
 
