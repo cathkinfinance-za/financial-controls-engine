@@ -186,6 +186,8 @@ def execute_phase2(conn, project_id=None):
                 pricing_items = data.get("pricing_line_items", [])
                 non_pricing_evals = data.get("non_pricing_evaluations", [])
 
+                print(f"DEBUG VENDOR {v_name} NON-PRICING EVALS COUNT: {len(non_pricing_evals)}, RAW DATA: {non_pricing_evals}", flush=True)
+
                 with conn.cursor() as cursor:
                     # Clear previous entries for vendor to prevent duplication
                     cursor.execute("DELETE FROM options_line_items_pricing WHERE procurement_option_id = %s;", (v_id,))
