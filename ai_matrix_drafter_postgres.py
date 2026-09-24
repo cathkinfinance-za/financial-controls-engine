@@ -179,6 +179,8 @@ def execute_phase1(conn, project_id):
             if weight_val is None:
                 weight_val = item.get('weighting', 0.0)
 
+            print(f"DEBUG INSERTING CRITERION: {criterion_name} -> {weight_val}", flush=True)
+
             if criterion_name and str(criterion_name).strip():
                 cursor.execute("""
                     INSERT INTO project_weightings (project_id, criterion_name, weight_percent)
