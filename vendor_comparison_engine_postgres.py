@@ -206,9 +206,18 @@ def execute_phase2(conn, project_id=None):
                             float(p_item.get("amount", 0.0))
                         ))
 
-                    # Populating options_line_items_non_pricing
+                     # Populating options_line_items_non_pricing
                     for np_item in non_pricing_evals:
                         weighting_id = np_item.get("weighting_id")
+                        
+                        # Fallback match: if model returned a criterion name instead of an ID, look it up from our weightings list
+                        if not weighting_id and "criterion_name" in np_item:
+                            c_name_target = str(np_item.get("criterion_name")).strip().lower()
+                            for w in weightings:
+                                if str(w["criterion_name"]).strip().lower() == c_name_target:
+                                    weighting_id = w["id"]
+                                    break
+
                         if weighting_id:
                             score = float(np_item.get("score", 0.0))
                             justification = np_item.get("justification", "")
@@ -217,7 +226,10 @@ def execute_phase2(conn, project_id=None):
                             cursor.execute("""
                                 INSERT INTO options_line_items_non_pricing 
                                 (line_item_id, procurement_option_id, weighting_id, score, justification, weighted_score_contribution)
-                                VALUES (%s, %s, %s, %s, %s, %s);
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (line_item_id) DO UPDATE 
+                                SET score = EXCLUDED.score, 
+                                    justification = EXCLUDED.justification;
                             """, (
                                 line_item_id,
                                 v_id,
@@ -226,6 +238,7 @@ def execute_phase2(conn, project_id=None):
                                 justification,
                                 0.0
                             ))
+
 
                 conn.commit()
 
