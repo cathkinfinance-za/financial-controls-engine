@@ -140,6 +140,8 @@ def execute_phase1(conn, project_id):
 
         # 4. Invoke AI Model
         ai_response = call_gemini_api(model=selected_model, contents=[formatted_prompt])
+        print(f"DEBUG PHASE 1 RAW TEXT: {ai_response.get('raw_text')}", flush=True)
+        print(f"DEBUG PHASE 1 PARSED DATA: {ai_response.get('parsed_content')}", flush=True)
         parsed_data = ai_response.get('parsed_content', {})
 
         # Flexible key extraction for price weighting across diverse prompt formats
