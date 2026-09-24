@@ -172,7 +172,7 @@ def execute_phase1(conn, project_id):
         cursor.execute("DELETE FROM project_weightings WHERE project_id = %s;", (project_id,))
         
         for item in criteria_list:
-            criterion_name = item.get('criterion_name') or item.get('component_name')
+            criterion_name = item.get('criterion_name') or item.get('component_name') or item.get('criteria_name') or item.get('name')
             
             # Handle weight_percent key extraction safely
             weight_val = item.get('weight_percent')
