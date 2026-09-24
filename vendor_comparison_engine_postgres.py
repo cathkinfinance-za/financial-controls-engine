@@ -221,9 +221,6 @@ def execute_phase2(conn, project_id=None):
                             justification = np_item.get("justification", "")
                             line_item_id = f"np_{weighting_id}_{v_id}"
 
-
-                           print(f"DEBUG GEMINI PARSED DATA: option_id={v_id}, score={score}, raw_item={np_item}")
-
                             cursor.execute("""
                                 INSERT INTO options_line_items_non_pricing 
                                 (line_item_id, procurement_option_id, weighting_id, score, justification, weighted_score_contribution)
