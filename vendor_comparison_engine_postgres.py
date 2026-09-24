@@ -181,6 +181,8 @@ def execute_phase2(conn, project_id=None):
                     contents=[content_part, formatted_prompt],
                     config=types.GenerateContentConfig(response_mime_type="application/json")
                 )
+
+                print(f"DEBUG RAW GEMINI RESPONSE FOR {v_name}: {res.text}", flush=True)
                 data = json.loads(res.text or "{}")
 
                 pricing_items = data.get("pricing_line_items", [])
