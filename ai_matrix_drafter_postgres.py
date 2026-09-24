@@ -82,6 +82,8 @@ def call_gemini_api(model: str, contents: list) -> dict:
     try:
         parsed_content = json.loads(clean_text)
     except json.JSONDecodeError:
+        print(f"JSONDecodeError: {e}\nFailed to parse raw Gemini text:\n{raw_text}", flush=True)
+       
         parsed_content = {}
         
     return {"parsed_content": parsed_content, "raw_text": raw_text}
