@@ -99,8 +99,6 @@ def run_due_diligence_osint(conn, project_id, vendors):
             """, (v_status, findings, v_id))
         conn.commit()
 
-# vendor_comparison_engine_postgres.py
-
 def execute_phase2(conn, project_id=None):
     # Handle single positional argument calls: execute_phase2(project_id)
     if project_id is None:
@@ -222,6 +220,9 @@ def execute_phase2(conn, project_id=None):
                             score = float(np_item.get("score", 0.0))
                             justification = np_item.get("justification", "")
                             line_item_id = f"np_{weighting_id}_{v_id}"
+
+
+print(f"DEBUG GEMINI PARSED DATA: option_id={procurement_option_id}, score={parsed_score}, raw_item={item}")
 
                             cursor.execute("""
                                 INSERT INTO options_line_items_non_pricing 
