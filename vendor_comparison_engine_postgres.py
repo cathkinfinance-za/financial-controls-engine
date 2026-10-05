@@ -99,8 +99,6 @@ def run_due_diligence_osint(conn, project_id, vendors):
             """, (v_status, findings, v_id))
         conn.commit()
 
-# vendor_comparison_engine_postgres.py
-
 def execute_phase2(conn, project_id=None):
     # Handle single positional argument calls: execute_phase2(project_id)
     if project_id is None:
@@ -183,10 +181,14 @@ def execute_phase2(conn, project_id=None):
                     contents=[content_part, formatted_prompt],
                     config=types.GenerateContentConfig(response_mime_type="application/json")
                 )
+
+                print(f"DEBUG RAW GEMINI RESPONSE FOR {v_name}: {res.text}", flush=True)
                 data = json.loads(res.text or "{}")
 
                 pricing_items = data.get("pricing_line_items", [])
                 non_pricing_evals = data.get("non_pricing_evaluations", [])
+
+                print(f"DEBUG VENDOR {v_name} NON-PRICING EVALS COUNT: {len(non_pricing_evals)}, RAW DATA: {non_pricing_evals}", flush=True)
 
                 with conn.cursor() as cursor:
                     # Clear previous entries for vendor to prevent duplication
@@ -206,18 +208,31 @@ def execute_phase2(conn, project_id=None):
                             float(p_item.get("amount", 0.0))
                         ))
 
-                    # Populating options_line_items_non_pricing
+                     # Populating options_line_items_non_pricing
                     for np_item in non_pricing_evals:
                         weighting_id = np_item.get("weighting_id")
+                        
+                        # Fallback match: if model returned a criterion name instead of an ID, look it up from our weightings list
+                        if not weighting_id and "criterion_name" in np_item:
+                            c_name_target = str(np_item.get("criterion_name")).strip().lower()
+                            for w in weightings:
+                                if str(w["criterion_name"]).strip().lower() == c_name_target:
+                                    weighting_id = w["id"]
+                                    break
+
                         if weighting_id:
                             score = float(np_item.get("score", 0.0))
                             justification = np_item.get("justification", "")
                             line_item_id = f"np_{weighting_id}_{v_id}"
+                            print(f"DEBUG GEMINI PARSED DATA: option_id={v_id}, score={score}, raw_item={np_item}")
 
                             cursor.execute("""
                                 INSERT INTO options_line_items_non_pricing 
                                 (line_item_id, procurement_option_id, weighting_id, score, justification, weighted_score_contribution)
-                                VALUES (%s, %s, %s, %s, %s, %s);
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (line_item_id) DO UPDATE 
+                                SET score = EXCLUDED.score, 
+                                    justification = EXCLUDED.justification;
                             """, (
                                 line_item_id,
                                 v_id,
@@ -226,6 +241,7 @@ def execute_phase2(conn, project_id=None):
                                 justification,
                                 0.0
                             ))
+
 
                 conn.commit()
 

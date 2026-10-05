@@ -82,6 +82,8 @@ def call_gemini_api(model: str, contents: list) -> dict:
     try:
         parsed_content = json.loads(clean_text)
     except json.JSONDecodeError:
+        print(f"JSONDecodeError: {e}\nFailed to parse raw Gemini text:\n{raw_text}", flush=True)
+       
         parsed_content = {}
         
     return {"parsed_content": parsed_content, "raw_text": raw_text}
@@ -138,6 +140,8 @@ def execute_phase1(conn, project_id):
 
         # 4. Invoke AI Model
         ai_response = call_gemini_api(model=selected_model, contents=[formatted_prompt])
+        print(f"DEBUG PHASE 1 RAW TEXT: {ai_response.get('raw_text')}", flush=True)
+        print(f"DEBUG PHASE 1 PARSED DATA: {ai_response.get('parsed_content')}", flush=True)
         parsed_data = ai_response.get('parsed_content', {})
 
         # Flexible key extraction for price weighting across diverse prompt formats
@@ -168,12 +172,14 @@ def execute_phase1(conn, project_id):
         cursor.execute("DELETE FROM project_weightings WHERE project_id = %s;", (project_id,))
         
         for item in criteria_list:
-            criterion_name = item.get('criterion_name') or item.get('component_name')
+            criterion_name = item.get('criterion_name') or item.get('component_name') or item.get('criteria_name') or item.get('name')
             
             # Handle weight_percent key extraction safely
             weight_val = item.get('weight_percent')
             if weight_val is None:
                 weight_val = item.get('weighting', 0.0)
+
+            print(f"DEBUG INSERTING CRITERION: {criterion_name} -> {weight_val}", flush=True)
 
             if criterion_name and str(criterion_name).strip():
                 cursor.execute("""
