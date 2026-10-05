@@ -312,6 +312,10 @@ def process_postgres_approvals():
                 row['email'].strip() for row in approver_records 
                 if row.get('approval_permission') == 'Estate Manager' and row.get('email')
             ]
+            admins = [
+                            row['email'].strip() for row in approver_records 
+                            if row.get('approval_permission') == 'Admin' and row.get('email')
+                        ]
 
 
             for idx, record in enumerate(records, start=1):
@@ -353,7 +357,7 @@ def process_postgres_approvals():
 
                 if submission_status.lower() == 'submit for finance review':
                     to_list = finance_reviewers
-                    cc_list = estate_managers
+                    cc_list = estate_managers + admins
                     
                     call_to_action = 'Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
                     next_status = "Finance Review"
@@ -361,8 +365,8 @@ def process_postgres_approvals():
                 else:
                     # "Submit for Approval" logic
                     to_list = approval_authorities
-                    # Copy in Finance Reviewers + Estate Managers
-                    cc_list = list(set(finance_reviewers + estate_managers))
+                    # Copy in Finance Reviewers + Estate Managers + Admins
+                    cc_list = list(set(finance_reviewers + estate_managers + admins))
                     
                     call_to_action = 'Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".'
                     next_status = "Sent"
