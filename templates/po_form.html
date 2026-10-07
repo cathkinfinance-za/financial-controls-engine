@@ -954,24 +954,26 @@
         }
     }
 
-        // Render AI analysis markdown safely with aggressive line breaking
+        // Render AI analysis markdown safely with automatic line-break injection
         const aiDisplay = document.getElementById('ai-analysis-display');
         let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
         
         if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
             try {
                 let cleanedMarkdown = rawMarkdown
-                    // Replace ALL instances of asterisks used as list separators with actual newlines
-                    .replace(/([.?!])\s+\*\s+/g, '$1\n\n* ')
-                    .replace(/\s+\*\s+/g, '\n* ')
-                    // Force headings to start on a new line
-                    .replace(/([^\n])(###\s)/g, '$1\n\n$2')
-                    // Clean up LaTeX math wrappers and symbols
-                    .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
-                    .replace(/\$([^\$\n]+?)\$/g, '$1')
-                    .replace(/\\text\{([^}]+)\}/g, '$1')
-                    .replace(/\\times/g, '×')
-                    .replace(/\\approx/g, '≈');
+                    // Force numbered headings (1., 2., 3.) onto a brand new line with spacing above them
+                    .reset ? '' : rawMarkdown
+                        .replace(/([^\n])\s+(\d+\.\s+[A-Z])/g, '$1\n\n### $2')
+                        // Turn inline section separators or hyphens into proper bullet points or line breaks
+                        .replace(/\s+-\s+([A-Z][a-z]+(?:\s+[a-z]+)*:)/g, '\n\n* **$1**')
+                        .replace(/\s+-\s+/g, '\n* ')
+                        // Ensure clear separation for system context
+                        .replace(/(System & Financial Context:)/i, '### $1\n')
+                        // Clean up any stray LaTeX wrappers
+                        .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+                        .replace(/\$([^\$\n]+?)\$/g, '$1')
+                        .replace(/\\text\{([^}]+)\}/g, '$1')
+                        .replace(/\\times/g, '×');
 
                 aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
             } catch (err) {
@@ -979,6 +981,7 @@
                 aiDisplay.textContent = rawMarkdown;
             }
         }
+
 
 
     function clearAiAnalysis() {
