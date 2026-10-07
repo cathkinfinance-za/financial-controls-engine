@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Order Details</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -251,6 +252,57 @@
             font-weight: 600;
             color: #0d6efd;
         }
+
+        .ai-analysis-card {
+    background: #ffffff;
+    border: 1px solid #cfe2ff;
+    border-left: 4px solid var(--primary-blue);
+    border-radius: 6px;
+    padding: 20px;
+    margin-top: 8px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-main);
+    box-shadow: 0 1px 3px rgba(13, 110, 253, 0.05);
+}
+
+.ai-analysis-card h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary-blue);
+    margin-top: 18px;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 1px solid #e9ecef;
+    padding-bottom: 4px;
+}
+
+.ai-analysis-card h3:first-child {
+    margin-top: 0;
+}
+
+.ai-analysis-card ul {
+    margin: 6px 0 12px 0;
+    padding-left: 20px;
+}
+
+.ai-analysis-card li {
+    margin-bottom: 4px;
+}
+
+.ai-analysis-card p {
+    margin: 6px 0;
+}
+
+.ai-empty-state {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 13px;
+    text-align: center;
+    padding: 12px;
+}
+
     </style>
 </head>
 <body>
@@ -498,18 +550,24 @@
                     <label class="form-label">Approval Notes</label>
                     <input type="text" name="approval_notes" class="form-control" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
                 </div>
+<div class="form-row">
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <label class="form-label">AI Recommendation Summary</label>
+        {% if selected_po and selected_po.ai_recommendation_summary %}
+            <button type="button" id="btn-clear-ai" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;">Clear Analysis</button>
+        {% endif %}
+    </div>
+    <div style="width: 100%;">
+        <!-- Hidden input to preserve form submission data -->
+        <input type="hidden" id="ai_recommendation_summary" name="ai_recommendation_summary" value="{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}">
+        
+        <!-- Formatted Render Container -->
+        <div id="ai-analysis-display" class="ai-analysis-card">
+            <div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>
+        </div>
+    </div>
+</div>
 
-                <div class="form-row">
-                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                        <label class="form-label">AI Recommendation Summary</label>
-                        {% if selected_po and selected_po.ai_recommendation_summary %}
-                            <button type="button" id="btn-clear-ai" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;">Clear Analysis</button>
-                        {% endif %}
-                    </div>
-                    <div style="width: 100%;">
-                        <textarea id="ai_recommendation_summary" name="ai_recommendation_summary" class="form-control" readonly style="background-color: #f8f9fa;">{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}</textarea>
-                    </div>
-                </div>
 
                 <!-- Vendor Selection & Rationale -->
                 <div class="section-header">Vendor Selection & Rationale</div>
@@ -900,6 +958,22 @@
             if (typeof calculateSystemStatus === 'function') calculateSystemStatus();
         }
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+    const aiDisplay = document.getElementById('ai-analysis-display');
+    const hiddenInput = document.getElementById('ai_recommendation_summary');
+    
+    if (aiDisplay && hiddenInput && hiddenInput.value.trim() !== '') {
+        try {
+            // marked.parse converts your markdown headings, bullets, and bold text into clean HTML
+            aiDisplay.innerHTML = marked.parse(hiddenInput.value);
+        } catch (err) {
+            console.error('Error parsing AI markdown:', err);
+            aiDisplay.textContent = hiddenInput.value; // Fallback to raw text if parsing fails
+        }
+    }
+});
+
 </script>
 
 </body>
