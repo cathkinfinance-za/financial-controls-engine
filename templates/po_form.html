@@ -550,6 +550,7 @@
                     <label class="form-label">Approval Notes</label>
                     <input type="text" name="approval_notes" class="form-control" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
                 </div>
+                
 <div class="form-row">
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
         <label class="form-label">AI Recommendation Summary</label>
@@ -558,15 +559,20 @@
         {% endif %}
     </div>
     <div style="width: 100%;">
-        <!-- Hidden input to preserve form submission data -->
+        <!-- Hidden input storing raw value for form submission -->
         <input type="hidden" id="ai_recommendation_summary" name="ai_recommendation_summary" value="{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}">
         
         <!-- Formatted Render Container -->
         <div id="ai-analysis-display" class="ai-analysis-card">
-            <div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>
+            {% if selected_po and selected_po.ai_recommendation_summary %}
+                <!-- Will be populated by JS script below -->
+            {% else %}
+                <div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>
+            {% endif %}
         </div>
     </div>
 </div>
+
 
 
                 <!-- Vendor Selection & Rationale -->
@@ -870,15 +876,18 @@
     }
 
     // Global Clear AI Analysis Helper
-    function clearAiAnalysis() {
-        const aiTextarea = document.getElementById('ai_recommendation_summary');
-        const clearFlag = document.getElementById('clear_ai_flag');
-        const clearBtn = document.getElementById('btn-clear-ai');
-        
-        if (aiTextarea) aiTextarea.value = '';
-        if (clearFlag) clearFlag.value = '1';
-        if (clearBtn) clearBtn.style.display = 'none';
-    }
+function clearAiAnalysis() {
+    const aiTextarea = document.getElementById('ai_recommendation_summary');
+    const aiDisplay = document.getElementById('ai-analysis-display');
+    const clearFlag = document.getElementById('clear_ai_flag');
+    const clearBtn = document.getElementById('btn-clear-ai');
+    
+    if (aiTextarea) aiTextarea.value = '';
+    if (aiDisplay) aiDisplay.innerHTML = '<div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>';
+    if (clearFlag) clearFlag.value = '1';
+    if (clearBtn) clearBtn.style.display = 'none';
+}
+
 
     // Event Listeners & Initialization on DOM Load
     document.addEventListener('DOMContentLoaded', function() {
@@ -959,20 +968,22 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function() {
     const aiDisplay = document.getElementById('ai-analysis-display');
-    const hiddenInput = document.getElementById('ai_recommendation_summary');
     
-    if (aiDisplay && hiddenInput && hiddenInput.value.trim() !== '') {
+    // Safely inject the raw markdown string from Python/Jinja using tojson
+    const rawAiText = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
+    
+    if (aiDisplay && rawAiText && rawAiText.trim() !== '') {
         try {
-            // marked.parse converts your markdown headings, bullets, and bold text into clean HTML
-            aiDisplay.innerHTML = marked.parse(hiddenInput.value);
+            aiDisplay.innerHTML = marked.parse(rawAiText);
         } catch (err) {
             console.error('Error parsing AI markdown:', err);
-            aiDisplay.textContent = hiddenInput.value; // Fallback to raw text if parsing fails
+            aiDisplay.textContent = rawAiText;
         }
     }
 });
+
 
 </script>
 
