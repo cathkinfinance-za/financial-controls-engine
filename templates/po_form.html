@@ -954,20 +954,28 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+        // Render AI analysis markdown safely with LaTeX cleanup & line break formatting
         const aiDisplay = document.getElementById('ai-analysis-display');
-        
-        // Safely pull raw markdown using Jinja's tojson (prevents mobile/multiline breaking)
         let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
         
         if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
             try {
-                // Clean up LaTeX math wrappers so they render cleanly as standard text
                 let cleanedMarkdown = rawMarkdown
-                    .replace(/\$\$?/g, '')                  // Remove $ or $$
-                    .replace(/\\text\{([^}]+)\}/g, '$1')    // Convert \text{W} to W
-                    .replace(/\\times/g, '×')               // Convert \times to ×
-                    .replace(/\\approx/g, '≈');             // Convert \approx to ≈
+                    // Fix inline asterisks used as separators by turning them into actual newlines/bullets
+                    .replace(/\s\*\s/g, '\n* ')
+                    // Ensure headings have proper spacing/newlines before them
+                    .replace(/([^\n])(###\s)/g, '$1\n\n$2')
+                    // Strip LaTeX math block wrappers ($...$ or $$...$$)
+                    .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+                    .replace(/\$([^\$\n]+?)\$/g, '$1')
+                    // Convert common LaTeX formatting commands to plain text/symbols
+                    .replace(/\\text\{([^}]+)\}/g, '$1')
+                    .replace(/\\times/g, '×')
+                    .replace(/\\approx/g, '≈')
+                    .replace(/\\div/g, '÷')
+                    .replace(/\\pm/g, '±')
+                    .replace(/\\le/g, '≤')
+                    .replace(/\\ge/g, '≥');
 
                 aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
             } catch (err) {
@@ -975,30 +983,6 @@
                 aiDisplay.textContent = rawMarkdown;
             }
         }
-    });
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const aiDisplay = document.getElementById('ai-analysis-display');
-        
-        // Safely pull raw markdown using Jinja's tojson (prevents mobile/multiline breaking)
-        let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
-        
-        if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
-            try {
-                // Clean up LaTeX math wrappers so they render cleanly as standard text
-                let cleanedMarkdown = rawMarkdown
-                    .replace(/\$\$?/g, '')                  // Remove $ or $$
-                    .replace(/\\text\{([^}]+)\}/g, '$1')    // Convert \text{W} to W
-                    .replace(/\\times/g, '×')               // Convert \times to ×
-                    .replace(/\\approx/g, '≈');             // Convert \approx to ≈
-
-                aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
-            } catch (err) {
-                console.error('Error parsing AI markdown:', err);
-                aiDisplay.textContent = rawMarkdown;
-            }
-        }
-    });
 
     function clearAiAnalysis() {
         const aiTextarea = document.getElementById('ai_recommendation_summary');
