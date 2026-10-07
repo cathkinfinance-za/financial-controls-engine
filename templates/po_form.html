@@ -954,28 +954,24 @@
         }
     }
 
-        // Render AI analysis markdown safely with LaTeX cleanup & line break formatting
+        // Render AI analysis markdown safely with aggressive line breaking
         const aiDisplay = document.getElementById('ai-analysis-display');
         let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
         
         if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
             try {
                 let cleanedMarkdown = rawMarkdown
-                    // Fix inline asterisks used as separators by turning them into actual newlines/bullets
-                    .replace(/\s\*\s/g, '\n* ')
-                    // Ensure headings have proper spacing/newlines before them
+                    // Replace ALL instances of asterisks used as list separators with actual newlines
+                    .replace(/([.?!])\s+\*\s+/g, '$1\n\n* ')
+                    .replace(/\s+\*\s+/g, '\n* ')
+                    // Force headings to start on a new line
                     .replace(/([^\n])(###\s)/g, '$1\n\n$2')
-                    // Strip LaTeX math block wrappers ($...$ or $$...$$)
+                    // Clean up LaTeX math wrappers and symbols
                     .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
                     .replace(/\$([^\$\n]+?)\$/g, '$1')
-                    // Convert common LaTeX formatting commands to plain text/symbols
                     .replace(/\\text\{([^}]+)\}/g, '$1')
                     .replace(/\\times/g, '×')
-                    .replace(/\\approx/g, '≈')
-                    .replace(/\\div/g, '÷')
-                    .replace(/\\pm/g, '±')
-                    .replace(/\\le/g, '≤')
-                    .replace(/\\ge/g, '≥');
+                    .replace(/\\approx/g, '≈');
 
                 aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
             } catch (err) {
@@ -983,6 +979,7 @@
                 aiDisplay.textContent = rawMarkdown;
             }
         }
+
 
     function clearAiAnalysis() {
         const aiTextarea = document.getElementById('ai_recommendation_summary');
