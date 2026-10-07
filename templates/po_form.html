@@ -875,20 +875,6 @@
         }
     }
 
-    // Global Clear AI Analysis Helper
-function clearAiAnalysis() {
-    const aiTextarea = document.getElementById('ai_recommendation_summary');
-    const aiDisplay = document.getElementById('ai-analysis-display');
-    const clearFlag = document.getElementById('clear_ai_flag');
-    const clearBtn = document.getElementById('btn-clear-ai');
-    
-    if (aiTextarea) aiTextarea.value = '';
-    if (aiDisplay) aiDisplay.innerHTML = '<div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>';
-    if (clearFlag) clearFlag.value = '1';
-    if (clearBtn) clearBtn.style.display = 'none';
-}
-
-
     // Event Listeners & Initialization on DOM Load
     document.addEventListener('DOMContentLoaded', function() {
         const statusInputs = [
@@ -968,23 +954,64 @@ function clearAiAnalysis() {
         }
     }
 
-document.addEventListener('DOMContentLoaded', function() {
-    const aiDisplay = document.getElementById('ai-analysis-display');
-    
-    // Safely inject the raw markdown string from Python/Jinja using tojson
-    const rawAiText = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
-    
-    if (aiDisplay && rawAiText && rawAiText.trim() !== '') {
-        try {
-            aiDisplay.innerHTML = marked.parse(rawAiText);
-        } catch (err) {
-            console.error('Error parsing AI markdown:', err);
-            aiDisplay.textContent = rawAiText;
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const aiDisplay = document.getElementById('ai-analysis-display');
+        
+        // Safely pull raw markdown using Jinja's tojson (prevents mobile/multiline breaking)
+        let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
+        
+        if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
+            try {
+                // Clean up LaTeX math wrappers so they render cleanly as standard text
+                let cleanedMarkdown = rawMarkdown
+                    .replace(/\$\$?/g, '')                  // Remove $ or $$
+                    .replace(/\\text\{([^}]+)\}/g, '$1')    // Convert \text{W} to W
+                    .replace(/\\times/g, '×')               // Convert \times to ×
+                    .replace(/\\approx/g, '≈');             // Convert \approx to ≈
+
+                aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
+            } catch (err) {
+                console.error('Error parsing AI markdown:', err);
+                aiDisplay.textContent = rawMarkdown;
+            }
         }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const aiDisplay = document.getElementById('ai-analysis-display');
+        
+        // Safely pull raw markdown using Jinja's tojson (prevents mobile/multiline breaking)
+        let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
+        
+        if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
+            try {
+                // Clean up LaTeX math wrappers so they render cleanly as standard text
+                let cleanedMarkdown = rawMarkdown
+                    .replace(/\$\$?/g, '')                  // Remove $ or $$
+                    .replace(/\\text\{([^}]+)\}/g, '$1')    // Convert \text{W} to W
+                    .replace(/\\times/g, '×')               // Convert \times to ×
+                    .replace(/\\approx/g, '≈');             // Convert \approx to ≈
+
+                aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
+            } catch (err) {
+                console.error('Error parsing AI markdown:', err);
+                aiDisplay.textContent = rawMarkdown;
+            }
+        }
+    });
+
+    function clearAiAnalysis() {
+        const aiTextarea = document.getElementById('ai_recommendation_summary');
+        const aiDisplay = document.getElementById('ai-analysis-display');
+        const clearFlag = document.getElementById('clear_ai_flag');
+        const clearBtn = document.getElementById('btn-clear-ai');
+        
+        if (aiTextarea) aiTextarea.value = '';
+        if (aiDisplay) aiDisplay.innerHTML = '<div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>';
+        if (clearFlag) clearFlag.value = '1';
+        if (clearBtn) clearBtn.style.display = 'none';
     }
-});
-
-
 </script>
 
 </body>
