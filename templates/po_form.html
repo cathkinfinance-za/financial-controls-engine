@@ -953,35 +953,33 @@
             if (typeof calculateSystemStatus === 'function') calculateSystemStatus();
         }
     }
+    
+    // Render AI analysis markdown safely with automatic line-break injection
+    const aiDisplay = document.getElementById('ai-analysis-display');
+    const rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
+    
+    if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
+        try {
+            let cleanedMarkdown = rawMarkdown
+                // Force numbered headings onto brand new lines
+                .replace(/([^\n])\s+(\d+\.\s+[A-Z])/g, '$1\n\n### $2')
+                // Turn inline section separators into proper bullet points
+                .replace(/\s+-\s+([A-Z][a-z]+(?:\s+[a-z]+)*:)/g, '\n\n* **$1**')
+                .replace(/\s+-\s+/g, '\n* ')
+                // Ensure clear separation for system context
+                .replace(/(System & Financial Context:)/i, '### $1\n')
+                // Clean up any stray LaTeX wrappers
+                .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+                .replace(/\$([^\$\n]+?)\$/g, '$1')
+                .replace(/\\text\{([^}]+)\}/g, '$1')
+                .replace(/\\times/g, '×');
 
-        // Render AI analysis markdown safely with automatic line-break injection
-        const aiDisplay = document.getElementById('ai-analysis-display');
-        let rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
-        
-        if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
-            try {
-                let cleanedMarkdown = rawMarkdown
-                    // Force numbered headings (1., 2., 3.) onto a brand new line with spacing above them
-                    .reset ? '' : rawMarkdown
-                        .replace(/([^\n])\s+(\d+\.\s+[A-Z])/g, '$1\n\n### $2')
-                        // Turn inline section separators or hyphens into proper bullet points or line breaks
-                        .replace(/\s+-\s+([A-Z][a-z]+(?:\s+[a-z]+)*:)/g, '\n\n* **$1**')
-                        .replace(/\s+-\s+/g, '\n* ')
-                        // Ensure clear separation for system context
-                        .replace(/(System & Financial Context:)/i, '### $1\n')
-                        // Clean up any stray LaTeX wrappers
-                        .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
-                        .replace(/\$([^\$\n]+?)\$/g, '$1')
-                        .replace(/\\text\{([^}]+)\}/g, '$1')
-                        .replace(/\\times/g, '×');
-
-                aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
-            } catch (err) {
-                console.error('Error parsing AI markdown:', err);
-                aiDisplay.textContent = rawMarkdown;
-            }
+            aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
+        } catch (err) {
+            console.error('Error parsing AI markdown:', err);
+            aiDisplay.textContent = rawMarkdown;
         }
-
+    }
 
 
     function clearAiAnalysis() {
