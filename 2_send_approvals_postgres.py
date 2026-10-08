@@ -393,7 +393,7 @@ def process_postgres_approvals():
                     attachments_section_plain = "\nAttached Quote Documents:\n  No documents attached.\n"
                     attachments_section_html = '<p style="color: #6c757d; font-style: italic; margin: 4px 0;">No documents attached.</p>'
 
-                email_subject = f"[{po_num}] - Approval Required: {desc_val} - PO-ID: {po_id}]"
+                email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}]"
 
                 # 1. Plain Text Fallback Body
                 email_body_plain = f"""Hello,
