@@ -954,32 +954,39 @@
         }
     }
     
-    // Render AI analysis markdown safely with automatic line-break injection
-    const aiDisplay = document.getElementById('ai-analysis-display');
-    const rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
-    
-    if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
-        try {
-            let cleanedMarkdown = rawMarkdown
-                // Force numbered headings onto brand new lines
-                .replace(/([^\n])\s+(\d+\.\s+[A-Z])/g, '$1\n\n### $2')
-                // Turn inline section separators into proper bullet points
-                .replace(/\s+-\s+([A-Z][a-z]+(?:\s+[a-z]+)*:)/g, '\n\n* **$1**')
-                .replace(/\s+-\s+/g, '\n* ')
-                // Ensure clear separation for system context
-                .replace(/(System & Financial Context:)/i, '### $1\n')
-                // Clean up any stray LaTeX wrappers
-                .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
-                .replace(/\$([^\$\n]+?)\$/g, '$1')
-                .replace(/\\text\{([^}]+)\}/g, '$1')
-                .replace(/\\times/g, '×');
+// Render AI analysis markdown safely with automatic line-break injection
+const aiDisplay = document.getElementById('ai-analysis-display');
+const rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
 
-            aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
-        } catch (err) {
-            console.error('Error parsing AI markdown:', err);
-            aiDisplay.textContent = rawMarkdown;
-        }
+if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
+    try {
+        let cleanedMarkdown = rawMarkdown
+            // 1. Break key metadata key-value pairs onto new lines
+            .replace(/(PO Number:|Description:|Expense Type:|GL Account:|Estimated Cost:|Total Annual Budget:|YTD Actual Spend:|YTD Budget:|Remaining Budget \(After Quote Amount\):|Recommended Vendor:|Justification:|Conflict of Interest Declared:|Governance Sign-off Tier:|System Compliance Status:)/gi, '\n* **$1**')
+            // 2. Separate main AI headers (e.g. "🤖 AI ANALYSIS:")
+            .replace(/(🤖?\s*AI ANALYSIS:)/gi, '\n\n### $1\n')
+            // 3. Force numbered headings (e.g. "1. Document Cross-Verification") onto new header lines
+            .replace(/(\d+\.\s+[A-Za-z &]+(?:\*|\n|$))/g, '\n\n### $1')
+            // 4. Convert inline asterisks used as sentence/bullet separators into clean list items
+            .replace(/\s*\*\s*/g, '\n* ')
+            // 5. Turn inline dash separators into bullet points
+            .replace(/\s+-\s+/g, '\n* ')
+            // 6. Ensure clear separation for system context
+            .replace(/(System & Financial Context:)/i, '\n\n### $1\n')
+            // 7. Clean up LaTeX math syntax if present
+            .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
+            .replace(/\$([^\$\n]+?)\$/g, '$1')
+            .replace(/\\text\{([^}]+)\}/g, '$1')
+            .replace(/\\times/g, '×');
+
+        // Configure marked to handle soft line breaks cleanly
+        marked.setOptions({ breaks: true, gfm: true });
+        aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
+    } catch (err) {
+        console.error('Error parsing AI markdown:', err);
+        aiDisplay.textContent = rawMarkdown;
     }
+}
 
 
     function clearAiAnalysis() {
