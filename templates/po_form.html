@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Order Details</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.js"></script>
+    
     <style>
         :root {
             --bg-color: #f8f9fa;
@@ -29,6 +29,7 @@
             min-height: 100vh;
         }
 
+        /* Sidebar Navigation */
         .sidebar {
             width: 280px;
             background: #ffffff;
@@ -86,6 +87,7 @@
             border-color: #74c0fc;
         }
 
+        /* Main Workspace */
         .main-content {
             flex-grow: 1;
             padding: 32px;
@@ -159,9 +161,7 @@
             background-color: #fff;
         }
 
-        .form-control[readonly] {
-            background-color: #f8f9fa;
-        }
+        .form-control[readonly] { background-color: #f8f9fa; }
 
         textarea.form-control { min-height: 80px; resize: vertical; }
 
@@ -253,82 +253,59 @@
             color: #0d6efd;
         }
 
+        /* Consolidated AI Analysis Display Card */
         .ai-analysis-card {
-    background: #ffffff;
-    border: 1px solid #cfe2ff;
-    border-left: 4px solid var(--primary-blue);
-    border-radius: 6px;
-    padding: 20px;
-    margin-top: 8px;
-    font-size: 14px;
-    line-height: 1.6;
-    color: var(--text-main);
-    box-shadow: 0 1px 3px rgba(13, 110, 253, 0.05);
-}
+            background: #ffffff;
+            border: 1px solid #cfe2ff;
+            border-left: 4px solid var(--primary-blue);
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 8px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: var(--text-main);
+            box-shadow: 0 1px 3px rgba(13, 110, 253, 0.05);
+        }
 
-.ai-analysis-card h3 {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--primary-blue);
-    margin-top: 18px;
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    border-bottom: 1px solid #e9ecef;
-    padding-bottom: 4px;
-}
+        .ai-analysis-card h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--primary-blue);
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+            padding-bottom: 4px;
+        }
 
-.ai-analysis-card h3:first-child {
-    margin-top: 0;
-}
+        .ai-analysis-card h3:first-child {
+            margin-top: 0;
+        }
 
-.ai-analysis-card ul {
-    margin: 6px 0 12px 0;
-    padding-left: 20px;
-}
+        .ai-analysis-card ul {
+            margin: 8px 0 16px 0;
+            padding-left: 20px;
+            list-style-type: disc;
+        }
 
-.ai-analysis-card li {
-    margin-bottom: 4px;
-}
+        .ai-analysis-card li {
+            margin-bottom: 6px;
+            line-height: 1.5;
+        }
 
-.ai-analysis-card p {
-    margin: 6px 0;
-}
+        .ai-analysis-card p {
+            margin: 8px 0;
+            line-height: 1.5;
+        }
 
-.ai-empty-state {
-    color: var(--text-muted);
-    font-style: italic;
-    font-size: 13px;
-    text-align: center;
-    padding: 12px;
-}
-
-#ai-analysis-display h3 {
-    margin-top: 18px;
-    margin-bottom: 8px;
-    font-size: 15px;
-    font-weight: 700;
-    color: #0f172a;
-    border-bottom: 1px solid #e2e8f0;
-    padding-bottom: 4px;
-}
-
-#ai-analysis-display ul {
-    margin: 8px 0 16px 20px;
-    padding: 0;
-    list-style-type: disc;
-}
-
-#ai-analysis-display li {
-    margin-bottom: 6px;
-    line-height: 1.5;
-}
-
-#ai-analysis-display p {
-    margin-bottom: 10px;
-    line-height: 1.5;
-}
+        .ai-empty-state {
+            color: var(--text-muted);
+            font-style: italic;
+            font-size: 13px;
+            text-align: center;
+            padding: 12px;
+        }
     </style>
+</head>
 </head>
 <body>
     {% include 'navbar.html' %}
