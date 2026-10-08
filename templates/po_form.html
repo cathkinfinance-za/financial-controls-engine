@@ -961,33 +961,37 @@ const rawMarkdown = {{ selected_po.ai_recommendation_summary | tojson if selecte
 if (aiDisplay && rawMarkdown && rawMarkdown.trim() !== '') {
     try {
         let cleanedMarkdown = rawMarkdown
-            // 1. Break key metadata key-value pairs onto new lines
-            .replace(/(PO Number:|Description:|Expense Type:|GL Account:|Estimated Cost:|Total Annual Budget:|YTD Actual Spend:|YTD Budget:|Remaining Budget \(After Quote Amount\):|Recommended Vendor:|Justification:|Conflict of Interest Declared:|Governance Sign-off Tier:|System Compliance Status:)/gi, '\n* **$1**')
-            // 2. Separate main AI headers (e.g. "🤖 AI ANALYSIS:")
-            .replace(/(🤖?\s*AI ANALYSIS:)/gi, '\n\n### $1\n')
-            // 3. Force numbered headings (e.g. "1. Document Cross-Verification") onto new header lines
-            .replace(/(\d+\.\s+[A-Za-z &]+(?:\*|\n|$))/g, '\n\n### $1')
-            // 4. Convert inline asterisks used as sentence/bullet separators into clean list items
-            .replace(/\s*\*\s*/g, '\n* ')
-            // 5. Turn inline dash separators into bullet points
-            .replace(/\s+-\s+/g, '\n* ')
-            // 6. Ensure clear separation for system context
-            .replace(/(System & Financial Context:)/i, '\n\n### $1\n')
-            // 7. Clean up LaTeX math syntax if present
-            .replace(/\$\$([\s\S]*?)\$\$/g, '$1')
-            .replace(/\$([^\$\n]+?)\$/g, '$1')
-            .replace(/\\text\{([^}]+)\}/g, '$1')
-            .replace(/\\times/g, '×');
+            // 1. Strip out trailing internal recommendation line
+            .replace(/AI_RECOMMENDATION_LINE:[\s\S]*/gi, '')
 
-        // Configure marked to handle soft line breaks cleanly
+            // 2. Convert inline section dividers (***) into actual section breaks
+            .replace(/\s*\*\*\*\s*/g, '\n\n')
+
+            // 3. Convert inline '####' or '###' headers into proper newlines + Markdown headers
+            .replace(/(###+)\s*/g, '\n\n### ')
+
+            // 4. Force numbered headers (e.g. "1. Document Cross-Verification") onto new header lines
+            .replace(/(\d+\.\s+[A-Za-z &]+)/g, '\n\n### $1')
+
+            // 5. Turn key metadata fields into bold bullet points on new lines
+            .replace(/(PO Number:|Description:|Expense Type:|GL Account:|Estimated Cost:|Total Annual Budget:|YTD Actual Spend:|YTD Budget:|Remaining Budget \([^)]+\):|Recommended Vendor:|Justification:|Conflict of Interest Declared:|Governance Sign-off Tier:|System Compliance Status:)/gi, '\n* **$1**')
+
+            // 6. Convert any remaining inline asterisks into new bullet point lines
+            .replace(/\s+\*\s+/g, '\n* ')
+
+            // 7. Clean up double spacing
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
+
+        // Configure marked options
         marked.setOptions({ breaks: true, gfm: true });
         aiDisplay.innerHTML = marked.parse(cleanedMarkdown);
+
     } catch (err) {
         console.error('Error parsing AI markdown:', err);
         aiDisplay.textContent = rawMarkdown;
     }
 }
-
 
     function clearAiAnalysis() {
         const aiTextarea = document.getElementById('ai_recommendation_summary');
