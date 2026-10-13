@@ -638,7 +638,7 @@ def handle_prompts_api():
                         (process_name,)
                     )
                     row = cursor.fetchone()
-                    model_name = (row.get('selected_model') if row else None) or 'gemini-3.6-flash'
+                    model_name = (row.get('selected_model') if row else None) or 'gemini-3.8-flash'
 
                 cursor.execute("""
                     UPDATE system_prompts 
