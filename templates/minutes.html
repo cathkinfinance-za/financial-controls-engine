@@ -292,6 +292,76 @@
                     display: block !important;
                 }
             }
+
+        /* --- ATTACHMENT BADGE STYLES --- */
+.attachment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 8px 0 16px 0;
+    padding: 0;
+    list-style: none;
+}
+
+.attachment-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 12px;
+    gap: 12px;
+    transition: background-color 0.15s ease;
+}
+
+.attachment-chip:hover {
+    background-color: #f1f5f9;
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0; /* Prevents flex overflow */
+    flex: 1;
+}
+
+.attachment-icon {
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.attachment-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* Truncates overly long filenames gracefully */
+}
+
+.btn-remove-att {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #fef2f2;
+    color: #dc2626;
+    border: 1px solid #fecaca;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.btn-remove-att:hover {
+    background: #fee2e2;
+    color: #991b1b;
+}
     </style>
 </head>
 <body>
@@ -327,24 +397,29 @@
                 <p style="margin: 6px 0; font-size: 14px;"><strong>Attendees:</strong> {{ m.attendees }}</p>
                 {% if m.apologies %}<p style="margin: 6px 0; font-size: 14px;"><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
                 
-                <!-- ATTACHMENT DISPLAY LINK -->
+                <!-- CURRENT ATTACHMENTS SECTION -->
                 <div class="form-group">
                     <label>Current Attachments</label>
                     {% if m.attachments %}
-                        <ul style="margin: 4px 0 12px 0; padding-left: 20px;">
+                        <ul class="attachment-list">
                             {% for att in m.attachments %}
-                            <li style="margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; max-width: 400px;">
-                                <span>📎 {{ att.filename }}</span>
+                            <li class="attachment-chip">
+                                <div class="attachment-info">
+                                    <span class="attachment-icon">📎</span>
+                                    <span class="attachment-name" title="{{ att.filename }}">{{ att.filename }}</span>
+                                </div>
                                 <input type="hidden" name="existing_attachment_id[]" value="{{ att.id }}">
-                                <button type="button" class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="markAttachmentForDeletion(this)">✕ Remove</button>
+                                <button type="button" class="btn-remove-att" onclick="markAttachmentForDeletion(this)">
+                                    <span>✕</span> Remove
+                                </button>
                             </li>
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p style="color: var(--text-muted); font-size: 13px;">No attachments.</p>
+                        <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 12px;">No attachments uploaded.</p>
                     {% endif %}
                 
-                    <label>Add New Attachments</label>
+                    <label style="margin-top: 12px;">Add New Attachments</label>
                     <input type="file" class="form-control" name="attachments" multiple>
                 </div>
 
@@ -700,20 +775,21 @@
             }, 500);
         }
 
-        function markAttachmentForDeletion(button) {
-            const li = button.parentElement;
-            const attachmentIdInput = li.querySelector('input[name="existing_attachment_id[]"]');
+       function markAttachmentForDeletion(button) {
+            const chip = button.closest('.attachment-chip');
+            const attachmentIdInput = chip.querySelector('input[name="existing_attachment_id[]"]');
             
             if (attachmentIdInput && attachmentIdInput.value) {
                 const deleteInput = document.createElement('input');
                 deleteInput.type = 'hidden';
                 deleteInput.name = 'delete_attachment_id[]';
                 deleteInput.value = attachmentIdInput.value;
-                li.parentElement.appendChild(deleteInput);
+                chip.parentElement.appendChild(deleteInput);
             }
             
-            li.remove();
+            chip.remove();
         }
+        
     </script>
 </body>
 </html>
