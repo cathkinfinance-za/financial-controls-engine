@@ -26,7 +26,7 @@ ALLOWED_MONTHS = {
 def expenditure_expose():
     selected_month = request.args.get('month', 'sep_2026')
     if selected_month not in ALLOWED_MONTHS:
-        selected_month = 'aug_2026'
+        selected_month = 'sep_2026'
 
     all_items = []
     grouped_audit = {}
