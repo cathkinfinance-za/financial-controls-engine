@@ -359,7 +359,7 @@
                 </form>
             </div>
 
-            <!-- EDIT FORM MODE WITH ENCTYPE -->
+            <!-- EDIT FORM MODE -->
             <div id="edit-mode-{{ m.id }}" style="display: none;">
                 <form method="POST" action="/update_meeting_minutes" enctype="multipart/form-data">
                     <input type="hidden" name="meeting_id" value="{{ m.id }}">
@@ -382,15 +382,33 @@
                         <label>Apologies</label>
                         <input type="text" name="apologies" value="{{ m.apologies or '' }}">
                     </div>
+
+                    <!-- CURRENT ATTACHMENTS & REMOVE BUTTONS -->
                     <div class="form-group">
-                        <label>Update Attachment {% if m.attachment_filename %}(Current: {{ m.attachment_filename }}){% endif %}</label>
+                        <label>Current Attachments</label>
+                        {% if m.attachments %}
+                            <ul style="margin: 4px 0 12px 0; padding-left: 20px;">
+                                {% for att in m.attachments %}
+                                <li style="margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; max-width: 450px;">
+                                    <span>📎 {{ att.filename }}</span>
+                                    <input type="hidden" name="existing_attachment_id[]" value="{{ att.id }}">
+                                    <button type="button" class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="markAttachmentForDeletion(this)">✕ Remove</button>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 8px;">No attachments uploaded.</p>
+                        {% endif %}
+
+                        <label>Add More Attachments</label>
                         <input type="file" class="form-control" name="attachments" multiple>
                     </div>
+
                     <div class="form-group">
                         <label>Agenda & Key Notes</label>
                         <textarea name="notes_summary" rows="8" required>{{ m.notes_summary }}</textarea>
                     </div>
-
+                    
                     <!-- ACTION ITEMS INSIDE FORM -->
                     <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">Manage Action Items</h4>
                     <div id="edit-action-items-container-{{ m.id }}">
