@@ -148,3 +148,43 @@ def view_audit_log():
         logs = cursor.fetchall()
     conn.close()
     return render_template('audit_log.html', logs=logs)
+
+
+@core_bp.route('/api/approved_vendors', methods=['GET'])
+def api_get_approved_vendors():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            SELECT id, vendor_name, supplier_code, gl_code, 
+                   monthly_threshold_amount, last_approval_date, 
+                   expiry_date, approval_reference, is_active 
+            FROM approved_vendors 
+            ORDER BY vendor_name ASC;
+        """)
+        rows = cur.fetchall()
+        # Convert rows to list of dicts if using RealDictCursor, 
+        # or map manually if using regular tuples.
+        vendors = [dict(row) for row in rows]
+        return jsonify({"status": "success", "data": vendors})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@core_bp.route('/api/approved_vendors/add', methods=['POST'])
+def api_add_approved_vendor():
+    # Extract form data and perform INSERT into approved_vendors
+    # Remember to conn.commit() and return jsonify({"status": "success"})
+    pass
+
+@core_bp.route('/api/approved_vendors/<int:vendor_id>/edit', methods=['POST'])
+def api_edit_approved_vendor(vendor_id):
+    # Handle updates for the specified vendor_id
+    pass
+
+@core_bp.route('/api/approved_vendors/<int:vendor_id>/toggle', methods=['POST'])
+def api_toggle_approved_vendor(vendor_id):
+    # Toggle the is_active boolean flag in the database
+    pass
