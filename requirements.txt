@@ -10,5 +10,3 @@ python-dotenv
 requests
 psycopg2-binary
 Markdown>=3.5
-Flask
-vercel_blob
