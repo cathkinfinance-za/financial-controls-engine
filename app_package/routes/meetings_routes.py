@@ -19,26 +19,28 @@ def finance_minutes():
         apologies = request.form.get('apologies')
         notes_summary = request.form.get('notes_summary')
 
-        # --- Handle File Upload as BLOB (BYTEA) ---
-        attachment_filename = None
-        attachment_data = None
-        if 'attachment' in request.files:
-            file = request.files['attachment']
-            if file and file.filename.strip() != '':
-                attachment_filename = secure_filename(file.filename)
-                attachment_data = file.read()  # Read binary data into memory
-
         with conn.cursor() as cursor:
-            # Insert meeting including attachment filename and binary data
+            # Insert meeting details
             cursor.execute("""
                 INSERT INTO meeting_minutes 
-                (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename, attachment_data)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename, attachment_data))
+            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary))
             
             row = cursor.fetchone()
             meeting_id = row['id'] if isinstance(row, dict) else row[0]
+
+            # --- Handle Multiple File Uploads ---
+            files = request.files.getlist('attachments')
+            for file in files:
+                if file and file.filename.strip() != '':
+                    filename = secure_filename(file.filename)
+                    file_data = file.read()
+                    cursor.execute("""
+                        INSERT INTO meeting_attachments (meeting_id, filename, file_data)
+                        VALUES (%s, %s, %s);
+                    """, (meeting_id, filename, file_data))
 
             # --- Handle Action Items ---
             descriptions = request.form.getlist('action_description[]')
@@ -61,10 +63,10 @@ def finance_minutes():
         conn.close()
         return redirect(url_for('meetings.finance_minutes', type=meeting_type))
 
-    # GET request: Fetch meetings filtered by the selected meeting_type
+    # GET request: Fetch meetings and attachments filtered by meeting_type
     with conn.cursor() as cursor:
         cursor.execute("""
-            SELECT id, meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename 
+            SELECT id, meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary 
             FROM meeting_minutes 
             WHERE meeting_type = %s
             ORDER BY meeting_date DESC;
@@ -81,8 +83,21 @@ def finance_minutes():
         """, (meeting_type,))
         all_actions = cursor.fetchall()
 
+        # Fetch all attachments for these meetings
+        cursor.execute("""
+            SELECT id, meeting_id, filename FROM meeting_attachments;
+        """)
+        all_attachments = cursor.fetchall()
+
         for m in meetings:
+            m_id = m['id'] if isinstance(m, dict) else m[0]
             m_date = m['meeting_date'] if isinstance(m, dict) else m[2]
+
+            # Attach matching files
+            m['attachments'] = [
+                att for att in all_attachments 
+                if (att['meeting_id'] if isinstance(att, dict) else att[1]) == m_id
+            ]
 
             relevant_actions = []
             for act in all_actions:
@@ -112,22 +127,7 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        # --- Handle Optional New File Upload as BLOB During Edit ---
-        attachment_sql_update = ""
-        query_params = [meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary]
-
-        if 'attachment' in request.files:
-            file = request.files['attachment']
-            if file and file.filename.strip() != '':
-                filename = secure_filename(file.filename)
-                file_data = file.read()
-                
-                attachment_sql_update = ", attachment_filename = %s, attachment_data = %s"
-                query_params.extend([filename, file_data])
-
-        query_params.append(meeting_id)
-
-        cursor.execute(f"""
+        cursor.execute("""
             UPDATE meeting_minutes
             SET meeting_type = %s,
                 meeting_date = %s,
@@ -135,9 +135,19 @@ def update_meeting_minutes():
                 attendees = %s,
                 apologies = %s,
                 notes_summary = %s
-                {attachment_sql_update}
             WHERE id = %s;
-        """, tuple(query_params))
+        """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+
+        # --- Handle Additional File Uploads During Edit ---
+        files = request.files.getlist('attachments')
+        for file in files:
+            if file and file.filename.strip() != '':
+                filename = secure_filename(file.filename)
+                file_data = file.read()
+                cursor.execute("""
+                    INSERT INTO meeting_attachments (meeting_id, filename, file_data)
+                    VALUES (%s, %s, %s);
+                """, (meeting_id, filename, file_data))
 
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
@@ -177,17 +187,17 @@ def update_meeting_minutes():
     return redirect(url_for('meetings.finance_minutes', type=meeting_type))
 
 
-@meetings_bp.route('/download_attachment/<int:meeting_id>')
-def download_attachment(meeting_id):
+@meetings_bp.route('/download_attachment/<int:attachment_id>')
+def download_attachment(attachment_id):
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("SELECT attachment_filename, attachment_data FROM meeting_minutes WHERE id = %s;", (meeting_id,))
+        cursor.execute("SELECT filename, file_data FROM meeting_attachments WHERE id = %s;", (attachment_id,))
         row = cursor.fetchone()
     conn.close()
 
     if row:
-        filename = row['attachment_filename'] if isinstance(row, dict) else row[0]
-        data = row['attachment_data'] if isinstance(row, dict) else row[1]
+        filename = row['filename'] if isinstance(row, dict) else row[0]
+        data = row['file_data'] if isinstance(row, dict) else row[1]
         
         if data:
             return send_file(
@@ -206,6 +216,7 @@ def delete_meeting():
     conn = get_db_connection()
     with conn.cursor() as cursor:
         cursor.execute("DELETE FROM meeting_action_items WHERE meeting_id = %s;", (meeting_id,))
+        cursor.execute("DELETE FROM meeting_attachments WHERE meeting_id = %s;", (meeting_id,))
         cursor.execute("DELETE FROM meeting_minutes WHERE id = %s;", (meeting_id,))
         conn.commit()
     conn.close()
