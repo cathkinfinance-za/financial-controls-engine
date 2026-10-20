@@ -17,6 +17,22 @@ def clean_and_convert_number(text_value):
     except ValueError:
         return 0.0
 
+def header_to_column(header_text):
+    """Maps header text like 'Jun 2026' to database column names like 'jun_2026'."""
+    text = header_text.strip().lower()
+    match = re.search(r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*(\d{4})', text)
+    if match:
+        return f"{match.group(1)}_{match.group(2)}"
+    if text == 'ytd':
+        return 'ytd'
+    if 'budget ytd' in text:
+        return 'budget_ytd'
+    if text == 'variance':
+        return 'variance'
+    if 'total budget' in text:
+        return 'total_budget'
+    return None
+
 def fetch_and_sync_weconnectu_budget():
     URL = os.getenv("WECONNECTU_URL")
     DATABASE_URL = os.getenv("DATABASE_URL")
@@ -40,8 +56,24 @@ def fetch_and_sync_weconnectu_budget():
         
     print("Parsing dynamic data containers and extracting currency arrays...")
     soup = BeautifulSoup(html_content, 'html.parser')
-    financial_data = []
     
+    # Dynamically extract ordered metric column names from report headers
+    metric_columns = []
+    header_rows = soup.find_all(['tr', 'thead'])
+    for elem in header_rows:
+        texts = [td.text.strip() for td in elem.find_all(['th', 'td'])]
+        potential_cols = [header_to_column(t) for t in texts if header_to_column(t)]
+        if len(potential_cols) >= 3:
+            metric_columns = potential_cols
+            break
+
+    if not metric_columns:
+        ths = soup.find_all('th')
+        metric_columns = [header_to_column(th.text) for th in ths if header_to_column(th.text)]
+
+    print(f"Detected metric columns from report headers: {metric_columns}")
+
+    financial_data = []
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
 
     for tr in soup.find_all('tr'):
@@ -55,7 +87,6 @@ def fetch_and_sync_weconnectu_budget():
         if gl_match:
             gl_code = gl_match.group(1)
             
-            # Find the cell containing the GL code and extract everything after it
             description = "Operational Portfolio Allocation"
             for cell in cells:
                 if gl_code in cell:
@@ -64,7 +95,6 @@ def fetch_and_sync_weconnectu_budget():
                         description = extracted_desc
                     break
 
-            # Collect all numeric values across row cells
             clean_metrics = []
             for cell in cells:
                 cleaned_cell = re.sub(r'[\s\xa0R]', '', cell)
@@ -73,60 +103,69 @@ def fetch_and_sync_weconnectu_budget():
             
             vals = [clean_and_convert_number(m) for m in clean_metrics]
 
-            # Map numbers with March hardcoded to 0.0
-            if len(vals) >= 8:
-                financial_data.append({
-                    "gl_code": gl_code,
-                    "description": description,
-                    "mar_2026": 0.0,
-                    "apr_2026": 0.0,
-                    "may_2026": vals[0],  # May 2026
-                    "jun_2026": vals[1],  # Jun 2026
-                    "jul_2026": vals[2],  # Jul 2026
-                    "aug_2026": vals[3],  # Aug 2026
-                    "ytd": vals[4],        # YTD
-                    "budget_ytd": vals[5], # Budget YTD
-                    "variance": vals[6],   # Variance
-                    "total_budget": vals[7]# Total Budget
-                                })
+            row_data = {
+                "gl_code": gl_code,
+                "description": description
+            }
+
+            for i, col_name in enumerate(metric_columns):
+                if i < len(vals):
+                    row_data[col_name] = vals[i]
+
+            financial_data.append(row_data)
 
     df = pd.DataFrame(financial_data)
     if not df.empty:
         df = df.drop_duplicates(subset=["gl_code"], keep="first")
     else:
         print("⚠️ Warning: Standard parsing found 0 rows.")
+        return
+
+    detected_db_columns = set(metric_columns)
 
     print("Connecting to Neon PostgreSQL for Budget Synchronization...")
-    upsert_query = """
-        INSERT INTO master_budget (
-            gl_code, description, mar_2026, apr_2026, may_2026, 
-            jun_2026, jul_2026, aug_2026,  ytd, budget_ytd, variance, total_budget
-        )
-        VALUES (
-            %(gl_code)s, %(description)s, %(mar_2026)s, %(apr_2026)s, %(may_2026)s, 
-            %(jun_2026)s, %(jul_2026)s, %(aug_2026)s, %(ytd)s, %(budget_ytd)s, %(variance)s, %(total_budget)s
-        )
-        ON CONFLICT (gl_code) DO UPDATE SET
-            description = EXCLUDED.description,
-            may_2026 = EXCLUDED.may_2026,
-            jun_2026 = EXCLUDED.jun_2026,
-            jul_2026 = EXCLUDED.jul_2026,
-            aug_2026 = EXCLUDED.aug_2026,
-            ytd = EXCLUDED.ytd,
-            budget_ytd = EXCLUDED.budget_ytd,
-            variance = EXCLUDED.variance,
-            total_budget = EXCLUDED.total_budget;
-    """
-
     try:
         conn = psycopg2.connect(DATABASE_URL)
         with conn.cursor() as cur:
-            print(f"Syncing {len(df)} financial records with PostgreSQL...")
+            # 1. Ensure any newly introduced month columns exist in PostgreSQL
+            for col in detected_db_columns:
+                if col and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
+                    cur.execute(f"""
+                        ALTER TABLE master_budget 
+                        ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';
+                    """)
+            conn.commit()
+
+            # 2. Build dynamic UPSERT updating ONLY active scraped columns + description
+            update_cols = [c for c in detected_db_columns if c]
+            base_cols = ['gl_code', 'description'] + update_cols
+            
+            placeholders = ", ".join([f"%({col})s" for col in base_cols])
+            columns_str = ", ".join(base_cols)
+            
+            update_set_clauses = ["description = EXCLUDED.description"]
+            for col in update_cols:
+                update_set_clauses.append(f"{col} = EXCLUDED.{col}")
+            
+            update_str = ", ".join(update_set_clauses)
+            
+            upsert_query = f"""
+                INSERT INTO master_budget ({columns_str})
+                VALUES ({placeholders})
+                ON CONFLICT (gl_code) DO UPDATE SET
+                    {update_str};
+            """
+
+            print(f"Syncing {len(df)} financial records with PostgreSQL (preserving historical months)...")
             for _, row in df.iterrows():
-                cur.execute(upsert_query, row.to_dict())
+                row_dict = row.to_dict()
+                for col in base_cols:
+                    if col not in row_dict or pd.isna(row_dict[col]):
+                        row_dict[col] = 0.0 if col not in ['gl_code', 'description'] else ""
+                cur.execute(upsert_query, row_dict)
             conn.commit()
         conn.close()
-        print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget.")
+        print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget without losing historical data.")
         
     except Exception as e:
         print(f"🔴 Database sync failed. Technical Error: {e}")
