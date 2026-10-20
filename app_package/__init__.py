@@ -8,7 +8,10 @@ from app_package.routes.meetings_routes import meetings_bp
 from app_package.routes.expenditure_routes import expenditure_bp
 
 def create_app():
-    app = Flask(__name__)
+    # Explicitly point to the root templates and static folders
+    app = Flask(__name__, 
+                template_folder="../templates", 
+                static_folder="../static")
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
 
     # Register external approved blueprints if present
