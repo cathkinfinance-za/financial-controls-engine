@@ -11,7 +11,8 @@ from werkzeug.utils import secure_filename
 UPLOAD_FOLDER = 'app_package/static/uploads'
 ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'doc', 'docx', 'xls', 'xlsx'}
 
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def create_app():
     # Explicitly point to the root templates and static folders
@@ -19,6 +20,8 @@ def create_app():
                 template_folder="../templates", 
                 static_folder="../static")
     app.secret_key = os.getenv("FLASK_SECRET_KEY", "cathkin-estates-secret-key")
+    
+    app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
     # Register external approved blueprints if present
     try:
@@ -41,8 +44,5 @@ def create_app():
         allowed_endpoints = ['core.login', 'static']
         if request.endpoint and request.endpoint not in allowed_endpoints and 'user_id' not in session:
             return redirect(url_for('core.login', next=request.url))
-
-    def allowed_file(filename):
-        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     return app
