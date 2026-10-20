@@ -1,14 +1,14 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+import os
+from flask import Blueprint, render_template, request, redirect, url_for, current_app
 from datetime import date
 from app_package.db import get_db_connection
+from werkzeug.utils import secure_filename
 
 meetings_bp = Blueprint('meetings', __name__)
 
 @meetings_bp.route('/minutes', methods=['GET', 'POST'])
 def finance_minutes():
     conn = get_db_connection()
-    
-    # Determine active meeting type from query param or form data (defaulting to 'Finance')
     meeting_type = request.args.get('type') or request.form.get('meeting_type') or 'Finance'
 
     if request.method == 'POST':
@@ -18,16 +18,34 @@ def finance_minutes():
         apologies = request.form.get('apologies')
         notes_summary = request.form.get('notes_summary')
 
+        # --- Handle File Upload ---
+        attachment_filename = None
+        if 'attachment' in request.files:
+            file = request.files['attachment']
+            if file and file.filename.strip() != '':
+                filename = secure_filename(file.filename)
+                
+                # Ensure upload folder exists
+                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+                
+                # Save file to disk
+                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                attachment_filename = filename
+
         with conn.cursor() as cursor:
+            # Insert meeting including the attachment filename
             cursor.execute("""
-                INSERT INTO meeting_minutes (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO meeting_minutes 
+                (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary))
+            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename))
             
             row = cursor.fetchone()
             meeting_id = row['id'] if isinstance(row, dict) else row[0]
 
+            # --- Handle Action Items (with your date fix) ---
             descriptions = request.form.getlist('action_description[]')
             responsibles = request.form.getlist('responsible_person[]')
             targets = request.form.getlist('target_date[]')
