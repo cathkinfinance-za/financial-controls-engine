@@ -71,7 +71,7 @@ def fetch_and_sync_weconnectu_budget():
         ths = soup.find_all('th')
         metric_columns = [header_to_column(th.text) for th in ths if header_to_column(th.text)]
 
-    print(f"Detected metric columns from report headers: {metric_columns}")
+    print(f"🔍 [LOG] Detected metric columns from report headers: {metric_columns}")
 
     financial_data = []
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
@@ -127,18 +127,27 @@ def fetch_and_sync_weconnectu_budget():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         
-        # 1. Ensure schema alterations (ALTER TABLE) are immediately committed
-        conn.autocommit = True
+        # 1. Fetch current columns directly from the database schema
         with conn.cursor() as cur:
-            for col in detected_db_columns:
-                if col and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
-                    cur.execute(f"""
-                        ALTER TABLE master_budget 
-                        ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';
-                    """)
-        
-        # 2. Reset autocommit and execute data upserts inside a standard transaction block
-        conn.autocommit = False
+            cur.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'master_budget';
+            """)
+            existing_columns = {row[0] for row in cur.fetchall()}
+            print(f"📋 [LOG] Current DB columns before alteration: {sorted(list(existing_columns))}")
+
+        # 2. Add missing columns with explicit autocommit & transaction commit
+        for col in detected_db_columns:
+            if col and col not in existing_columns and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
+                print(f"⚙️ [LOG] Executing DDL: ALTER TABLE master_budget ADD COLUMN {col}...")
+                conn.autocommit = True
+                with conn.cursor() as cur:
+                    cur.execute(f"ALTER TABLE master_budget ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';")
+                conn.autocommit = False
+                print(f"✅ [LOG] Column {col} added successfully.")
+
+        # 3. Perform Upsert
         with conn.cursor() as cur:
             update_cols = [c for c in detected_db_columns if c]
             base_cols = ['gl_code', 'description'] + update_cols
@@ -159,7 +168,9 @@ def fetch_and_sync_weconnectu_budget():
                     {update_str};
             """
 
-            print(f"Syncing {len(df)} financial records with PostgreSQL (preserving historical months)...")
+            print(f"📝 [LOG] Generated UPSERT Query Structure:\n{upsert_query.strip()}\n")
+            print(f"Syncing {len(df)} financial records with PostgreSQL...")
+            
             for _, row in df.iterrows():
                 row_dict = row.to_dict()
                 for col in base_cols:
@@ -167,13 +178,22 @@ def fetch_and_sync_weconnectu_budget():
                         row_dict[col] = 0.0 if col not in ['gl_code', 'description'] else ""
                 cur.execute(upsert_query, row_dict)
             conn.commit()
+
+        # 4. Final verification of database schema
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'master_budget';
+            """)
+            final_columns = [row[0] for row in cur.fetchall()]
+            print(f"📊 [LOG] Final DB columns after script run: {final_columns}")
             
         conn.close()
-        print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget without losing historical data.")
+        print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget.")
         
     except Exception as e:
         print(f"🔴 Database sync failed. Technical Error: {e}")
-
 
 if __name__ == "__main__":
     fetch_and_sync_weconnectu_budget()
