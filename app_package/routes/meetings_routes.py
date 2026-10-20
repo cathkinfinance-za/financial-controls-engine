@@ -69,12 +69,13 @@ def finance_minutes():
     # GET request: Fetch meetings filtered by the selected meeting_type
     with conn.cursor() as cursor:
         cursor.execute("""
-            SELECT id, meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary 
+            SELECT id, meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename 
             FROM meeting_minutes 
             WHERE meeting_type = %s
             ORDER BY meeting_date DESC;
         """, (meeting_type,))
         meetings = cursor.fetchall()
+
         
         cursor.execute("""
             SELECT a.id, a.meeting_id, a.action_description, a.responsible_person, 
