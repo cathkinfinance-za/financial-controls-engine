@@ -681,6 +681,21 @@
                 window.location.reload();
             }, 500);
         }
+
+        function markAttachmentForDeletion(button) {
+            const li = button.parentElement;
+            const attachmentIdInput = li.querySelector('input[name="existing_attachment_id[]"]');
+            
+            if (attachmentIdInput && attachmentIdInput.value) {
+                const deleteInput = document.createElement('input');
+                deleteInput.type = 'hidden';
+                deleteInput.name = 'delete_attachment_id[]';
+                deleteInput.value = attachmentIdInput.value;
+                li.parentElement.appendChild(deleteInput);
+            }
+            
+            li.remove();
+        }
     </script>
 </body>
 </html>
