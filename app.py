@@ -1474,6 +1474,9 @@ def handle_generate_recommendation_html(project_id):
 def finance_minutes():
     conn = get_db_connection()
     
+    # 1. Determine active meeting type from query param or form data (defaulting to 'Finance')
+    meeting_type = request.args.get('type') or request.form.get('meeting_type') or 'Finance'
+
     if request.method == 'POST':
         meeting_date = request.form.get('meeting_date')
         chairperson = request.form.get('chairperson')
@@ -1483,10 +1486,10 @@ def finance_minutes():
 
         with conn.cursor() as cursor:
             cursor.execute("""
-                INSERT INTO meeting_minutes (meeting_date, chairperson, attendees, apologies, notes_summary)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO meeting_minutes (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (meeting_date, chairperson, attendees, apologies, notes_summary))
+            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary))
             
             row = cursor.fetchone()
             meeting_id = row['id'] if isinstance(row, dict) else row[0]
@@ -1509,39 +1512,36 @@ def finance_minutes():
 
             conn.commit()
         conn.close()
-        return redirect(url_for('finance_minutes'))
+        return redirect(url_for('finance_minutes', type=meeting_type))
 
-    # GET request: Fetch all meetings and group appropriate action items
+    # GET request: Fetch meetings filtered by the selected meeting_type
     with conn.cursor() as cursor:
-        # 1. Fetch all meetings
         cursor.execute("""
-            SELECT id, meeting_date, chairperson, attendees, apologies, notes_summary 
+            SELECT id, meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary 
             FROM meeting_minutes 
+            WHERE meeting_type = %s
             ORDER BY meeting_date DESC;
-        """)
+        """, (meeting_type,))
         meetings = cursor.fetchall()
         
-        # 2. Fetch ALL action items with their originating meeting's date
         cursor.execute("""
             SELECT a.id, a.meeting_id, a.action_description, a.responsible_person, 
-                   a.target_date, a.status, a.action_notes, m.meeting_date AS created_meeting_date
+                   a.target_date, a.status, a.action_notes, m.meeting_date AS created_meeting_date, m.meeting_type
             FROM meeting_action_items a
             JOIN meeting_minutes m ON a.meeting_id = m.id
+            WHERE m.meeting_type = %s
             ORDER BY a.target_date ASC;
-        """)
+        """, (meeting_type,))
         all_actions = cursor.fetchall()
 
-        # 3. Filter actions per meeting: ALL open items + ONLY relevant completed items
         for m in meetings:
-            m_date = m['meeting_date'] if isinstance(m, dict) else m[1]
+            m_date = m['meeting_date'] if isinstance(m, dict) else m[2]
 
             relevant_actions = []
             for act in all_actions:
                 act_status = act['status'] if isinstance(act, dict) else act[5]
                 act_created_date = act['created_meeting_date'] if isinstance(act, dict) else act[7]
 
-                # Condition 1: Include ALL open/in-progress items regardless of meeting origin
-                # Condition 2: Include completed items ONLY if created on or after this meeting's date
                 if act_status != 'Completed':
                     relevant_actions.append(act)
                 elif act_status == 'Completed' and act_created_date >= m_date:
@@ -1550,52 +1550,13 @@ def finance_minutes():
             m['action_items'] = relevant_actions
 
     conn.close()
-    return render_template('minutes.html', meetings=meetings)
-
-
-@app.route('/delete_meeting', methods=['POST'])
-def delete_meeting():
-    meeting_id = request.form.get('meeting_id')
-
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("DELETE FROM meeting_action_items WHERE meeting_id = %s;", (meeting_id,))
-        cursor.execute("DELETE FROM meeting_minutes WHERE id = %s;", (meeting_id,))
-        conn.commit()
-    conn.close()
-
-    return redirect(url_for('finance_minutes'))
-
-
-@app.route('/update_action_item', methods=['POST'])
-def update_action_item():
-    action_id = request.form.get('action_id')
-    action_description = request.form.get('action_description')
-    responsible_person = request.form.get('responsible_person')
-    target_date_val = request.form.get('target_date')
-    status = request.form.get('status')
-    action_notes = request.form.get('action_notes')
-
-    conn = get_db_connection()
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            UPDATE meeting_action_items
-            SET action_description = %s,
-                responsible_person = %s,
-                target_date = %s,
-                status = %s,
-                action_notes = %s
-            WHERE id = %s;
-        """, (action_description, responsible_person, target_date_val, status, action_notes, action_id))
-        conn.commit()
-    conn.close()
-
-    return redirect(url_for('finance_minutes'))
+    return render_template('minutes.html', meetings=meetings, current_type=meeting_type)
 
 
 @app.route('/update_meeting_minutes', methods=['POST'])
 def update_meeting_minutes():
     meeting_id = request.form.get('meeting_id')
+    meeting_type = request.form.get('meeting_type', 'Finance')
     meeting_date = request.form.get('meeting_date')
     chairperson = request.form.get('chairperson')
     attendees = request.form.get('attendees')
@@ -1606,13 +1567,14 @@ def update_meeting_minutes():
     with conn.cursor() as cursor:
         cursor.execute("""
             UPDATE meeting_minutes
-            SET meeting_date = %s,
+            SET meeting_type = %s,
+                meeting_date = %s,
                 chairperson = %s,
                 attendees = %s,
                 apologies = %s,
                 notes_summary = %s
             WHERE id = %s;
-        """, (meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+        """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
 
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
@@ -1649,24 +1611,22 @@ def update_meeting_minutes():
         conn.commit()
     conn.close()
 
-    return redirect(url_for('finance_minutes'))
+    return redirect(url_for('finance_minutes', type=meeting_type))
 
-@app.route('/delete_action_item', methods=['POST'])
-def delete_action_item():
-    action_id = request.form.get('action_id')
-    if action_id:
-        conn = get_db_connection()
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (action_id,))
-            conn.commit()
-            flash("Action item deleted successfully.")
-        except Exception as e:
-            conn.rollback()
-            flash(f"Error deleting action item: {str(e)}")
-        finally:
-            conn.close()
-    return redirect(url_for('finance_minutes'))
+
+@app.route('/delete_meeting', methods=['POST'])
+def delete_meeting():
+    meeting_id = request.form.get('meeting_id')
+    meeting_type = request.form.get('meeting_type', 'Finance')
+
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("DELETE FROM meeting_action_items WHERE meeting_id = %s;", (meeting_id,))
+        cursor.execute("DELETE FROM meeting_minutes WHERE id = %s;", (meeting_id,))
+        conn.commit()
+    conn.close()
+
+    return redirect(url_for('finance_minutes', type=meeting_type))
 
 @app.route('/update_authority_matrix', methods=['POST'])
 def update_authority_matrix():
