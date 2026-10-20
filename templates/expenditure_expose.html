@@ -167,7 +167,7 @@
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 1px 3px rgba(0,0,0,0.02);
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
 
         table {
@@ -227,6 +227,32 @@
             padding: 32px;
         }
 
+        /* Collapsible Section Styling */
+        details.collapsible-table-group {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        details.collapsible-table-group summary {
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent-blue);
+            cursor: pointer;
+            background-color: #f8fafc;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        details.collapsible-table-group summary:hover {
+            background-color: #f1f5f9;
+        }
+
         /* Compliance Badge Base Styling */
         .badge-compliance {
             display: inline-block;
@@ -238,7 +264,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Status Variants */
         .badge-compliant {
             background-color: #d1e7dd;
             color: #0f5132;
@@ -259,8 +284,9 @@
     </style>
 </head>
 <body>
-        {% include 'navbar.html' %}
-    
+    {% include 'navbar.html' %}
+
+    <div class="container">
         <div class="top-nav" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
                 <a href="/minutes" class="back-link">← Back to Minutes Dashboard</a>
@@ -382,8 +408,13 @@
             <div class="ai-body">{{ ai_analysis }}</div>
         </div>
 
-        <!-- Over-Budget Expenditure Table -->
-        <div class="section-title">Over-Budget Expenditure Line Items</div>
+        <!-- Over-Budget Expenditure Table (Top 10 + Collapsible Rest) -->
+        <div class="section-title">
+            Over-Budget Expenditure Line Items 
+            {% if over_budget_expenditure|length > 10 %}
+                <span style="font-size: 12px; font-weight: 500; color: var(--text-muted);">(Showing Top 10 of {{ over_budget_expenditure|length }})</span>
+            {% endif %}
+        </div>
         <div class="table-container">
             <table>
                 <thead>
@@ -399,7 +430,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in over_budget_expenditure %}
+                    {% for item in over_budget_expenditure[:10] %}
                     <tr>
                         <td><strong>{{ item.gl_code }}</strong></td>
                         <td>{{ item.description }}</td>
@@ -425,8 +456,43 @@
             </table>
         </div>
 
-        <!-- Under-Budget Income Table -->
-        <div class="section-title">Under-Budget Income Line Items (Shortfalls)</div>
+        {% if over_budget_expenditure|length > 10 %}
+        <details class="collapsible-table-group">
+            <summary>
+                <span>▼ View Remaining {{ over_budget_expenditure|length - 10 }} Over-Budget Items</span>
+            </summary>
+            <div class="table-container" style="border: none; margin-bottom: 0;">
+                <table>
+                    <tbody>
+                        {% for item in over_budget_expenditure[10:] %}
+                        <tr>
+                            <td><strong>{{ item.gl_code }}</strong></td>
+                            <td>{{ item.description }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.selected_month_actual) }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.ytd) }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.budget_ytd) }}</td>
+                            <td class="text-right">
+                                <span class="badge-pct danger">{{ "{:.1f}%".format(item.ytd_pct) if item.budget_ytd > 0 else 'N/A' }}</span>
+                            </td>
+                            <td class="text-right">
+                                <span class="badge-overrun">+R {{ "{:,.2f}".format(item.variance) }}</span>
+                            </td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.total_budget) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
+
+        <!-- Under-Budget Income Table (Top 10 + Collapsible Rest) -->
+        <div class="section-title">
+            Under-Budget Income Line Items (Shortfalls)
+            {% if under_budget_income|length > 10 %}
+                <span style="font-size: 12px; font-weight: 500; color: var(--text-muted);">(Showing Top 10 of {{ under_budget_income|length }})</span>
+            {% endif %}
+        </div>
         <div class="table-container">
             <table>
                 <thead>
@@ -442,7 +508,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in under_budget_income %}
+                    {% for item in under_budget_income[:10] %}
                     <tr>
                         <td><strong>{{ item.gl_code }}</strong></td>
                         <td>{{ item.description }}</td>
@@ -468,7 +534,37 @@
             </table>
         </div>
 
+        {% if under_budget_income|length > 10 %}
+        <details class="collapsible-table-group">
+            <summary>
+                <span>▼ View Remaining {{ under_budget_income|length - 10 }} Under-Budget Items</span>
+            </summary>
+            <div class="table-container" style="border: none; margin-bottom: 0;">
+                <table>
+                    <tbody>
+                        {% for item in under_budget_income[10:] %}
+                        <tr>
+                            <td><strong>{{ item.gl_code }}</strong></td>
+                            <td>{{ item.description }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.selected_month_actual) }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.ytd) }}</td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.budget_ytd) }}</td>
+                            <td class="text-right">
+                                <span class="badge-pct">{{ "{:.1f}%".format(item.ytd_pct) if item.budget_ytd > 0 else '0.0%' }}</span>
+                            </td>
+                            <td class="text-right">
+                                <span class="badge-overrun">-R {{ "{:,.2f}".format(item.variance) }}</span>
+                            </td>
+                            <td class="text-right">R {{ "{:,.2f}".format(item.total_budget) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% endif %}
 
+        <!-- Cashbook Compliance Audit Register -->
         <div style="display: flex; justify-content: space-between; align-items: center; margin: 28px 0 12px 0;">
             <div class="section-title" style="margin: 0;">Cashbook Compliance Audit Register (Priority View)</div>
             <a href="{{ url_for('approved_vendors.approved_vendors_ui') }}" class="back-link" style="font-size: 13px;">
