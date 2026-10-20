@@ -328,13 +328,19 @@
                 {% if m.apologies %}<p style="margin: 6px 0; font-size: 14px;"><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
                 
                 <!-- ATTACHMENT DISPLAY LINK -->
-                {% if m.attachment_filename %}
-                <p style="margin: 6px 0; font-size: 14px;">
-                    <strong>Attachment:</strong> 
-                    <a href="{{ url_for('meetings.download_attachment', meeting_id=m.id) }}" target="_blank">
-                        📎 {{ m.attachment_filename }}
-                    </a>
-                </p>
+                {% if m.attachments %}
+                <div style="margin: 8px 0; font-size: 14px;">
+                    <strong>Attachments:</strong>
+                    <ul style="margin: 4px 0 0 0; padding-left: 20px;">
+                        {% for att in m.attachments %}
+                        <li>
+                            <a href="{{ url_for('meetings.download_attachment', attachment_id=att.id) }}" target="_blank">
+                                📎 {{ att.filename }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
                 {% endif %}
 
                 <p style="margin: 12px 0 6px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.025em;">Summary Notes</p>
@@ -373,7 +379,7 @@
                     </div>
                     <div class="form-group">
                         <label>Update Attachment {% if m.attachment_filename %}(Current: {{ m.attachment_filename }}){% endif %}</label>
-                        <input type="file" class="form-control" name="attachment">
+                        <input type="file" class="form-control" name="attachments" multiple>
                     </div>
                     <div class="form-group">
                         <label>Agenda & Key Notes</label>
