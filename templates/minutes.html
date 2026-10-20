@@ -331,7 +331,7 @@
                 {% if m.attachment_filename %}
                 <p style="margin: 6px 0; font-size: 14px;">
                     <strong>Attachment:</strong> 
-                    <a href="{{ url_for('static', filename='uploads/' + m.attachment_filename) }}" target="_blank">
+                    <a href="{{ url_for('meetings.download_attachment', meeting_id=m.id) }}" target="_blank">
                         📎 {{ m.attachment_filename }}
                     </a>
                 </p>
@@ -348,9 +348,8 @@
                 </form>
             </div>
 
-            <!-- EDIT FORM MODE -->
+            <!-- EDIT FORM MODE WITH ENCTYPE -->
             <div id="edit-mode-{{ m.id }}" style="display: none;">
-                <!-- Added enctype to support file uploads -->
                 <form method="POST" action="/update_meeting_minutes" enctype="multipart/form-data">
                     <input type="hidden" name="meeting_id" value="{{ m.id }}">
                     <input type="hidden" name="meeting_type" value="{{ current_type }}">
@@ -372,18 +371,14 @@
                         <label>Apologies</label>
                         <input type="text" name="apologies" value="{{ m.apologies or '' }}">
                     </div>
-
-                    <!-- NEW: Attachment input for editing -->
                     <div class="form-group">
                         <label>Update Attachment {% if m.attachment_filename %}(Current: {{ m.attachment_filename }}){% endif %}</label>
                         <input type="file" class="form-control" name="attachment">
                     </div>
-
                     <div class="form-group">
                         <label>Agenda & Key Notes</label>
                         <textarea name="notes_summary" rows="8" required>{{ m.notes_summary }}</textarea>
                     </div>
-                    <!-- Rest of your action items and buttons... -->
 
                     <!-- ACTION ITEMS INSIDE FORM -->
                     <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">Manage Action Items</h4>
@@ -526,7 +521,7 @@
     <div class="container" style="margin-top: 24px;">
     <h2>Capture New Meeting</h2>
 
-       <!-- MINUTES ENTRY FORM WITH ENCTYPE FOR ATTACHMENTS -->
+       <!-- MINUTES ENTRY FORM WITH ENCTYPE -->
         <form method="POST" action="/minutes" enctype="multipart/form-data">
             <input type="hidden" name="meeting_type" value="{{ current_type }}">
             <div style="display: flex; gap: 15px;">
@@ -552,7 +547,7 @@
 
             <div class="form-group">
                 <label>Attach Document (PDF, Image, etc.)</label>
-                <input type="file" class="form-control" id="attachment" name="attachment">
+                <input type="file" class="form-control" name="attachment">
             </div>
 
             <div class="form-group">
