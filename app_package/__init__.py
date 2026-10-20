@@ -43,6 +43,6 @@ def create_app():
             return redirect(url_for('core.login', next=request.url))
 
     def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
     return app
