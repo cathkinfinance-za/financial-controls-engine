@@ -1,5 +1,6 @@
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, current_app
+import io
+from flask import Blueprint, render_template, request, redirect, url_for, current_app, send_file
 from datetime import date
 from app_package.db import get_db_connection
 from werkzeug.utils import secure_filename
@@ -18,34 +19,28 @@ def finance_minutes():
         apologies = request.form.get('apologies')
         notes_summary = request.form.get('notes_summary')
 
-        # --- Handle File Upload ---
+        # --- Handle File Upload as BLOB (BYTEA) ---
         attachment_filename = None
+        attachment_data = None
         if 'attachment' in request.files:
             file = request.files['attachment']
             if file and file.filename.strip() != '':
-                filename = secure_filename(file.filename)
-                
-                # Ensure upload folder exists
-                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-                
-                # Save file to disk
-                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
-                attachment_filename = filename
+                attachment_filename = secure_filename(file.filename)
+                attachment_data = file.read()  # Read binary data into memory
 
         with conn.cursor() as cursor:
-            # Insert meeting including the attachment filename
+            # Insert meeting including attachment filename and binary data
             cursor.execute("""
                 INSERT INTO meeting_minutes 
-                (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename, attachment_data)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
-            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename))
+            """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, attachment_filename, attachment_data))
             
             row = cursor.fetchone()
             meeting_id = row['id'] if isinstance(row, dict) else row[0]
 
-            # --- Handle Action Items (with your date fix) ---
+            # --- Handle Action Items ---
             descriptions = request.form.getlist('action_description[]')
             responsibles = request.form.getlist('responsible_person[]')
             targets = request.form.getlist('target_date[]')
@@ -75,7 +70,6 @@ def finance_minutes():
             ORDER BY meeting_date DESC;
         """, (meeting_type,))
         meetings = cursor.fetchall()
-
         
         cursor.execute("""
             SELECT a.id, a.meeting_id, a.action_description, a.responsible_person, 
@@ -118,7 +112,7 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        # --- Handle Optional New File Upload During Edit ---
+        # --- Handle Optional New File Upload as BLOB During Edit ---
         attachment_sql_update = ""
         query_params = [meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary]
 
@@ -126,15 +120,11 @@ def update_meeting_minutes():
             file = request.files['attachment']
             if file and file.filename.strip() != '':
                 filename = secure_filename(file.filename)
-                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
-                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                file.save(file_path)
+                file_data = file.read()
                 
-                # If a new file is provided, update the filename column as well
-                attachment_sql_update = ", attachment_filename = %s"
-                query_params.append(filename)
+                attachment_sql_update = ", attachment_filename = %s, attachment_data = %s"
+                query_params.extend([filename, file_data])
 
-        # Append meeting_id to the parameter list for the WHERE clause
         query_params.append(meeting_id)
 
         cursor.execute(f"""
@@ -149,7 +139,6 @@ def update_meeting_minutes():
             WHERE id = %s;
         """, tuple(query_params))
 
-        # --- Handle Action Items & Deletions (existing logic) ---
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
             if act_id:
@@ -188,6 +177,27 @@ def update_meeting_minutes():
     return redirect(url_for('meetings.finance_minutes', type=meeting_type))
 
 
+@meetings_bp.route('/download_attachment/<int:meeting_id>')
+def download_attachment(meeting_id):
+    conn = get_db_connection()
+    with conn.cursor() as cursor:
+        cursor.execute("SELECT attachment_filename, attachment_data FROM meeting_minutes WHERE id = %s;", (meeting_id,))
+        row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        filename = row['attachment_filename'] if isinstance(row, dict) else row[0]
+        data = row['attachment_data'] if isinstance(row, dict) else row[1]
+        
+        if data:
+            return send_file(
+                io.BytesIO(data),
+                download_name=filename,
+                as_attachment=False
+            )
+    return "File not found", 404
+
+
 @meetings_bp.route('/delete_meeting', methods=['POST'])
 def delete_meeting():
     meeting_id = request.form.get('meeting_id')
@@ -209,7 +219,6 @@ def update_action_item():
     action_description = request.form.get('action_description')
     responsible_person = request.form.get('responsible_person')
     
-    # Sanitize target_date: convert empty strings to None (SQL NULL)
     raw_target_date = request.form.get('target_date')
     target_date_val = raw_target_date if (raw_target_date and raw_target_date.strip()) else None
 
