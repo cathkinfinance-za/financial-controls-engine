@@ -328,20 +328,25 @@
                 {% if m.apologies %}<p style="margin: 6px 0; font-size: 14px;"><strong>Apologies:</strong> {{ m.apologies }}</p>{% endif %}
                 
                 <!-- ATTACHMENT DISPLAY LINK -->
-                {% if m.attachments %}
-                <div style="margin: 8px 0; font-size: 14px;">
-                    <strong>Attachments:</strong>
-                    <ul style="margin: 4px 0 0 0; padding-left: 20px;">
-                        {% for att in m.attachments %}
-                        <li>
-                            <a href="{{ url_for('meetings.download_attachment', attachment_id=att.id) }}" target="_blank">
-                                📎 {{ att.filename }}
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
+                <div class="form-group">
+                    <label>Current Attachments</label>
+                    {% if m.attachments %}
+                        <ul style="margin: 4px 0 12px 0; padding-left: 20px;">
+                            {% for att in m.attachments %}
+                            <li style="margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; max-width: 400px;">
+                                <span>📎 {{ att.filename }}</span>
+                                <input type="hidden" name="existing_attachment_id[]" value="{{ att.id }}">
+                                <button type="button" class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="markAttachmentForDeletion(this)">✕ Remove</button>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p style="color: var(--text-muted); font-size: 13px;">No attachments.</p>
+                    {% endif %}
+                
+                    <label>Add New Attachments</label>
+                    <input type="file" class="form-control" name="attachments" multiple>
                 </div>
-                {% endif %}
 
                 <p style="margin: 12px 0 6px 0; font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.025em;">Summary Notes</p>
                 <div style="white-space: pre-line; background: var(--bg-color); border: 1px solid var(--border-color); padding: 14px; border-radius: 6px; font-size: 14px; color: var(--text-secondary); line-height: 1.6;">{{ m.notes_summary }}</div>
