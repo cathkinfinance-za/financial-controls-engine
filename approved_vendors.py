@@ -5,7 +5,7 @@ approved_vendors_bp = Blueprint('approved_vendors', __name__)
 # 1. API: Get list of all approved vendors
 @approved_vendors_bp.route('/api/approved_vendors', methods=['GET'])
 def get_approved_vendors():
-    from app import get_db_connection  # <--- Imported inside function to break circular dependency
+    from app_package.db import get_db_connection  # <--- Imported inside function to break circular dependency
     try:
         conn = get_db_connection()
         cur = conn.cursor()
@@ -27,7 +27,7 @@ def get_approved_vendors():
 # 2. API: Create a new approved vendor whitelist entry
 @approved_vendors_bp.route('/api/approved_vendors/add', methods=['POST'])
 def add_approved_vendor():
-    from app import get_db_connection  
+    from app_package.db import get_db_connection  
     try:
         data = request.form if request.form else request.get_json()
         
@@ -72,7 +72,7 @@ def add_approved_vendor():
 # 3. API: Edit an existing approved vendor
 @approved_vendors_bp.route('/api/approved_vendors/<int:vendor_id>/edit', methods=['POST'])
 def edit_approved_vendor(vendor_id):
-    from app import get_db_connection  # <--- Imported inside function
+    from app_package.db import get_db_connection
     try:
         data = request.form if request.form else request.get_json()
         
@@ -121,7 +121,7 @@ def edit_approved_vendor(vendor_id):
 # 4. API: Toggle Active/Suspended Status
 @approved_vendors_bp.route('/api/approved_vendors/<int:vendor_id>/toggle', methods=['POST'])
 def toggle_vendor_status(vendor_id):
-    from app import get_db_connection  # <--- Imported inside function
+    from app_package.db import get_db_connection
     try:
         conn = get_db_connection()
         cur = conn.cursor()
