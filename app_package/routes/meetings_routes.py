@@ -118,7 +118,26 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
-        cursor.execute("""
+        # --- Handle Optional New File Upload During Edit ---
+        attachment_sql_update = ""
+        query_params = [meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary]
+
+        if 'attachment' in request.files:
+            file = request.files['attachment']
+            if file and file.filename.strip() != '':
+                filename = secure_filename(file.filename)
+                os.makedirs(current_app.config['UPLOAD_FOLDER'], exist_ok=True)
+                file_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                file.save(file_path)
+                
+                # If a new file is provided, update the filename column as well
+                attachment_sql_update = ", attachment_filename = %s"
+                query_params.append(filename)
+
+        # Append meeting_id to the parameter list for the WHERE clause
+        query_params.append(meeting_id)
+
+        cursor.execute(f"""
             UPDATE meeting_minutes
             SET meeting_type = %s,
                 meeting_date = %s,
@@ -126,9 +145,11 @@ def update_meeting_minutes():
                 attendees = %s,
                 apologies = %s,
                 notes_summary = %s
+                {attachment_sql_update}
             WHERE id = %s;
-        """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+        """, tuple(query_params))
 
+        # --- Handle Action Items & Deletions (existing logic) ---
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
             if act_id:
