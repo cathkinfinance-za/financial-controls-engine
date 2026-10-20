@@ -149,7 +149,6 @@ def view_audit_log():
     conn.close()
     return render_template('audit_log.html', logs=logs)
 
-
 @core_bp.route('/api/approved_vendors', methods=['GET'])
 def api_get_approved_vendors():
     conn = get_db_connection()
@@ -158,33 +157,34 @@ def api_get_approved_vendors():
         cur.execute("""
             SELECT id, vendor_name, supplier_code, gl_code, 
                    monthly_threshold_amount, last_approval_date, 
-                   expiry_date, approval_reference, is_active 
+                   expiry_date, approval_reference, is_active, 
+                   notes, match_pattern, created_at 
             FROM approved_vendors 
             ORDER BY vendor_name ASC;
         """)
         rows = cur.fetchall()
-        # Convert rows to list of dicts if using RealDictCursor, 
-        # or map manually if using regular tuples.
-        vendors = [dict(row) for row in rows]
+        
+        vendors = []
+        for r in rows:
+            vendors.append({
+                "id": r[0],
+                "vendor_name": r[1],
+                "supplier_code": r[2],
+                "gl_code": r[3],
+                "monthly_threshold_amount": float(r[4]) if r[4] is not None else 0.0,
+                "last_approval_date": str(r[5]) if r[5] else None,
+                "expiry_date": str(r[6]) if r[6] else None,
+                "approval_reference": r[7],
+                "is_active": r[8],
+                "notes": r[9],
+                "match_pattern": r[10],
+                "created_at": str(r[11]) if r[11] else None
+            })
+            
         return jsonify({"status": "success", "data": vendors})
     except Exception as e:
+        print(f"Error fetching approved vendors: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         cur.close()
         conn.close()
-
-@core_bp.route('/api/approved_vendors/add', methods=['POST'])
-def api_add_approved_vendor():
-    # Extract form data and perform INSERT into approved_vendors
-    # Remember to conn.commit() and return jsonify({"status": "success"})
-    pass
-
-@core_bp.route('/api/approved_vendors/<int:vendor_id>/edit', methods=['POST'])
-def api_edit_approved_vendor(vendor_id):
-    # Handle updates for the specified vendor_id
-    pass
-
-@core_bp.route('/api/approved_vendors/<int:vendor_id>/toggle', methods=['POST'])
-def api_toggle_approved_vendor(vendor_id):
-    # Toggle the is_active boolean flag in the database
-    pass
