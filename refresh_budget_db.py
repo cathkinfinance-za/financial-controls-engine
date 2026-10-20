@@ -126,17 +126,20 @@ def fetch_and_sync_weconnectu_budget():
     print("Connecting to Neon PostgreSQL for Budget Synchronization...")
     try:
         conn = psycopg2.connect(DATABASE_URL)
+        
+        # 1. Ensure schema alterations (ALTER TABLE) are immediately committed
+        conn.autocommit = True
         with conn.cursor() as cur:
-            # 1. Ensure any newly introduced month columns exist in PostgreSQL
             for col in detected_db_columns:
                 if col and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
                     cur.execute(f"""
                         ALTER TABLE master_budget 
                         ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';
                     """)
-            conn.commit()
-
-            # 2. Build dynamic UPSERT updating ONLY active scraped columns + description
+        
+        # 2. Reset autocommit and execute data upserts inside a standard transaction block
+        conn.autocommit = False
+        with conn.cursor() as cur:
             update_cols = [c for c in detected_db_columns if c]
             base_cols = ['gl_code', 'description'] + update_cols
             
@@ -164,11 +167,13 @@ def fetch_and_sync_weconnectu_budget():
                         row_dict[col] = 0.0 if col not in ['gl_code', 'description'] else ""
                 cur.execute(upsert_query, row_dict)
             conn.commit()
+            
         conn.close()
         print("🟢 Success! Parsed and pushed to Neon PostgreSQL master_budget without losing historical data.")
         
     except Exception as e:
         print(f"🔴 Database sync failed. Technical Error: {e}")
+
 
 if __name__ == "__main__":
     fetch_and_sync_weconnectu_budget()
