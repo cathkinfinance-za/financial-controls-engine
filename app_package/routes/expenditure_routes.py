@@ -18,12 +18,13 @@ ALLOWED_MONTHS = {
     'may_2026': 'May 2026',
     'jun_2026': 'June 2026',
     'jul_2026': 'July 2026',
-    'aug_2026': 'August 2026'
+    'aug_2026': 'August 2026',
+    'sep_2026': 'September 2026'
 }
 
 @expenditure_bp.route('/expenditure_expose')
 def expenditure_expose():
-    selected_month = request.args.get('month', 'aug_2026')
+    selected_month = request.args.get('month', 'sep_2026')
     if selected_month not in ALLOWED_MONTHS:
         selected_month = 'aug_2026'
 
