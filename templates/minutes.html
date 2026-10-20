@@ -350,7 +350,8 @@
 
             <!-- EDIT FORM MODE -->
             <div id="edit-mode-{{ m.id }}" style="display: none;">
-                <form method="POST" action="/update_meeting_minutes">
+                <!-- Added enctype to support file uploads -->
+                <form method="POST" action="/update_meeting_minutes" enctype="multipart/form-data">
                     <input type="hidden" name="meeting_id" value="{{ m.id }}">
                     <input type="hidden" name="meeting_type" value="{{ current_type }}">
                     <div style="display: flex; gap: 15px;">
@@ -371,10 +372,18 @@
                         <label>Apologies</label>
                         <input type="text" name="apologies" value="{{ m.apologies or '' }}">
                     </div>
+
+                    <!-- NEW: Attachment input for editing -->
+                    <div class="form-group">
+                        <label>Update Attachment {% if m.attachment_filename %}(Current: {{ m.attachment_filename }}){% endif %}</label>
+                        <input type="file" class="form-control" name="attachment">
+                    </div>
+
                     <div class="form-group">
                         <label>Agenda & Key Notes</label>
                         <textarea name="notes_summary" rows="8" required>{{ m.notes_summary }}</textarea>
                     </div>
+                    <!-- Rest of your action items and buttons... -->
 
                     <!-- ACTION ITEMS INSIDE FORM -->
                     <h4 style="border-bottom: 1px solid var(--border-color); padding-bottom: 6px;">Manage Action Items</h4>
