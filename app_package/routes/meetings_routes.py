@@ -168,7 +168,11 @@ def update_action_item():
     action_id = request.form.get('action_id')
     action_description = request.form.get('action_description')
     responsible_person = request.form.get('responsible_person')
-    target_date_val = request.form.get('target_date')
+    
+    # Sanitize target_date: convert empty strings to None (SQL NULL)
+    raw_target_date = request.form.get('target_date')
+    target_date_val = raw_target_date if (raw_target_date and raw_target_date.strip()) else None
+
     status = request.form.get('status')
     action_notes = request.form.get('action_notes')
 
