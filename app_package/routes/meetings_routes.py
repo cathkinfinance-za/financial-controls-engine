@@ -127,6 +127,7 @@ def update_meeting_minutes():
 
     conn = get_db_connection()
     with conn.cursor() as cursor:
+        # Update core meeting details
         cursor.execute("""
             UPDATE meeting_minutes
             SET meeting_type = %s,
@@ -137,6 +138,12 @@ def update_meeting_minutes():
                 notes_summary = %s
             WHERE id = %s;
         """, (meeting_type, meeting_date, chairperson, attendees, apologies, notes_summary, meeting_id))
+
+        # --- Handle Deleting Marked Attachments ---
+        delete_attachment_ids = request.form.getlist('delete_attachment_id[]')
+        for att_id in delete_attachment_ids:
+            if att_id:
+                cursor.execute("DELETE FROM meeting_attachments WHERE id = %s;", (att_id,))
 
         # --- Handle Additional File Uploads During Edit ---
         files = request.files.getlist('attachments')
@@ -149,11 +156,13 @@ def update_meeting_minutes():
                     VALUES (%s, %s, %s);
                 """, (meeting_id, filename, file_data))
 
+        # --- Handle Action Item Deletions ---
         delete_action_ids = request.form.getlist('delete_action_id[]')
         for act_id in delete_action_ids:
             if act_id:
                 cursor.execute("DELETE FROM meeting_action_items WHERE id = %s;", (act_id,))
 
+        # --- Handle Existing & New Action Items ---
         action_ids = request.form.getlist('existing_action_id[]')
         descriptions = request.form.getlist('existing_action_description[]')
         responsibles = request.form.getlist('existing_responsible_person[]')
@@ -162,7 +171,7 @@ def update_meeting_minutes():
         for i in range(len(descriptions)):
             act_id = action_ids[i] if (i < len(action_ids) and action_ids[i]) else None
             desc = descriptions[i]
-            resp = responsibles[i]
+            resp = responsibles[i] if i < len(responsibles) else ''
             
             raw_target = targets[i] if i < len(targets) else None
             target = raw_target if (raw_target and raw_target.strip()) else (meeting_date or str(date.today()))
