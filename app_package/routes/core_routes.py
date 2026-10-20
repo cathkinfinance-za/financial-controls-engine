@@ -67,6 +67,79 @@ def legal_framework():
 def render_prompts_page():
     return render_template('prompts.html')
 
+@core_bp.route('/api/prompts', methods=['GET'])
+def api_get_prompts():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    process_name = request.args.get('process')
+    
+    try:
+        if process_name:
+            # Fetch a specific prompt configuration from system_prompts
+            cur.execute(
+                """
+                SELECT process, prompt_key, prompt_template, description, is_active, selected_model 
+                FROM system_prompts WHERE process = %s
+                """,
+                (process_name,)
+            )
+            row = cur.fetchone()
+            if row:
+                return jsonify({
+                    "process": row['process'],
+                    "prompt_key": row['prompt_key'],
+                    "prompt_template": row['prompt_template'],
+                    "description": row['description'],
+                    "is_active": row['is_active'],
+                    "selected_model": row['selected_model']
+                })
+            return jsonify({"error": "Prompt not found"}), 404
+        else:
+            # Return list of all available processes for the dropdown
+            cur.execute("SELECT process FROM system_prompts ORDER BY process ASC;")
+            rows = cur.fetchall()
+            processes = [row['process'] for row in rows]
+            return jsonify(processes)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
+@core_bp.route('/api/prompts', methods=['POST'])
+def api_save_prompt():
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Invalid JSON payload"}), 400
+        
+    process = data.get('process')
+    prompt_template = data.get('prompt_template')
+    is_active = data.get('is_active')
+    selected_model = data.get('selected_model')
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # Update system_prompts and refresh updated_at timestamp
+        cur.execute(
+            """
+            UPDATE system_prompts 
+            SET prompt_template = %s, is_active = %s, selected_model = %s, updated_at = CURRENT_TIMESTAMP 
+            WHERE process = %s
+            """,
+            (prompt_template, is_active, selected_model, process)
+        )
+        conn.commit()
+        return jsonify({"success": True, "message": "Settings saved successfully"})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cur.close()
+        conn.close()
+
 @core_bp.route('/audit-log')
 def view_audit_log():
     conn = get_db_connection()
