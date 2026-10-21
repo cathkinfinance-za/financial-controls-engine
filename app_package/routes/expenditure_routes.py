@@ -118,7 +118,7 @@ def expenditure_expose():
     ]
     expenditure_items = [
         item for item in all_items 
-        if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE') or str(item['gl_code']).startswith('RFI')
+        if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE')
     ]
 
     over_budget_expenditure = []
