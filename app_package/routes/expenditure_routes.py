@@ -113,7 +113,10 @@ def expenditure_expose():
         flash(f"Database error: {str(e)}", "danger")
 
     income_items = [item for item in all_items if str(item['gl_code']).startswith('1')]
-    expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2')]
+    expenditure_items = [
+        item for item in all_items 
+        if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE') or str(item['gl_code']).startswith('RFI')
+    ]
 
     over_budget_expenditure = []
     for item in expenditure_items:
