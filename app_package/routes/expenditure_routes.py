@@ -112,7 +112,10 @@ def expenditure_expose():
     except Exception as e:
         flash(f"Database error: {str(e)}", "danger")
 
-    income_items = [item for item in all_items if str(item['gl_code']).startswith('1')]
+    income_items = [
+        item for item in all_items 
+        if str(item['gl_code']).startswith('1') or str(item['gl_code']).startswith('RFI')
+    ]
     expenditure_items = [
         item for item in all_items 
         if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE') or str(item['gl_code']).startswith('RFI')
