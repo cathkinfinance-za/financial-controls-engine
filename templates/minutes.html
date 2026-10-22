@@ -406,7 +406,13 @@
                             <li class="attachment-chip">
                                 <div class="attachment-info">
                                     <span class="attachment-icon">📎</span>
-                                    <span class="attachment-name" title="{{ att.filename }}">{{ att.filename }}</span>
+                                    <a href="{{ url_for('meetings.download_attachment', attachment_id=att.id) }}" 
+                                       target="_blank" 
+                                       class="attachment-name" 
+                                       title="View or download {{ att.filename }}"
+                                       style="color: var(--primary-blue); text-decoration: none;">
+                                        {{ att.filename }}
+                                    </a>
                                 </div>
                                 <input type="hidden" name="existing_attachment_id[]" value="{{ att.id }}">
                                 <button type="button" class="btn-remove-att" onclick="markAttachmentForDeletion(this)">
@@ -465,7 +471,11 @@
                             <ul style="margin: 4px 0 12px 0; padding-left: 20px;">
                                 {% for att in m.attachments %}
                                 <li style="margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; max-width: 450px;">
-                                    <span>📎 {{ att.filename }}</span>
+                                    <span>
+                                        📎 <a href="{{ url_for('meetings.download_attachment', attachment_id=att.id) }}" 
+                                              target="_blank" 
+                                              style="color: var(--primary-blue); text-decoration: none;">{{ att.filename }}</a>
+                                    </span>
                                     <input type="hidden" name="existing_attachment_id[]" value="{{ att.id }}">
                                     <button type="button" class="btn btn-danger" style="padding: 2px 6px; font-size: 11px;" onclick="markAttachmentForDeletion(this)">✕ Remove</button>
                                 </li>
