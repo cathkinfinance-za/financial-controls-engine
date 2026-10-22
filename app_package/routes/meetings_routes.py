@@ -196,6 +196,8 @@ def update_meeting_minutes():
     return redirect(url_for('meetings.finance_minutes', type=meeting_type))
 
 
+import mimetypes
+
 @meetings_bp.route('/download_attachment/<int:attachment_id>')
 def download_attachment(attachment_id):
     conn = get_db_connection()
@@ -209,10 +211,17 @@ def download_attachment(attachment_id):
         data = row['file_data'] if isinstance(row, dict) else row[1]
         
         if data:
+            # Guess content type based on file extension
+            mime_type, _ = mimetypes.guess_type(filename)
+            
+            # Convert binary data or memoryview to BytesIO
+            file_bytes = bytes(data) if isinstance(data, memoryview) else data
+
             return send_file(
-                io.BytesIO(data),
+                io.BytesIO(file_bytes),
+                mimetype=mime_type or 'application/octet-stream',
                 download_name=filename,
-                as_attachment=False
+                as_attachment=False  # Opens in browser tab if supported (PDF, Images, TXT)
             )
     return "File not found", 404
 
