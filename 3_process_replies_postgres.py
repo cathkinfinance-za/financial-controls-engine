@@ -355,19 +355,18 @@ def process_replies():
 
                 po_number = record['po_number']
                 
-                # REMOVED the rigid 'Already Approved' or 'Rejected' skips here!
-                # We want the script to re-evaluate quorum dynamically if a new vote arrives.
-
+                # (We removed the 'if record.get('submission_status') == 'Rejected': continue' block here)
+                
                 actual_voter = meta.get("voter") or meta.get("sender")
                 forwarded_by = meta.get("sender")
 
                 auth_info = verify_approver_authority(cursor, actual_voter, 'Approval Authority')
                 if not auth_info["authorized"]:
-                    log(f"⚠️ Unauthorized action attempt by {actual_voter} (forwarded by {forwarded_by}) for PO {po_number}", "WARNING")
+                    log(f"⚠️ Unauthorized action attempt by {actual_voter} for PO {po_number}", "WARNING")
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.")
                     continue
 
-                # Fetch all valid approval logs for this PO
+                # Fetch all valid approval logs for this PO to count active quorum
                 cursor.execute("""
                     SELECT actor_email 
                     FROM workflow_control_log 
@@ -378,6 +377,7 @@ def process_replies():
                 approved_emails = set(row['actor_email'].lower() for row in prior_logs if row.get('actor_email'))
                 approved_emails.add(actual_voter.lower())
 
+                # Check chair approval requirements
                 cursor.execute("""
                     SELECT count(*) as chair_count 
                     FROM approvers 
@@ -390,7 +390,7 @@ def process_replies():
                 requires_chair = record.get('requires_chair_approval', False)
                 current_count = len(approved_emails)
 
-                # Recalculate if quorum is met
+                # Dynamically calculate new status based on current valid approvals
                 if current_count >= required_count and (not requires_chair or chair_approved):
                     new_status = 'Approved'
                     log_action = 'Inbound Approval'
@@ -398,14 +398,9 @@ def process_replies():
                 else:
                     new_status = 'Partially Approved'
                     log_action = 'Inbound Partial Approval'
-                    missing_reasons = []
-                    if current_count < required_count:
-                        missing_reasons.append(f"{current_count}/{required_count} approvals")
-                    if requires_chair and not chair_approved:
-                        missing_reasons.append("Chair approval pending")
-                    notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
+                    notes = meta.get("notes") or f"Partially approved ({current_count}/{required_count})."
 
-                # Update status (allowing a transition out of Rejected if quorum is achieved)
+                # Update status back to Approved or Partially Approved, overwriting previous rejections if quorum is met
                 cursor.execute("""
                     UPDATE po_log 
                     SET submission_status = %s
@@ -414,18 +409,16 @@ def process_replies():
                 conn.commit()
 
                 write_control_log(conn, po_number, log_action, actual_voter, notes)
-                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Logged vote by {actual_voter}).")
+                log(f"✅ PO '{po_number}' successfully updated to {new_status.upper()} by {actual_voter}.")
 
-            # 3. PROCESS REJECTIONS
+           # 3. PROCESS REJECTIONS
             for meta in final_rejections:
                 po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if record:
-                    if record.get('submission_status') == 'Rejected':
-                        log(f"PO ID '{record['id']}' is already REJECTED. Skipping.")
-                        continue
-
                     actual_voter = meta.get("voter") or meta.get("sender")
+                    
+                    # Set status to Rejected
                     cursor.execute("""
                         UPDATE po_log 
                         SET submission_status = 'Rejected'
@@ -435,7 +428,7 @@ def process_replies():
                     
                     notes = meta.get("notes") or "Marked as rejected via email reply."
                     write_control_log(conn, record['po_number'], "Inbound Rejection", actual_voter, notes)
-                    log(f"❌ PO ID '{record['id']}' updated to REJECTED (Logged vote by {actual_voter}).")
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED by {actual_voter}.")
 
         conn.close()
     except Exception as db_err:
