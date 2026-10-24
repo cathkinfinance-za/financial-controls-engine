@@ -6,7 +6,7 @@ from email.header import decode_header
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import google.generativeai as genai
+from google import genai
 import json
 
 def log(msg, level="INFO"):
@@ -82,9 +82,11 @@ def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
         "is_active": True
     }
 
+
 def classify_reply_with_gemini(conn, sender_email, subject, body):
     """
-    Uses Gemini and the database-stored system prompt to intelligently classify reply intent.
+    Uses the modern google-genai SDK and the database-stored system prompt 
+    to classify reply intent.
     """
     prompt_config = get_system_prompt_from_db(conn, process_name="Email Reply Classification")
     
@@ -93,9 +95,8 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
         return {"classification": "NEUTRAL", "summary_notes": "Prompt disabled in system configuration."}
 
     template = prompt_config["template"]
-    model_name = prompt_config["model"]
+    model_name = prompt_config["model"] or "gemini-3.5-flash"
 
-    # Format the template with Python keyword arguments
     try:
         prompt = template.format(
             sender_email=sender_email,
@@ -107,20 +108,18 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
         prompt = f"Sender: {sender_email}\nSubject: {subject}\nBody: {body}"
 
     try:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            log("GEMINI_API_KEY is missing.", "ERROR")
-            return {"classification": "NEUTRAL", "summary_notes": "API key missing."}
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(model_name)
-        response = model.generate_content(prompt)
+        # Automatically picks up GEMINI_API_KEY from environment variables
+        client = genai.Client()
+        response = client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+        )
         
         cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
         result = json.loads(cleaned_text)
         return result
     except Exception as e:
-        log(f"Gemini classification error: {e}", "WARNING")
+        log(f"Gemini SDK classification error: {e}", "WARNING")
         return {"classification": "NEUTRAL", "summary_notes": "Failed to parse via Gemini fallback."}
 
 def fetch_approval_replies(conn):
