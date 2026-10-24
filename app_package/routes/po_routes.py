@@ -455,3 +455,53 @@ def cron_check_escalations():
         return {"status": "error", "message": str(e)}, 500
     finally:
         conn.close()
+
+
+# Helper to trigger process_replies.yml
+def trigger_process_replies_workflow():
+    github_token = os.environ.get("GITHUB_TOKEN")
+    repo = "cathkinfinance-za/financial-controls-engine" 
+
+    if not github_token:
+        print("GITHUB_TOKEN missing; skipping reply processing dispatch.")
+        return False, "GITHUB_TOKEN missing."
+
+    # GitHub workflow dispatch API endpoint
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/process_replies.yml/dispatches"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    payload = {"ref": "main"}
+
+    try:
+        response = requests.post(url, json=payload, headers=headers)
+        if response.status_code == 204:
+            print("Successfully triggered Process Approval Replies workflow.")
+            return True, "Approval reply check triggered successfully!"
+        else:
+            print(f"Failed to trigger GitHub Action: {response.status_code} - {response.text}")
+            return False, f"Failed to dispatch workflow (HTTP {response.status_code})."
+    except Exception as e:
+        print(f"Error triggering GitHub Action: {e}")
+        return False, f"Error triggering workflow: {str(e)}"
+
+
+# Flask endpoint for the button call
+@po_bp.route("/api/check-approvals", methods=["POST"])
+def check_approvals():
+    po_number = request.json.get("po_number") if request.is_json else None
+    
+    # 1. Trigger the reply ingestion GitHub action
+    success, msg = trigger_process_replies_workflow()
+    
+    if success:
+        return jsonify({
+            "status": "success", 
+            "message": "Approval check initiated. Incoming email responses are being processed!"
+        }), 200
+    else:
+        return jsonify({
+            "status": "error", 
+            "message": msg
+        }), 500
