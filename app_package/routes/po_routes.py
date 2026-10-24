@@ -562,3 +562,52 @@ def get_approval_matrix():
             return jsonify(rows)
     finally:
         conn.close()
+
+
+def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
+    """
+    Dynamically queries the approval_matrix table based on transaction parameters.
+    Zero numeric thresholds (like 30000, 50000) are hardcoded in Python; 
+    all value ranges are evaluated dynamically by the database table.
+    """
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            # Determine category keyword filter based on business attributes
+            if expense_type == 'Emergency':
+                cat_filter = '%Emergency%'
+            elif is_budgeted == 'No':
+                cat_filter = '%Unbudgeted%'
+            elif expense_type == 'Service Contract':
+                cat_filter = '%Service Provider Contracts%'
+            elif expense_type == 'Capital':
+                cat_filter = '%Capital Expenditure%'
+            else:
+                cat_filter = '%Operational%'
+
+            # Query the database using the table's own min_value and max_value bounds
+            cur.execute("""
+                SELECT * FROM approval_matrix 
+                WHERE matrix_category ILIKE %s 
+                  AND min_value <= %s 
+                  AND (max_value >= %s OR max_value IS NULL)
+                ORDER BY min_value DESC 
+                LIMIT 1;
+            """, (cat_filter, estimated_cost, estimated_cost))
+            
+            row = cur.fetchone()
+            
+            # Fallback if category filter doesn't match an exact tier
+            if not row:
+                cur.execute("""
+                    SELECT * FROM approval_matrix 
+                    WHERE min_value <= %s 
+                      AND (max_value >= %s OR max_value IS NULL)
+                    ORDER BY min_value DESC 
+                    LIMIT 1;
+                """, (estimated_cost, estimated_cost))
+                row = cur.fetchone()
+
+            return dict(row) if row else None
+    finally:
+        conn.close()
