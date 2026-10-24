@@ -619,7 +619,7 @@
                         name="calculated_approval_status" 
                         value="{{ selected_po.calculated_approval_status if selected_po and selected_po.calculated_approval_status else '' }}" 
                         readonly 
-                        class="form-control"
+                        class="form-control {% if selected_po and 'APPROVED' in selected_po.calculated_approval_status|upper %}text-success fw-bold{% elif selected_po and 'REJECTED' in selected_po.calculated_approval_status|upper %}text-danger fw-bold{% endif %}"
                     >
                 </div>
 
