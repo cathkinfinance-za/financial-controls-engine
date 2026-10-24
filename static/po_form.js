@@ -207,6 +207,7 @@ function calculateSystemStatus() {
     const remainingAnnualBudget = totalBudget - ytdActual;
     const isOverAnnualBudget = totalBudget > 0 && estimatedCost > remainingAnnualBudget;
 
+
     // 1. HARD COMPLIANCE LOCK: Over Annual Budget forces Unbudgeted Workflow
     if (isOverAnnualBudget && isBudgetedSelect) {
         if (isBudgetedSelect.value !== 'No') {
@@ -291,6 +292,26 @@ function calculateSystemStatus() {
     
     if (reqInputTop) reqInputTop.value = approvalRequirement;
     if (reqInputBottom) reqInputBottom.value = approvalRequirement;
+
+    // --- CALCULATE & DISPLAY EXPIRY DEADLINE ---
+    const expiryInput = document.getElementById('expiry_date_display');
+    const dispatchedInput = document.getElementById('dispatched_date_display');
+    const dispatchedStr = dispatchedInput ? dispatchedInput.value : '';
+
+    if (expiryInput) {
+        if (dispatchedStr && dispatchedStr.trim() !== '' && dispatchedStr !== 'Not yet dispatched' && dispatchedStr !== 'Pending Dispatch') {
+            const dispatchDate = new Date(dispatchedStr);
+            const timeLimitDays = rule ? (rule.response_time_limit_days || 7) : 7;
+            
+            // Add the database matrix rule's time limit days to dispatch date
+            dispatchDate.setDate(dispatchDate.getDate() + timeLimitDays);
+            
+            const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            expiryInput.value = dispatchDate.toLocaleDateString('en-US', options) + ` (${timeLimitDays}-day limit)`;
+        } else {
+            expiryInput.value = 'Pending Dispatch';
+        }
+    }
 }
 
 function removeAttachment(filename, elementId) {
