@@ -85,8 +85,8 @@ def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
 
 def classify_reply_with_gemini(conn, sender_email, subject, body):
     """
-    Uses the modern google-genai SDK and the database-stored system prompt 
-    to classify reply intent.
+    Uses the modern google-genai SDK and database prompt template, 
+    safely replacing placeholders without crashing on JSON curly braces.
     """
     prompt_config = get_system_prompt_from_db(conn, process_name="Email Reply Classification")
     
@@ -97,19 +97,20 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
     template = prompt_config["template"]
     model_name = prompt_config["model"] or "gemini-3.5-flash"
 
-    try:
-        prompt = template.format(
-            sender_email=sender_email,
-            subject=subject or "",
-            body=body or ""
-        )
-    except Exception as fmt_err:
-        log(f"Prompt template formatting error: {fmt_err}. Using raw format.", "WARNING")
-        prompt = f"Sender: {sender_email}\nSubject: {subject}\nBody: {body}"
+    # Safely replace placeholders using string replacement 
+    # (This prevents Python from crashing on the JSON curly braces in your template)
+    prompt = template.replace("{sender_email}", sender_email) \
+                     .replace("{subject}", subject or "") \
+                     .replace("{body}", body or "")
+
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        log("GEMINI_API_KEY environment variable is missing.", "ERROR")
+        return {"classification": "NEUTRAL", "summary_notes": "API key missing."}
 
     try:
-        # Automatically picks up GEMINI_API_KEY from environment variables
-        client = genai.Client()
+        # Explicitly pass the API key to the modern google-genai client
+        client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
             model=model_name,
             contents=prompt,
