@@ -567,8 +567,8 @@ def get_approval_matrix():
 def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
     """
     Dynamically queries the approval_matrix table based on transaction parameters.
-    Zero numeric thresholds (like 30000, 50000) are hardcoded in Python; 
-    all value ranges are evaluated dynamically by the database table.
+    Zero numeric thresholds are hardcoded in Python; all bounds and requirements 
+    are evaluated dynamically from the database.
     """
     conn = get_db_connection()
     try:
@@ -585,7 +585,7 @@ def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
             else:
                 cat_filter = '%Operational%'
 
-            # Query the database using the table's own min_value and max_value bounds
+            # Query database using the table's own min_value and max_value bounds
             cur.execute("""
                 SELECT * FROM approval_matrix 
                 WHERE matrix_category ILIKE %s 
@@ -597,7 +597,7 @@ def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
             
             row = cur.fetchone()
             
-            # Fallback if category filter doesn't match an exact tier
+            # Fallback search by cost bounds across all categories if specific keyword missed
             if not row:
                 cur.execute("""
                     SELECT * FROM approval_matrix 
