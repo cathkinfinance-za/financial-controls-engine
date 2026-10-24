@@ -486,7 +486,38 @@ def trigger_process_replies_workflow():
         print(f"Error triggering GitHub Action: {e}")
         return False, f"Error triggering workflow: {str(e)}"
 
+@po_bp.route("/api/workflow-status", methods=["GET"])
+def check_workflow_status():
+    github_token = os.environ.get("GITHUB_TOKEN")
+    repo = "cathkinfinance-za/financial-controls-engine"
 
+    if not github_token:
+        return jsonify({"status": "error", "message": "Missing token"}), 500
+
+    url = f"https://api.github.com/repos/{repo}/actions/workflows/process_replies.yml/runs?per_page=1"
+    headers = {
+        "Authorization": f"Bearer {github_token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            runs = response.json().get("workflow_runs", [])
+            if runs:
+                latest_run = runs[0]
+                run_status = latest_run.get("status")       # e.g., 'queued', 'in_progress', 'completed'
+                conclusion = latest_run.get("conclusion")   # e.g., 'success', 'failure'
+                
+                return jsonify({
+                    "status": "success",
+                    "workflow_status": run_status,
+                    "conclusion": conclusion
+                }), 200
+        return jsonify({"status": "error", "workflow_status": "unknown"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
 # Flask endpoint for the button call
 @po_bp.route("/api/check-approvals", methods=["POST"])
 def check_approvals():
@@ -505,3 +536,5 @@ def check_approvals():
             "status": "error", 
             "message": msg
         }), 500
+
+
