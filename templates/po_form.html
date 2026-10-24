@@ -623,6 +623,31 @@
                     >
                 </div>
 
+                <!-- Dispatched Date & Expiry Display -->
+                <div class="form-row">
+                    <label class="form-label">Dispatched Date</label>
+                    <input 
+                        type="text" 
+                        id="dispatched_date_display" 
+                        value="{{ selected_po.chair_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po and selected_po.chair_requested_at else 'Not yet dispatched' }}" 
+                        readonly 
+                        class="form-control"
+                        style="width: 240px;"
+                    >
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Voting Expiry Deadline</label>
+                    <input 
+                        type="text" 
+                        id="expiry_date_display" 
+                        value="Calculated on load..." 
+                        readonly 
+                        class="form-control"
+                        style="width: 240px;"
+                    >
+                </div>
+
                 <div class="form-row">
                     <label class="form-label">Approval Status</label>
                     <input 
