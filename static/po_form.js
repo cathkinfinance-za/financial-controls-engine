@@ -273,7 +273,10 @@ function calculateSystemStatus() {
     } else if (quotesProvided < requiredQuotes) {
         systemStatus = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
     } else {
-        systemStatus = '🟢 READY: Compliance Met, Ready for Routing';
+        // Incorporating quorum and time limit rules into compliant status display
+        const minResponsesReq = rule ? (rule.min_responses_required || 1) : 1;
+        const timeLimitDays = rule ? (rule.response_time_limit_days || 7) : 7;
+        systemStatus = `🟢 READY: Compliance Met (Min Quorum: ${minResponsesReq} Approvers | Time Limit: ${timeLimitDays}d)`;
     }
 
     // Update Form Inputs / Outputs
@@ -288,7 +291,6 @@ function calculateSystemStatus() {
     
     if (reqInputTop) reqInputTop.value = approvalRequirement;
     if (reqInputBottom) reqInputBottom.value = approvalRequirement;
-    }
 }
 
 function removeAttachment(filename, elementId) {
