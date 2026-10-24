@@ -611,6 +611,18 @@
                     </select>
                 </div>
 
+                <!-- Bottom Copy of Governance Sign-off Tier (Next to Approval Status) -->
+                <div class="form-row">
+                    <label class="form-label">Governance Sign-off Tier</label>
+                    <input 
+                        type="text" 
+                        id="approval_requirement_copy" 
+                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
+                        readonly 
+                        class="form-control"
+                    >
+                </div>
+
                 <div class="form-row">
                     <label class="form-label">Approval Status</label>
                     <input 
