@@ -172,7 +172,7 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None):
 @po_bp.route("/po_form", methods=["GET", "POST"])
 @po_bp.route("/simple", methods=["GET", "POST"])
 def po_form():
-   conn = get_db_connection()
+    conn = get_db_connection()
     message = None
     selected_po = None
     financial_summary = None
