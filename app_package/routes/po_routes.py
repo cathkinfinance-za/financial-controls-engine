@@ -237,7 +237,7 @@ def po_form():
                     file_bytes = quote_file.read()
                     safe_filename = secure_filename(quote_file.filename)
                     
-                   blob_url = f"https://blob.vercel-storage.com/quotes/{safe_filename}"
+                    blob_url = f"https://blob.vercel-storage.com/quotes/{safe_filename}"
                     headers = {
                         "Authorization": f"Bearer {os.getenv('PUBLIC_BLOB_READ_WRITE_TOKEN')}",
                         "x-access": "public",
@@ -253,10 +253,6 @@ def po_form():
                             new_urls.append(url)
                     else:
                         print(f"Blob upload failed with status {upload_resp.status_code}: {upload_resp.text}")
-                    
-                    url = blob_response.get('url') if isinstance(blob_response, dict) else getattr(blob_response, 'url', None)
-                    if url:
-                        new_urls.append(url)
 
                     gemini_file_payloads.append((file_bytes, safe_filename, quote_file.mimetype))
                 except Exception as upload_err:
