@@ -551,3 +551,14 @@ def check_approvals():
             "status": "error", 
             "message": msg
         }), 500
+
+@po_bp.route("/api/approval-matrix")
+def get_approval_matrix():
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT * FROM approval_matrix ORDER BY min_value ASC;")
+            rows = cur.fetchall()
+            return jsonify(rows)
+    finally:
+        conn.close()
