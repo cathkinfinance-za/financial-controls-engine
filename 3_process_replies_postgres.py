@@ -2,12 +2,14 @@ import os
 import re
 import imaplib
 import email
+import email.utils
 from email.header import decode_header
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from google import genai
 import json
+
 
 def log(msg, level="INFO"):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -34,15 +36,14 @@ def ensure_audit_log_table(conn):
         """)
         conn.commit()
 
-def write_control_log(conn, po_number, action_type, user_email, notes=""):
-    try:
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                INSERT INTO workflow_control_log (po_number, action_type, actor_email, system_notes)
-                VALUES (%s, %s, %s, %s);
-            """, (po_number, action_type, user_email, notes))
-            conn.commit()
-            log(f"Control log recorded in DB for PO '{po_number}'.")
+def write_control_log(conn, po_number, action_type, actor_email, notes, timestamp=None):
+    with conn.cursor() as cursor:
+        cursor.execute("""
+            INSERT INTO workflow_control_log (po_number, action_type, actor_email, system_notes, timestamp)
+            VALUES (%s, %s, %s, %s, %s);
+        """, (po_number, action_type, actor_email, notes, timestamp or datetime.datetime.now()))
+        conn.commit()
+        log(f"Control log recorded in DB for PO '{po_number}'.")
     except Exception as e:
         log(f"Failed to write control log: {e}", "WARNING")
 
@@ -122,7 +123,7 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
     except Exception as e:
         log(f"Gemini SDK classification error: {e}", "WARNING")
         return {"classification": "NEUTRAL", "summary_notes": "Failed to parse via Gemini fallback."}
-
+        
 def fetch_approval_replies(conn):
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
@@ -163,6 +164,18 @@ def fetch_approval_replies(conn):
                         continue
 
                     msg = email.message_from_bytes(raw_bytes)
+                    
+                    # --- 1. EXTRACT NATIVE EMAIL TIMESTAMP ---
+                    date_header = msg.get('Date')
+                    if date_header:
+                        parsed_date_tuple = email.utils.parsedate_tz(date_header)
+                        if parsed_date_tuple:
+                            email_timestamp = datetime.datetime.fromtimestamp(email.utils.mktime_tz(parsed_date_tuple))
+                        else:
+                            email_timestamp = datetime.datetime.now()
+                    else:
+                        email_timestamp = datetime.datetime.now()
+
                     subject_header = msg.get('Subject', '')
                     
                     decoded_subject = ""
@@ -224,7 +237,8 @@ def fetch_approval_replies(conn):
                         "po_id": po_id, 
                         "sender": sender_clean, 
                         "voter": voter_email or sender_clean, 
-                        "notes": parsed_notes
+                        "notes": parsed_notes,
+                        "timestamp": email_timestamp  # Passed along for correct audit logging
                     }
 
                     # --- ROLE-BASED ROUTING & INTERCEPTION ---
@@ -241,7 +255,7 @@ def fetch_approval_replies(conn):
                             recommendations_rejection.append(payload_meta)
                             log(f"ℹ️ Reassigned rejection from Finance Reviewer {payload_meta['voter']} to FINANCE REJECTION.")
                         else:
-                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
+                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes, email_timestamp)
                             log(f"ℹ️ Email from Finance Reviewer {sender_clean} classified as NEUTRAL.")
 
                     elif auth_check["authorized"]:
@@ -251,11 +265,11 @@ def fetch_approval_replies(conn):
                         elif intent in ["REJECT", "RECOMMEND_REJECT"]:
                             final_rejections.append(payload_meta)
                         else:
-                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
+                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes, email_timestamp)
                             log(f"ℹ️ Email from Director {payload_meta['voter']} classified as NEUTRAL.")
                     else:
                         # 3. UNAUTHORIZED SENDER
-                        write_control_log(conn, f"PO-ID-{po_id}", "Unauthorized Action Blocked", sender_clean, "Sender lacks recognized approval or review authority.")
+                        write_control_log(conn, f"PO-ID-{po_id}", "Unauthorized Action Blocked", sender_clean, "Sender lacks recognized approval or review authority.", email_timestamp)
                         log(f"⚠️ Unauthorized sender blocked: {sender_clean}", "WARNING")
 
                     mail.store(e_id, '+FLAGS', '\\Seen')
@@ -338,8 +352,10 @@ def process_replies():
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for approval."
                     voter = meta.get("voter") or meta.get("sender")
-                    write_control_log(conn, record['po_number'], "Finance Review", voter, notes)
-                    log(f"✅ PO '{record['po_number']}' recorded as FINANCE REVIEW recommendation by {voter}.")
+                    email_ts = meta.get("timestamp")
+                    
+                    write_control_log(conn, record['po_number'], "Finance Review - Approval", voter, notes, email_ts)
+                    log(f"✅ PO '{record['po_number']}' recorded as Finance Review - Approval by {voter}.")
 
             for meta in recommendations_rejection:
                 po_id = int(meta["po_id"])
@@ -356,8 +372,10 @@ def process_replies():
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for rejection."
                     voter = meta.get("voter") or meta.get("sender")
-                    write_control_log(conn, record['po_number'], "Finance Review", voter, notes)
-                    log(f"❌ PO '{record['po_number']}' recorded as FINANCE REVIEW rejection by {voter}.")
+                    email_ts = meta.get("timestamp")
+                    
+                    write_control_log(conn, record['po_number'], "Finance Review - Rejection", voter, notes, email_ts)
+                    log(f"❌ PO '{record['po_number']}' recorded as Finance Review - Rejection by {voter}.")
 
             # 2. PROCESS FINAL APPROVALS
             for meta in final_approvals:
@@ -367,28 +385,34 @@ def process_replies():
                     continue
 
                 po_number = record['po_number']
-                
-                # (We removed the 'if record.get('submission_status') == 'Rejected': continue' block here)
-                
                 actual_voter = meta.get("voter") or meta.get("sender")
                 forwarded_by = meta.get("sender")
+                email_ts = meta.get("timestamp")
 
                 auth_info = verify_approver_authority(cursor, actual_voter, 'Approval Authority')
                 if not auth_info["authorized"]:
                     log(f"⚠️ Unauthorized action attempt by {actual_voter} for PO {po_number}", "WARNING")
-                    write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.")
+                    write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.", email_ts)
                     continue
 
-                # Fetch all valid approval logs for this PO to count active quorum
-                cursor.execute("""
-                    SELECT actor_email 
-                    FROM workflow_control_log 
-                    WHERE po_number = %s AND action_type IN ('Inbound Approval', 'Board Approval');
-                """, (po_number,))
-                prior_logs = cursor.fetchall()
+                # Log the inbound approval first so it's included in vote tallying
+                write_control_log(conn, po_number, "Inbound Approval", actual_voter, meta.get("notes") or "Approved via email reply.", email_ts)
 
-                approved_emails = set(row['actor_email'].lower() for row in prior_logs if row.get('actor_email'))
-                approved_emails.add(actual_voter.lower())
+                # Fetch all valid active votes for this PO to compute detailed breakdown
+                cursor.execute("""
+                    SELECT actor_email, action_type 
+                    FROM workflow_control_log 
+                    WHERE po_number = %s AND action_type IN ('Inbound Approval', 'Board Approval', 'Inbound Rejection');
+                """, (po_number,))
+                all_votes = cursor.fetchall()
+
+                # Deduplicate to get each approver's latest action
+                latest_votes = {}
+                for vote in all_votes:
+                    latest_votes[vote['actor_email'].lower()] = vote['action_type']
+
+                approved_emails = [email for email, action in latest_votes.items() if action in ('Inbound Approval', 'Board Approval')]
+                rejected_emails = [email for email, action in latest_votes.items() if action == 'Inbound Rejection']
 
                 # Check chair approval requirements
                 cursor.execute("""
@@ -396,52 +420,94 @@ def process_replies():
                     FROM approvers 
                     WHERE LOWER(email) = ANY(%s) 
                       AND approval_permission LIKE '%%Chair%%';
-                """, (list(approved_emails),))
+                """, (approved_emails,))
                 chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
                 required_count = record.get('required_approval_count', 1)
                 requires_chair = record.get('requires_chair_approval', False)
-                current_count = len(approved_emails)
+                current_approvals = len(approved_emails)
+                current_rejections = len(rejected_emails)
+                chair_status_text = "Approved" if chair_approved else "Pending"
 
-                # Dynamically calculate new status based on current valid approvals
-                if current_count >= required_count and (not requires_chair or chair_approved):
+                # Formulate detailed governance status banner string
+                if current_rejections > 0 and current_approvals < required_count:
+                    new_status = 'Rejected'
+                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+                elif current_approvals >= required_count and (not requires_chair or chair_approved):
                     new_status = 'Approved'
-                    log_action = 'Inbound Approval'
-                    notes = meta.get("notes") or f"Fully approved ({current_count}/{required_count} sign-offs received)."
+                    detailed_status = f"APPROVED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
                 else:
                     new_status = 'Partially Approved'
-                    log_action = 'Inbound Partial Approval'
-                    notes = meta.get("notes") or f"Partially approved ({current_count}/{required_count})."
+                    detailed_status = f"PENDING APPROVAL (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
 
-                # Update status back to Approved or Partially Approved, overwriting previous rejections if quorum is met
+                # Update PO status & calculated approval status string in database
                 cursor.execute("""
                     UPDATE po_log 
-                    SET submission_status = %s
+                    SET submission_status = %s, calculated_approval_status = %s
                     WHERE id = %s;
-                """, (new_status, record['id']))
+                """, (new_status, detailed_status, record['id']))
                 conn.commit()
 
-                write_control_log(conn, po_number, log_action, actual_voter, notes)
-                log(f"✅ PO '{po_number}' successfully updated to {new_status.upper()} by {actual_voter}.")
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()} [{detailed_status}] (Vote logged by {actual_voter}).")
 
-           # 3. PROCESS REJECTIONS
+            # 3. PROCESS REJECTIONS
             for meta in final_rejections:
                 po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if record:
+                    po_number = record['po_number']
                     actual_voter = meta.get("voter") or meta.get("sender")
-                    
-                    # Set status to Rejected
+                    forwarded_by = meta.get("sender")
+                    email_ts = meta.get("timestamp")
+
+                    auth_info = verify_approver_authority(cursor, actual_voter, 'Approval Authority')
+                    if not auth_info["authorized"]:
+                        log(f"⚠️ Unauthorized rejection attempt by {actual_voter} for PO {po_number}", "WARNING")
+                        write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.", email_ts)
+                        continue
+
+                    # Log the inbound rejection
+                    write_control_log(conn, po_number, "Inbound Rejection", actual_voter, meta.get("notes") or "Marked as rejected via email reply.", email_ts)
+
+                    # Re-tally votes
+                    cursor.execute("""
+                        SELECT actor_email, action_type 
+                        FROM workflow_control_log 
+                        WHERE po_number = %s AND action_type IN ('Inbound Approval', 'Board Approval', 'Inbound Rejection');
+                    """, (po_number,))
+                    all_votes = cursor.fetchall()
+
+                    latest_votes = {}
+                    for vote in all_votes:
+                        latest_votes[vote['actor_email'].lower()] = vote['action_type']
+
+                    approved_emails = [email for email, action in latest_votes.items() if action in ('Inbound Approval', 'Board Approval')]
+                    rejected_emails = [email for email, action in latest_votes.items() if action == 'Inbound Rejection']
+
+                    cursor.execute("""
+                        SELECT count(*) as chair_count 
+                        FROM approvers 
+                        WHERE LOWER(email) = ANY(%s) 
+                          AND approval_permission LIKE '%%Chair%%';
+                    """, (approved_emails,))
+                    chair_approved = (cursor.fetchone()['chair_count'] > 0)
+
+                    required_count = record.get('required_approval_count', 1)
+                    requires_chair = record.get('requires_chair_approval', False)
+                    current_approvals = len(approved_emails)
+                    current_rejections = len(rejected_emails)
+                    chair_status_text = "Approved" if chair_approved else "Pending"
+
+                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+
                     cursor.execute("""
                         UPDATE po_log 
-                        SET submission_status = 'Rejected'
+                        SET submission_status = 'Rejected', calculated_approval_status = %s
                         WHERE id = %s;
-                    """, (record['id'],))
+                    """, (detailed_status, record['id']))
                     conn.commit()
                     
-                    notes = meta.get("notes") or "Marked as rejected via email reply."
-                    write_control_log(conn, record['po_number'], "Inbound Rejection", actual_voter, notes)
-                    log(f"❌ PO ID '{record['id']}' updated to REJECTED by {actual_voter}.")
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED [{detailed_status}] (Vote logged by {actual_voter}).")
 
         conn.close()
     except Exception as db_err:
