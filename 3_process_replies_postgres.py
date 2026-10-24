@@ -74,7 +74,7 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        # Pull the latest emails and let your Python logic filter them:
+        # Pull the latest unread emails
         status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
             log("No new unread approval emails found in inbox.")
@@ -87,7 +87,7 @@ def fetch_approval_replies():
         latest_email_ids = email_ids[-20:]
         log(f"Scanning latest {len(latest_email_ids)} unread workflow email(s)...")
 
-        # 1. Initialize all 4 response categories
+        # Initialize all 4 response categories
         recommendations_approval = {}
         recommendations_rejection = {}
         final_approvals = {}
@@ -130,29 +130,42 @@ def fetch_approval_replies():
                     if not po_id:
                         continue
 
+                    # Strip email threading and splitters
                     top_reply = body.strip()
                     reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
                     for splitter in reply_splitters:
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    clean_reply_notes = top_reply.strip()
-                    full_payload = f"{decoded_subject} {top_reply}".upper()
+                    # Clean lines to remove quoted email history (>) and boilerplate instructions
+                    lines = top_reply.splitlines()
+                    clean_lines = []
+                    for line in lines:
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                        if stripped.startswith('>') or 'please reply' in stripped.lower() or 'approved or rejected' in stripped.lower():
+                            continue
+                        clean_lines.append(stripped)
+
+                    clean_reply_notes = "\n".join(clean_lines).strip()
+                    full_payload = f"{decoded_subject} {clean_reply_notes}".upper()
+                    
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    # Save 'notes' along with sender
+                    # Save cleaned notes along with sender
                     payload_meta = {"sender": sender_clean, "notes": clean_reply_notes}
 
-                    # Categorize reply
-                    if "RECOMMEND FOR REJECTION" in full_payload or "RECOMMEND REJECT" in full_payload:
+                    # Robust categorization avoiding false positives from template text
+                    if "RECOMMEND" in full_payload and ("REJECT" in full_payload):
                         recommendations_rejection[po_id] = payload_meta
-                    elif "RECOMMEND FOR APPROVAL" in full_payload or "RECOMMEND APPROVE" in full_payload:
+                    elif "RECOMMEND" in full_payload and ("APPROV" in full_payload):
                         recommendations_approval[po_id] = payload_meta
-                    elif "REJECTED" in full_payload or "REJECT" in full_payload:
+                    elif "REJECT" in full_payload:
                         final_rejections[po_id] = payload_meta
-                    elif "APPROVED" in full_payload or "APPROVE" in full_payload:
+                    elif "APPROV" in full_payload:
                         final_approvals[po_id] = payload_meta
 
                     # Mark this email as read so it isn't fetched again on future runs:
