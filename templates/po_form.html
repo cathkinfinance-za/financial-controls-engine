@@ -1002,7 +1002,7 @@ function checkApprovals() {
 }
 
 function pollWorkflowStatus() {
-    const maxAttempts = 20; // Try for up to 60 seconds (20 * 3s)
+    const maxAttempts = 15; // 15 attempts * 10 seconds = 150 seconds total timeout window
     let attempts = 0;
 
     const interval = setInterval(() => {
@@ -1021,15 +1021,15 @@ function pollWorkflowStatus() {
                     showToast("⚠️ Workflow is taking longer than usual. Refreshing anyway...", "info");
                     setTimeout(() => {
                         window.location.reload();
-                    }, 1500);
+                    }, 2000);
                 } else {
-                    showToast(`⏳ Workflow in progress... (Attempt ${attempts})`, "info");
+                    showToast(`⏳ Processing emails via Gemini... (Attempt ${attempts}/${maxAttempts})`, "info");
                 }
             })
             .catch(err => {
                 console.error('Polling error:', err);
             });
-    }, 3000); // Check every 3 seconds
+    }, 10000); // Check every 10 seconds
 }
 
 function resetButtonState(btn, spinner) {
