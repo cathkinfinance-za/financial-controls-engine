@@ -176,6 +176,7 @@ def po_form():
     message = None
     selected_po = None
     financial_summary = None
+    audit_logs = {"board": [], "finance": [], "other": []}
 
     if request.method == "POST":
         original_po = request.form.get("original_po_number", "").strip()
@@ -355,7 +356,6 @@ def po_form():
                 message = f"Error saving purchase order: {e}"
 
     selected_po_num = request.args.get("po_number") or request.form.get("po_number")
-    audit_logs = []
 
     try:
         with conn.cursor() as cur:
@@ -387,13 +387,32 @@ def po_form():
                             FROM workflow_control_log l
                             LEFT JOIN approvers a ON LOWER(TRIM(l.actor_email)) = LOWER(TRIM(a.email))
                             WHERE TRIM(l.po_number) ILIKE TRIM(%s) 
-                            ORDER BY l.timestamp DESC;
+                            ORDER BY l.timestamp ASC;
                             """,
                             (target_po,)
                         )
-                        audit_logs = cur.fetchall()
+                        raw_audit_logs = cur.fetchall()
+                        
+                        board_approvers_log = [
+                            l for l in raw_audit_logs 
+                            if 'Approval Authority' in (l.get('approval_permission') or '') or 'Chair' in (l.get('approval_permission') or '')
+                        ]
+                        finance_reviewers_log = [
+                            l for l in raw_audit_logs 
+                            if 'Finance Review' in (l.get('approval_permission') or '') and 'Approval Authority' not in (l.get('approval_permission') or '')
+                        ]
+                        other_logs = [
+                            l for l in raw_audit_logs 
+                            if l not in board_approvers_log and l not in finance_reviewers_log
+                        ]
+                        
+                        audit_logs = {
+                            "board": board_approvers_log,
+                            "finance": finance_reviewers_log,
+                            "other": other_logs
+                        }
                     except Exception:
-                        audit_logs = []
+                        audit_logs = {"board": [], "finance": [], "other": []}
 
                     if selected_po.get('gl_code'):
                         try:
@@ -457,7 +476,6 @@ def cron_check_escalations():
         conn.close()
 
 
-# Helper to trigger process_replies.yml
 def trigger_process_replies_workflow():
     github_token = os.environ.get("GITHUB_TOKEN")
     repo = "cathkinfinance-za/financial-controls-engine" 
@@ -466,7 +484,6 @@ def trigger_process_replies_workflow():
         print("GITHUB_TOKEN missing; skipping reply processing dispatch.")
         return False, "GITHUB_TOKEN missing."
 
-    # GitHub workflow dispatch API endpoint
     url = f"https://api.github.com/repos/{repo}/actions/workflows/process_replies.yml/dispatches"
     headers = {
         "Authorization": f"Bearer {github_token}",
@@ -506,8 +523,8 @@ def check_workflow_status():
             runs = response.json().get("workflow_runs", [])
             if runs:
                 latest_run = runs[0]
-                run_status = latest_run.get("status")       # e.g., 'queued', 'in_progress', 'completed'
-                conclusion = latest_run.get("conclusion")   # e.g., 'success', 'failure'
+                run_status = latest_run.get("status")       
+                conclusion = latest_run.get("conclusion")   
                 
                 return jsonify({
                     "status": "success",
@@ -518,12 +535,10 @@ def check_workflow_status():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
         
-# Flask endpoint for the button call
 @po_bp.route("/api/check-approvals", methods=["POST"])
 def check_approvals():
     po_number = request.json.get("po_number") if request.is_json else None
     
-    # 1. Trigger the reply ingestion GitHub action
     success, msg = trigger_process_replies_workflow()
     
     if success:
@@ -536,5 +551,3 @@ def check_approvals():
             "status": "error", 
             "message": msg
         }), 500
-
-
