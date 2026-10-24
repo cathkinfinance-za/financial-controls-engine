@@ -27,6 +27,7 @@ jobs:
       - name: Execute Reply Ingestion
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
           SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
           SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
