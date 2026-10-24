@@ -1,6 +1,5 @@
 google-genai>=2.20.0
 vercel_blob
-playwright
 openpyxl
 pandas
 Flask
