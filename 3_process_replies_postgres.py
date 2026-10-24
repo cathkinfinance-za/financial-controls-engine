@@ -354,9 +354,9 @@ def process_replies():
                     continue
 
                 po_number = record['po_number']
-                if record.get('submission_status') == 'Approved':
-                    log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
-                    continue
+                
+                # REMOVED the rigid 'Already Approved' or 'Rejected' skips here!
+                # We want the script to re-evaluate quorum dynamically if a new vote arrives.
 
                 actual_voter = meta.get("voter") or meta.get("sender")
                 forwarded_by = meta.get("sender")
@@ -367,6 +367,7 @@ def process_replies():
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.")
                     continue
 
+                # Fetch all valid approval logs for this PO
                 cursor.execute("""
                     SELECT actor_email 
                     FROM workflow_control_log 
@@ -389,6 +390,7 @@ def process_replies():
                 requires_chair = record.get('requires_chair_approval', False)
                 current_count = len(approved_emails)
 
+                # Recalculate if quorum is met
                 if current_count >= required_count and (not requires_chair or chair_approved):
                     new_status = 'Approved'
                     log_action = 'Inbound Approval'
@@ -403,6 +405,7 @@ def process_replies():
                         missing_reasons.append("Chair approval pending")
                     notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
 
+                # Update status (allowing a transition out of Rejected if quorum is achieved)
                 cursor.execute("""
                     UPDATE po_log 
                     SET submission_status = %s
