@@ -37,12 +37,13 @@ def ensure_audit_log_table(conn):
         conn.commit()
 
 def write_control_log(conn, po_number, action_type, actor_email, notes, timestamp=None):
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            INSERT INTO workflow_control_log (po_number, action_type, actor_email, system_notes, timestamp)
-            VALUES (%s, %s, %s, %s, %s);
-        """, (po_number, action_type, actor_email, notes, timestamp or datetime.datetime.now()))
-        conn.commit()
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO workflow_control_log (po_number, action_type, actor_email, system_notes, timestamp)
+                VALUES (%s, %s, %s, %s, %s);
+            """, (po_number, action_type, actor_email, notes, timestamp or datetime.datetime.now()))
+            conn.commit()
         log(f"Control log recorded in DB for PO '{po_number}'.")
     except Exception as e:
         log(f"Failed to write control log: {e}", "WARNING")
