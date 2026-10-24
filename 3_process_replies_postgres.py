@@ -259,9 +259,10 @@ def verify_approver_authority(cursor, sender_email, required_permission):
         """
         SELECT approval_permission 
         FROM approvers 
-        WHERE LOWER(email) = LOWER(%s) AND active = 'YES';
+        WHERE (LOWER(email) = LOWER(%s) OR LOWER(temp_email) = LOWER(%s)) 
+          AND active = 'YES';
         """,
-        (sender_email,)
+        (sender_email, sender_email)
     )
     row = cursor.fetchone()
     if not row:
