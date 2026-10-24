@@ -220,30 +220,43 @@ def fetch_approval_replies(conn):
                     voter_email = ai_decision.get("voter_email", sender_clean).strip().lower()
                     parsed_notes = ai_decision.get("summary_notes", clean_reply_notes)
 
-                    # Updated log to show both the voter and the email sender if they differ
-                    if voter_email != sender_clean:
-                        log(f"Gemini Intent for voter {voter_email} (via {sender_clean}): {intent} -> {parsed_notes}")
-                    else:
-                        log(f"Gemini Intent for {sender_clean}: {intent} -> {parsed_notes}")
-
                     payload_meta = {
                         "po_id": po_id, 
                         "sender": sender_clean, 
-                        "voter": voter_email, 
+                        "voter": voter_email or sender_clean, 
                         "notes": parsed_notes
                     }
-                    
-                    if intent == "RECOMMEND_REJECT":
-                        recommendations_rejection.append(payload_meta)
-                    elif intent == "RECOMMEND_APPROVE":
-                        recommendations_approval.append(payload_meta)
-                    elif intent == "REJECT":
-                        final_rejections.append(payload_meta)
-                    elif intent == "APPROVE":
-                        final_approvals.append(payload_meta)
+
+                    # --- ROLE-BASED ROUTING & INTERCEPTION ---
+                    with conn.cursor() as perm_cursor:
+                        auth_check = verify_approver_authority(perm_cursor, payload_meta["voter"], 'Approval Authority')
+                        finance_check = verify_approver_authority(perm_cursor, payload_meta["voter"], 'Finance Review')
+
+                    if not auth_check["authorized"] and finance_check["authorized"]:
+                        # 1. FINANCE REVIEWER: Force any approval/rejection intent into Finance Recommendations
+                        if intent in ["APPROVE", "RECOMMEND_APPROVE"]:
+                            recommendations_approval.append(payload_meta)
+                            log(f"ℹ️ Reassigned approval from Finance Reviewer {payload_meta['voter']} to FINANCE RECOMMENDATION.")
+                        elif intent in ["REJECT", "RECOMMEND_REJECT"]:
+                            recommendations_rejection.append(payload_meta)
+                            log(f"ℹ️ Reassigned rejection from Finance Reviewer {payload_meta['voter']} to FINANCE REJECTION.")
+                        else:
+                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
+                            log(f"ℹ️ Email from Finance Reviewer {sender_clean} classified as NEUTRAL.")
+
+                    elif auth_check["authorized"]:
+                        # 2. BOARD DIRECTOR / APPROVAL AUTHORITY: Route to final votes
+                        if intent in ["APPROVE", "RECOMMEND_APPROVE"]:
+                            final_approvals.append(payload_meta)
+                        elif intent in ["REJECT", "RECOMMEND_REJECT"]:
+                            final_rejections.append(payload_meta)
+                        else:
+                            write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
+                            log(f"ℹ️ Email from Director {payload_meta['voter']} classified as NEUTRAL.")
                     else:
-                        write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
-                        log(f"ℹ️ Email from {sender_clean} classified as NEUTRAL. Ignored as vote.")
+                        # 3. UNAUTHORIZED SENDER
+                        write_control_log(conn, f"PO-ID-{po_id}", "Unauthorized Action Blocked", sender_clean, "Sender lacks recognized approval or review authority.")
+                        log(f"⚠️ Unauthorized sender blocked: {sender_clean}", "WARNING")
 
                     mail.store(e_id, '+FLAGS', '\\Seen')
 
