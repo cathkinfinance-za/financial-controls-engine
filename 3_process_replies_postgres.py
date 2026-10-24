@@ -282,7 +282,6 @@ def process_replies():
             conn.close()
             return
 
-        # Gather unique PO IDs from all lists
         all_po_ids = list(set(
             [item["po_id"] for item in recommendations_approval] + 
             [item["po_id"] for item in recommendations_rejection] + 
@@ -298,40 +297,41 @@ def process_replies():
             )
             records = cursor.fetchall()
             po_id_map = {row['id']: row for row in records if row.get('id')}
-            current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
             # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
             for meta in recommendations_approval:
                 po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
-                if record and record.get('submission_status') == 'Finance Review':
+                if record:
                     cursor.execute("""
                         UPDATE po_log 
-                        SET submission_status = 'Finance Recommended',
-                            actioned_by = %s,
-                            actioned_date = %s
+                        SET submission_status = CASE 
+                                WHEN submission_status = 'Finance Review' THEN 'Finance Recommended'
+                                ELSE submission_status 
+                            END
                         WHERE id = %s;
-                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    """, (record['id'],))
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for approval."
-                    write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
-                    log(f"✅ PO ID '{record['id']}' updated to FINANCE RECOMMENDED.")
+                    write_control_log(conn, record['po_number'], "Finance Review", meta.get("sender"), notes)
+                    log(f"✅ PO '{record['po_number']}' recorded as FINANCE REVIEW recommendation by {meta['sender']}.")
 
             for meta in recommendations_rejection:
                 po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
-                if record and record.get('submission_status') == 'Finance Review':
+                if record:
                     cursor.execute("""
                         UPDATE po_log 
-                        SET submission_status = 'Finance Rejected',
-                            actioned_by = %s,
-                            actioned_date = %s
+                        SET submission_status = CASE 
+                                WHEN submission_status = 'Finance Review' THEN 'Finance Rejected'
+                                ELSE submission_status 
+                            END
                         WHERE id = %s;
-                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    """, (record['id'],))
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for rejection."
-                    write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' updated to FINANCE REJECTED.")
+                    write_control_log(conn, record['po_number'], "Finance Review", meta.get("sender"), notes)
+                    log(f"❌ PO '{record['po_number']}' recorded as FINANCE REVIEW rejection by {meta['sender']}.")
 
             # 2. PROCESS FINAL APPROVALS
             for meta in final_approvals:
@@ -387,17 +387,16 @@ def process_replies():
                         missing_reasons.append("Chair approval pending")
                     notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
 
+                # Update status without overwriting actioned_by
                 cursor.execute("""
                     UPDATE po_log 
-                    SET submission_status = %s,
-                        actioned_by = %s,
-                        actioned_date = %s
+                    SET submission_status = %s
                     WHERE id = %s;
-                """, (new_status, meta.get("sender"), current_timestamp, record['id']))
+                """, (new_status, record['id']))
                 conn.commit()
 
                 write_control_log(conn, po_number, log_action, meta.get("sender"), notes)
-                log(f"✅ PO '{po_number}' updated to {new_status.upper()} by {meta['sender']}.")
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Logged vote by {meta['sender']}).")
 
             # 3. PROCESS REJECTIONS
             for meta in final_rejections:
@@ -410,16 +409,14 @@ def process_replies():
 
                     cursor.execute("""
                         UPDATE po_log 
-                        SET submission_status = 'Rejected',
-                            actioned_by = %s,
-                            actioned_date = %s
+                        SET submission_status = 'Rejected'
                         WHERE id = %s;
-                    """, (meta.get("sender"), current_timestamp, record['id']))
+                    """, (record['id'],))
                     conn.commit()
                     
                     notes = meta.get("notes") or "Marked as rejected via email reply."
                     write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' updated to REJECTED by {meta['sender']}.")
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED (Logged vote by {meta['sender']}).")
 
         conn.close()
     except Exception as db_err:
