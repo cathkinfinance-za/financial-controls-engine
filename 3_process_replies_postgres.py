@@ -271,7 +271,6 @@ def fetch_approval_replies(conn):
                         finance_check = verify_approver_authority(perm_cursor, payload_meta["voter"], 'Finance Review')
 
                     if not auth_check["authorized"] and finance_check["authorized"]:
-                        # 1. FINANCE REVIEWER: Force any approval/rejection intent into Finance Recommendations
                         if intent in ["APPROVE", "RECOMMEND_APPROVE"]:
                             recommendations_approval.append(payload_meta)
                             log(f"ℹ️ Reassigned approval from Finance Reviewer {payload_meta['voter']} to FINANCE RECOMMENDATION.")
@@ -283,7 +282,6 @@ def fetch_approval_replies(conn):
                             log(f"ℹ️ Email from Finance Reviewer {sender_clean} classified as NEUTRAL.")
 
                     elif auth_check["authorized"]:
-                        # 2. BOARD DIRECTOR / APPROVAL AUTHORITY: Route to final votes
                         if intent in ["APPROVE", "RECOMMEND_APPROVE"]:
                             final_approvals.append(payload_meta)
                         elif intent in ["REJECT", "RECOMMEND_REJECT"]:
@@ -292,7 +290,6 @@ def fetch_approval_replies(conn):
                             write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes, email_timestamp)
                             log(f"ℹ️ Email from Director {payload_meta['voter']} classified as NEUTRAL.")
                     else:
-                        # 3. UNAUTHORIZED SENDER
                         write_control_log(conn, f"PO-ID-{po_id}", "Unauthorized Action Blocked", sender_clean, "Sender lacks recognized approval or review authority.", email_timestamp)
                         log(f"⚠️ Unauthorized sender blocked: {sender_clean}", "WARNING")
 
@@ -443,29 +440,46 @@ def process_replies():
                 """, (approved_emails,))
                 chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                # --- DYNAMIC MATRIX LOOKUP FOR REQUIRED QUORUM ---
+                # --- DYNAMIC MATRIX LOOKUP FOR QUORUM & TIME LIMIT ---
                 matrix_rule = get_matrix_rule_for_po(
                     cursor, 
                     record.get('expense_type'), 
                     record.get('is_budgeted'), 
                     float(record.get('estimated_cost', 0))
                 )
-                required_count = int(matrix_rule.get('min_responses_required') or 1)
+                min_responses = int(matrix_rule.get('min_responses_required') or 1)
+                time_limit_days = int(matrix_rule.get('response_time_limit_days') or 7)
                 
+                # Check if response time limit has elapsed
+                chair_requested_at = record.get('chair_requested_at')
+                time_elapsed = False
+                if chair_requested_at:
+                    if isinstance(chair_requested_at, str):
+                        try:
+                            chair_requested_at = datetime.datetime.fromisoformat(chair_requested_at)
+                        except ValueError:
+                            chair_requested_at = datetime.datetime.now()
+                    deadline = chair_requested_at + datetime.timedelta(days=time_limit_days)
+                    time_elapsed = datetime.datetime.now() > deadline
+
                 requires_chair = record.get('requires_chair_approval', False)
                 current_approvals = len(approved_emails)
                 current_rejections = len(rejected_emails)
                 chair_status_text = "Approved" if chair_approved else "Pending"
 
-                if current_rejections > 0 and current_approvals < required_count:
+                # --- EVALUATE STATUS WITH TIME & QUORUM RULES ---
+                if current_rejections > 0 and current_approvals < min_responses:
                     new_status = 'Rejected'
-                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
-                elif current_approvals >= required_count and (not requires_chair or chair_approved):
+                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{min_responses}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+                elif current_approvals >= min_responses and (not requires_chair or chair_approved):
                     new_status = 'Approved'
-                    detailed_status = f"APPROVED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+                    detailed_status = f"APPROVED (Quorum Met: {current_approvals}/{min_responses}; Chair: {chair_status_text})"
+                elif time_elapsed and current_approvals < min_responses:
+                    new_status = 'Expired'
+                    detailed_status = f"EXPIRED (Time Limit of {time_limit_days} days elapsed. Quorum unmet: {current_approvals}/{min_responses})"
                 else:
                     new_status = 'Partially Approved'
-                    detailed_status = f"PENDING APPROVAL (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+                    detailed_status = f"PENDING APPROVAL (Approvals: {current_approvals}/{min_responses}, Time Limit: {time_limit_days}d; Chair: {chair_status_text})"
 
                 cursor.execute("""
                     UPDATE po_log 
@@ -516,21 +530,21 @@ def process_replies():
                     """, (approved_emails,))
                     chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                    # --- DYNAMIC MATRIX LOOKUP FOR REQUIRED QUORUM ---
+                    # --- DYNAMIC MATRIX LOOKUP FOR QUORUM & TIME LIMIT ---
                     matrix_rule = get_matrix_rule_for_po(
                         cursor, 
                         record.get('expense_type'), 
                         record.get('is_budgeted'), 
                         float(record.get('estimated_cost', 0))
                     )
-                    required_count = int(matrix_rule.get('min_responses_required') or 1)
+                    min_responses = int(matrix_rule.get('min_responses_required') or 1)
 
                     requires_chair = record.get('requires_chair_approval', False)
                     current_approvals = len(approved_emails)
                     current_rejections = len(rejected_emails)
                     chair_status_text = "Approved" if chair_approved else "Pending"
 
-                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
+                    detailed_status = f"REJECTED (Approvals: {current_approvals}/{min_responses}, Rejections: {current_rejections}; Chair: {chair_status_text})"
 
                     cursor.execute("""
                         UPDATE po_log 
