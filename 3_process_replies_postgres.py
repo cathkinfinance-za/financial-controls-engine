@@ -282,11 +282,12 @@ def process_replies():
             conn.close()
             return
 
+        # Gather unique PO IDs from all lists
         all_po_ids = list(set(
-            list(recommendations_approval.keys()) + 
-            list(recommendations_rejection.keys()) + 
-            list(final_approvals.keys()) + 
-            list(final_rejections.keys())
+            [item["po_id"] for item in recommendations_approval] + 
+            [item["po_id"] for item in recommendations_rejection] + 
+            [item["po_id"] for item in final_approvals] + 
+            [item["po_id"] for item in final_rejections]
         ))
         log(f"Found replies for PO IDs: {all_po_ids}")
 
@@ -300,8 +301,8 @@ def process_replies():
             current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
             # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
-            for raw_po_id, meta in recommendations_approval.items():
-                po_id = int(raw_po_id)
+            for meta in recommendations_approval:
+                po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
@@ -316,8 +317,8 @@ def process_replies():
                     write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
                     log(f"✅ PO ID '{record['id']}' updated to FINANCE RECOMMENDED.")
 
-            for raw_po_id, meta in recommendations_rejection.items():
-                po_id = int(raw_po_id)
+            for meta in recommendations_rejection:
+                po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
@@ -350,7 +351,6 @@ def process_replies():
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
                     continue
 
-                # Check prior approvals from audit log + current vote
                 cursor.execute("""
                     SELECT actor_email 
                     FROM workflow_control_log 
@@ -400,8 +400,8 @@ def process_replies():
                 log(f"✅ PO '{po_number}' updated to {new_status.upper()} by {meta['sender']}.")
 
             # 3. PROCESS REJECTIONS
-            for raw_po_id, meta in final_rejections.items():
-                po_id = int(raw_po_id)
+            for meta in final_rejections:
+                po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if record:
                     if record.get('submission_status') == 'Rejected':
@@ -419,7 +419,7 @@ def process_replies():
                     
                     notes = meta.get("notes") or "Marked as rejected via email reply."
                     write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' updated to REJECTED.")
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED by {meta['sender']}.")
 
         conn.close()
     except Exception as db_err:
