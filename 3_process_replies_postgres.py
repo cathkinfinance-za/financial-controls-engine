@@ -6,6 +6,8 @@ from email.header import decode_header
 import datetime
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import google.generativeai as genai
+import json
 
 def log(msg, level="INFO"):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -45,21 +47,83 @@ def write_control_log(conn, po_number, action_type, user_email, notes=""):
         log(f"Failed to write control log: {e}", "WARNING")
 
 def extract_po_id(subject, body):
-    # Combine subject and body and match PO-ID: followed by digits flexibly
     text_to_search = f"{subject or ''} {body or ''}"
     match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
+def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
+    """
+    Fetches the prompt template, selected model, and active status from the database table system_prompts.
+    """
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT prompt_template, selected_model, is_active 
+                FROM system_prompts 
+                WHERE process = %s;
+                """,
+                (process_name,)
+            )
+            row = cur.fetchone()
+            if row:
+                return {
+                    "template": row['prompt_template'],
+                    "model": row['selected_model'] or 'gemini-3.5-flash',
+                    "is_active": row['is_active']
+                }
+    except Exception as e:
+        log(f"Error fetching prompt from system_prompts: {e}", "WARNING")
+    
+    # Fallback default if table row is missing
+    return {
+        "template": "Sender: {sender_email}\nSubject: {subject}\nBody: {body}\nClassify as APPROVE, REJECT, RECOMMEND_APPROVE, RECOMMEND_REJECT, or NEUTRAL as JSON.",
+        "model": "gemini-3.5-flash",
+        "is_active": True
+    }
 
-def parse_incoming_reply(email_subject, email_body):
-    text_to_search = f"{email_subject} {email_body}"
-    # Match [PO-ID: 3] or PO-ID: 3
-    match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
-    if match:
-        return int(match.group(1))
-    return None
+def classify_reply_with_gemini(conn, sender_email, subject, body):
+    """
+    Uses Gemini and the database-stored system prompt to intelligently classify reply intent.
+    """
+    prompt_config = get_system_prompt_from_db(conn, process_name="Email Reply Classification")
+    
+    if not prompt_config["is_active"]:
+        log("Email Reply Classification prompt is disabled in system_prompts. Defaulting to NEUTRAL.", "WARNING")
+        return {"classification": "NEUTRAL", "summary_notes": "Prompt disabled in system configuration."}
 
-def fetch_approval_replies():
+    template = prompt_config["template"]
+    model_name = prompt_config["model"]
+
+    # Format the template with Python keyword arguments
+    try:
+        prompt = template.format(
+            sender_email=sender_email,
+            subject=subject or "",
+            body=body or ""
+        )
+    except Exception as fmt_err:
+        log(f"Prompt template formatting error: {fmt_err}. Using raw format.", "WARNING")
+        prompt = f"Sender: {sender_email}\nSubject: {subject}\nBody: {body}"
+
+    try:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            log("GEMINI_API_KEY is missing.", "ERROR")
+            return {"classification": "NEUTRAL", "summary_notes": "API key missing."}
+
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name)
+        response = model.generate_content(prompt)
+        
+        cleaned_text = response.text.replace("```json", "").replace("```", "").strip()
+        result = json.loads(cleaned_text)
+        return result
+    except Exception as e:
+        log(f"Gemini classification error: {e}", "WARNING")
+        return {"classification": "NEUTRAL", "summary_notes": "Failed to parse via Gemini fallback."}
+
+def fetch_approval_replies(conn):
     imap_server = os.getenv("IMAP_SERVER", "imap.gmail.com")
     email_account = os.getenv("SENDER_EMAIL")
     email_password = os.getenv("SENDER_PASSWORD")
@@ -74,7 +138,6 @@ def fetch_approval_replies():
         mail.login(email_account, email_password)
         mail.select("inbox")
 
-        # Pull the latest unread emails
         status, messages = mail.search(None, 'UNSEEN')
         if status != "OK" or not messages or messages == [b'']:
             log("No new unread approval emails found in inbox.")
@@ -83,11 +146,9 @@ def fetch_approval_replies():
 
         raw_data = messages[0]
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
-        
         latest_email_ids = email_ids[-20:]
         log(f"Scanning latest {len(latest_email_ids)} unread workflow email(s)...")
 
-        # Initialize all 4 response categories
         recommendations_approval = {}
         recommendations_rejection = {}
         final_approvals = {}
@@ -137,38 +198,43 @@ def fetch_approval_replies():
                         if splitter in top_reply:
                             top_reply = top_reply.split(splitter)[0]
 
-                    # Clean lines to remove quoted email history (>) and boilerplate instructions
                     lines = top_reply.splitlines()
                     clean_lines = []
                     for line in lines:
                         stripped = line.strip()
                         if not stripped:
                             continue
-                        if stripped.startswith('>') or 'please reply' in stripped.lower() or 'approved or rejected' in stripped.lower():
+                        if stripped.startswith('>'):
                             continue
                         clean_lines.append(stripped)
 
                     clean_reply_notes = "\n".join(clean_lines).strip()
-                    full_payload = f"{decoded_subject} {clean_reply_notes}".upper()
                     
                     sender = str(msg.get('From', '')).lower()
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    # Save cleaned notes along with sender
-                    payload_meta = {"sender": sender_clean, "notes": clean_reply_notes}
+                    # Classify intent using the database prompt & Gemini
+                    ai_decision = classify_reply_with_gemini(conn, sender_clean, decoded_subject, clean_reply_notes)
+                    intent = ai_decision.get("classification")
+                    parsed_notes = ai_decision.get("summary_notes", clean_reply_notes)
 
-                    # Robust categorization avoiding false positives from template text
-                    if "RECOMMEND" in full_payload and ("REJECT" in full_payload):
+                    log(f"Gemini Intent for {sender_clean}: {intent} -> {parsed_notes}")
+
+                    payload_meta = {"sender": sender_clean, "notes": parsed_notes}
+
+                    if intent == "RECOMMEND_REJECT":
                         recommendations_rejection[po_id] = payload_meta
-                    elif "RECOMMEND" in full_payload and ("APPROV" in full_payload):
+                    elif intent == "RECOMMEND_APPROVE":
                         recommendations_approval[po_id] = payload_meta
-                    elif "REJECT" in full_payload:
+                    elif intent == "REJECT":
                         final_rejections[po_id] = payload_meta
-                    elif "APPROV" in full_payload:
+                    elif intent == "APPROVE":
                         final_approvals[po_id] = payload_meta
+                    else:
+                        write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
+                        log(f"ℹ️ Email from {sender_clean} classified as NEUTRAL. Ignored as vote.")
 
-                    # Mark this email as read so it isn't fetched again on future runs:
                     mail.store(e_id, '+FLAGS', '\\Seen')
 
         mail.logout()
@@ -179,10 +245,6 @@ def fetch_approval_replies():
         return {}, {}, {}, {}
 
 def verify_approver_authority(cursor, sender_email, required_permission):
-    """
-    Checks approvers table to verify user permissions.
-    Returns dictionary with boolean authorization flags.
-    """
     cursor.execute(
         """
         SELECT approval_permission 
@@ -209,18 +271,17 @@ def verify_approver_authority(cursor, sender_email, required_permission):
 
 def process_replies():
     log("Starting Inbox Reply Processor...")
-    recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies()
-    
-    # 1. Guard against empty responses across all 4 categories
-    if not any([recommendations_approval, recommendations_rejection, final_approvals, final_rejections]):
-        log("No actionable email replies detected. Processing complete.")
-        return
-
     try:
         conn = get_db_connection()
         ensure_audit_log_table(conn)
         
-        # 2. Combine all unique PO numbers across all categories
+        recommendations_approval, recommendations_rejection, final_approvals, final_rejections = fetch_approval_replies(conn)
+        
+        if not any([recommendations_approval, recommendations_rejection, final_approvals, final_rejections]):
+            log("No actionable email replies detected. Processing complete.")
+            conn.close()
+            return
+
         all_po_ids = list(set(
             list(recommendations_approval.keys()) + 
             list(recommendations_rejection.keys()) + 
@@ -235,18 +296,12 @@ def process_replies():
                 (all_po_ids,)
             )
             records = cursor.fetchall()
-            po_map = {str(row['po_number']).strip().lower(): row for row in records if row.get('po_number')}
             po_id_map = {row['id']: row for row in records if row.get('id')}
-
             current_timestamp = datetime.datetime.now().strftime("%Y-%m-%d")
 
             # 1. PROCESS FINANCE REVIEW RECOMMENDATIONS
             for raw_po_id, meta in recommendations_approval.items():
-                try:
-                    po_id = int(raw_po_id)
-                except (ValueError, TypeError):
-                    continue
-
+                po_id = int(raw_po_id)
                 record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
@@ -257,18 +312,12 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-                    
-                    # Capture actual email notes
                     notes = meta.get("notes") or "Finance Committee recommended for approval."
                     write_control_log(conn, record['po_number'], "Finance Review Recommendation", meta.get("sender"), notes)
-                    log(f"✅ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE RECOMMENDED.")
+                    log(f"✅ PO ID '{record['id']}' updated to FINANCE RECOMMENDED.")
 
             for raw_po_id, meta in recommendations_rejection.items():
-                try:
-                    po_id = int(raw_po_id)
-                except (ValueError, TypeError):
-                    continue
-
+                po_id = int(raw_po_id)
                 record = po_id_map.get(po_id)
                 if record and record.get('submission_status') == 'Finance Review':
                     cursor.execute("""
@@ -279,24 +328,18 @@ def process_replies():
                         WHERE id = %s;
                     """, (meta.get("sender"), current_timestamp, record['id']))
                     conn.commit()
-
                     notes = meta.get("notes") or "Finance Committee recommended for rejection."
                     write_control_log(conn, record['po_number'], "Finance Review Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to FINANCE REJECTED.")
+                    log(f"❌ PO ID '{record['id']}' updated to FINANCE REJECTED.")
 
-            # 2. PROCESS FINAL APPROVALS WITH MULTI-SIGNATORY & CHAIR LOGIC
+            # 2. PROCESS FINAL APPROVALS
             for raw_po_id, meta in final_approvals.items():
-                try:
-                    po_id = int(raw_po_id)
-                except (ValueError, TypeError):
-                    continue
-
+                po_id = int(raw_po_id)
                 record = po_id_map.get(po_id)
                 if not record:
                     continue
 
                 po_number = record['po_number']
-
                 if record.get('submission_status') == 'Approved':
                     log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
                     continue
@@ -307,7 +350,6 @@ def process_replies():
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
                     continue
 
-                # Fetch prior valid approval actions from audit log for this PO
                 cursor.execute("""
                     SELECT actor_email 
                     FROM workflow_control_log 
@@ -315,11 +357,9 @@ def process_replies():
                 """, (po_number,))
                 prior_logs = cursor.fetchall()
 
-                # Collect distinct set of approved email addresses
                 approved_emails = set(row['actor_email'].lower() for row in prior_logs if row.get('actor_email'))
                 approved_emails.add(meta["sender"].lower())
 
-                # Query database to check if Chair has signed off among all recorded approvers
                 cursor.execute("""
                     SELECT count(*) as chair_count 
                     FROM approvers 
@@ -328,12 +368,10 @@ def process_replies():
                 """, (list(approved_emails),))
                 chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                # Pull thresholds directly from the SQL view columns (replacing Python logic)
                 required_count = record.get('required_approval_count', 1)
                 requires_chair = record.get('requires_chair_approval', False)
                 current_count = len(approved_emails)
 
-                # Determine target submission status
                 if current_count >= required_count and (not requires_chair or chair_approved):
                     new_status = 'Approved'
                     log_action = 'Inbound Approval'
@@ -346,7 +384,6 @@ def process_replies():
                         missing_reasons.append(f"{current_count}/{required_count} approvals")
                     if requires_chair and not chair_approved:
                         missing_reasons.append("Chair approval pending")
-                    
                     notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
 
                 cursor.execute("""
@@ -359,18 +396,13 @@ def process_replies():
                 conn.commit()
 
                 write_control_log(conn, po_number, log_action, meta.get("sender"), notes)
-                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Approvals: {current_count}/{required_count}, Chair Signed: {chair_approved}).")
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()}.")
 
             # 3. PROCESS REJECTIONS
             for raw_po_id, meta in final_rejections.items():
-                try:
-                    po_id = int(raw_po_id)
-                except (ValueError, TypeError):
-                    continue
-
+                po_id = int(raw_po_id)
                 record = po_id_map.get(po_id)
                 if record:
-                    # ---> IDEMPOTENCY CHECK <---
                     if record.get('submission_status') == 'Rejected':
                         log(f"PO ID '{record['id']}' is already REJECTED. Skipping.")
                         continue
@@ -386,14 +418,11 @@ def process_replies():
                     
                     notes = meta.get("notes") or "Marked as rejected via email reply."
                     write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' (PO: '{record['po_number']}') updated to REJECTED.")
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED.")
 
+        conn.close()
     except Exception as db_err:
         log(f"Database sync error: {db_err}", "CRITICAL")
-    finally:
-        if 'conn' in locals() and conn:
-            conn.close()
-            log("PostgreSQL connection closed.")
 
 if __name__ == "__main__":
     process_replies()
