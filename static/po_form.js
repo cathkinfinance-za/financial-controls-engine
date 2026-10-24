@@ -282,9 +282,12 @@ function calculateSystemStatus() {
         systemStatusInput.value = systemStatus;
     }
 
-    const approvalRequirementInput = document.getElementById('approval_requirement') || document.querySelector('[name="approval_requirement"]');
-    if (approvalRequirementInput) {
-        approvalRequirementInput.value = approvalRequirement;
+    // Update both top and bottom Governance Sign-off Tier fields simultaneously
+    const reqInputTop = document.getElementById('approval_requirement');
+    const reqInputBottom = document.getElementById('approval_requirement_copy');
+    
+    if (reqInputTop) reqInputTop.value = approvalRequirement;
+    if (reqInputBottom) reqInputBottom.value = approvalRequirement;
     }
 }
 
