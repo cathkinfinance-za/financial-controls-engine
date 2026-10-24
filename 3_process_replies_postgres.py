@@ -214,15 +214,25 @@ def fetch_approval_replies(conn):
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                    # Classify intent using the database prompt & Gemini
+                   # Classify intent using the database prompt & Gemini
                     ai_decision = classify_reply_with_gemini(conn, sender_clean, decoded_subject, clean_reply_notes)
                     intent = ai_decision.get("classification")
+                    voter_email = ai_decision.get("voter_email", sender_clean).strip().lower()
                     parsed_notes = ai_decision.get("summary_notes", clean_reply_notes)
 
-                    log(f"Gemini Intent for {sender_clean}: {intent} -> {parsed_notes}")
+                    # Updated log to show both the voter and the email sender if they differ
+                    if voter_email != sender_clean:
+                        log(f"Gemini Intent for voter {voter_email} (via {sender_clean}): {intent} -> {parsed_notes}")
+                    else:
+                        log(f"Gemini Intent for {sender_clean}: {intent} -> {parsed_notes}")
 
-                    payload_meta = {"po_id": po_id, "sender": sender_clean, "notes": parsed_notes}
-
+                    payload_meta = {
+                        "po_id": po_id, 
+                        "sender": sender_clean, 
+                        "voter": voter_email, 
+                        "notes": parsed_notes
+                    }
+                    
                     if intent == "RECOMMEND_REJECT":
                         recommendations_rejection.append(payload_meta)
                     elif intent == "RECOMMEND_APPROVE":
@@ -313,8 +323,9 @@ def process_replies():
                     """, (record['id'],))
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for approval."
-                    write_control_log(conn, record['po_number'], "Finance Review", meta.get("sender"), notes)
-                    log(f"✅ PO '{record['po_number']}' recorded as FINANCE REVIEW recommendation by {meta['sender']}.")
+                    voter = meta.get("voter") or meta.get("sender")
+                    write_control_log(conn, record['po_number'], "Finance Review", voter, notes)
+                    log(f"✅ PO '{record['po_number']}' recorded as FINANCE REVIEW recommendation by {voter}.")
 
             for meta in recommendations_rejection:
                 po_id = int(meta["po_id"])
@@ -330,8 +341,9 @@ def process_replies():
                     """, (record['id'],))
                     conn.commit()
                     notes = meta.get("notes") or "Finance Committee recommended for rejection."
-                    write_control_log(conn, record['po_number'], "Finance Review", meta.get("sender"), notes)
-                    log(f"❌ PO '{record['po_number']}' recorded as FINANCE REVIEW rejection by {meta['sender']}.")
+                    voter = meta.get("voter") or meta.get("sender")
+                    write_control_log(conn, record['po_number'], "Finance Review", voter, notes)
+                    log(f"❌ PO '{record['po_number']}' recorded as FINANCE REVIEW rejection by {voter}.")
 
             # 2. PROCESS FINAL APPROVALS
             for meta in final_approvals:
@@ -345,10 +357,13 @@ def process_replies():
                     log(f"PO ID '{record['id']}' is already APPROVED. Skipping.")
                     continue
 
-                auth_info = verify_approver_authority(cursor, meta["sender"], 'Approval Authority')
+                actual_voter = meta.get("voter") or meta.get("sender")
+                forwarded_by = meta.get("sender")
+
+                auth_info = verify_approver_authority(cursor, actual_voter, 'Approval Authority')
                 if not auth_info["authorized"]:
-                    log(f"⚠️ Unauthorized action attempt by {meta['sender']} for PO {po_number}", "WARNING")
-                    write_control_log(conn, po_number, "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
+                    log(f"⚠️ Unauthorized action attempt by {actual_voter} (forwarded by {forwarded_by}) for PO {po_number}", "WARNING")
+                    write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.")
                     continue
 
                 cursor.execute("""
@@ -359,7 +374,7 @@ def process_replies():
                 prior_logs = cursor.fetchall()
 
                 approved_emails = set(row['actor_email'].lower() for row in prior_logs if row.get('actor_email'))
-                approved_emails.add(meta["sender"].lower())
+                approved_emails.add(actual_voter.lower())
 
                 cursor.execute("""
                     SELECT count(*) as chair_count 
@@ -387,7 +402,6 @@ def process_replies():
                         missing_reasons.append("Chair approval pending")
                     notes = meta.get("notes") or f"Partially approved: {', '.join(missing_reasons)}."
 
-                # Update status without overwriting actioned_by
                 cursor.execute("""
                     UPDATE po_log 
                     SET submission_status = %s
@@ -395,8 +409,8 @@ def process_replies():
                 """, (new_status, record['id']))
                 conn.commit()
 
-                write_control_log(conn, po_number, log_action, meta.get("sender"), notes)
-                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Logged vote by {meta['sender']}).")
+                write_control_log(conn, po_number, log_action, actual_voter, notes)
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()} (Logged vote by {actual_voter}).")
 
             # 3. PROCESS REJECTIONS
             for meta in final_rejections:
@@ -407,6 +421,7 @@ def process_replies():
                         log(f"PO ID '{record['id']}' is already REJECTED. Skipping.")
                         continue
 
+                    actual_voter = meta.get("voter") or meta.get("sender")
                     cursor.execute("""
                         UPDATE po_log 
                         SET submission_status = 'Rejected'
@@ -415,8 +430,8 @@ def process_replies():
                     conn.commit()
                     
                     notes = meta.get("notes") or "Marked as rejected via email reply."
-                    write_control_log(conn, record['po_number'], "Inbound Rejection", meta.get("sender"), notes)
-                    log(f"❌ PO ID '{record['id']}' updated to REJECTED (Logged vote by {meta['sender']}).")
+                    write_control_log(conn, record['po_number'], "Inbound Rejection", actual_voter, notes)
+                    log(f"❌ PO ID '{record['id']}' updated to REJECTED (Logged vote by {actual_voter}).")
 
         conn.close()
     except Exception as db_err:
