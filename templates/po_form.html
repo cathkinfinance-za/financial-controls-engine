@@ -904,22 +904,6 @@
             clearBtn.addEventListener('click', clearAiAnalysis);
         }
 
-        const monitoredFields = [
-            'po_number', 'description', 'po_date', 'is_budgeted', 
-            'gl_code', 'expense_type', 'estimated_cost', 
-            'recommended_vendor', 'justification_notes', 'attach_quotes'
-        ];
-
-        monitoredFields.forEach(fieldName => {
-            const inputEl = document.querySelector(`[name="${fieldName}"]`);
-            if (inputEl) {
-                inputEl.addEventListener('change', clearAiAnalysis);
-                if (inputEl.tagName === 'INPUT' || inputEl.tagName === 'TEXTAREA') {
-                    inputEl.addEventListener('input', clearAiAnalysis);
-                }
-            }
-        });
-
         // Form Submit Unbudgeted Guard
         const formEl = document.getElementById('po-form');
         if (formEl) {
