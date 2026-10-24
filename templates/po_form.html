@@ -977,6 +977,9 @@ function checkApprovals() {
     if (btn) btn.disabled = true;
     if (spinner) spinner.style.display = 'inline';
 
+    // Optional: Show a subtle on-screen status banner immediately
+    showToast("Checking email inbox for incoming approvals...", "info");
+
     fetch('/api/check-approvals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -984,22 +987,61 @@ function checkApprovals() {
     })
     .then(response => response.json())
     .then(data => {
-        alert(data.message);
-        // Refresh page after a short delay so updated DB statuses render
         if (data.status === 'success') {
+            // Success pop-up notification
+            showToast("✅ Approval check complete! Refreshing page...", "success");
             setTimeout(() => {
                 window.location.reload();
-            }, 3000);
+            }, 2000); // reloads after 2 seconds so you can read the pop-up
+        } else {
+            showToast("⚠️ " + data.message, "error");
+            if (btn) btn.disabled = false;
+            if (spinner) spinner.style.display = 'none';
         }
     })
     .catch(err => {
         console.error('Error checking approvals:', err);
-        alert('An error occurred while dispatching the approval check.');
-    })
-    .finally(() => {
+        showToast("❌ An error occurred while checking approvals.", "error");
         if (btn) btn.disabled = false;
         if (spinner) spinner.style.display = 'none';
     });
+}
+
+// Simple floating toast notification helper
+function showToast(message, type = 'success') {
+    let existingToast = document.getElementById('app-toast-notification');
+    if (existingToast) existingToast.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'app-toast-notification';
+    toast.textContent = message;
+    
+    let bgColor = '#212529'; // default dark
+    if (type === 'success') bgColor = '#198754'; // green
+    if (type === 'error') bgColor = '#dc3545'; // red
+    if (type === 'info') bgColor = '#0d6efd'; // blue
+
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background-color: ${bgColor};
+        color: white;
+        padding: 12px 20px;
+        border-radius: 6px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 9999;
+        transition: opacity 0.3s ease;
+    `;
+
+    document.body.appendChild(toast);
+    
+    // Auto remove if not reloading
+    if (type !== 'success') {
+        setTimeout(() => { toast.remove(); }, 4000);
+    }
 }
 </script>
 
