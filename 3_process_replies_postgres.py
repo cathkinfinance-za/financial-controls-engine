@@ -130,7 +130,7 @@ def fetch_approval_replies(conn):
 
     if not email_account or not email_password:
         log("SENDER_EMAIL or SENDER_PASSWORD missing.", "ERROR")
-        return {}, {}, {}, {}
+        return [], [], [], []
 
     log(f"Connecting to IMAP inbox at {imap_server}...")
     try:
@@ -142,17 +142,17 @@ def fetch_approval_replies(conn):
         if status != "OK" or not messages or messages == [b'']:
             log("No new unread approval emails found in inbox.")
             mail.logout()
-            return {}, {}, {}, {}
+            return [], [], [], []
 
         raw_data = messages[0]
         email_ids = raw_data.split() if isinstance(raw_data, bytes) else str(raw_data).split()
         latest_email_ids = email_ids[-20:]
         log(f"Scanning latest {len(latest_email_ids)} unread workflow email(s)...")
 
-        recommendations_approval = {}
-        recommendations_rejection = {}
-        final_approvals = {}
-        final_rejections = {}
+        recommendations_approval = []
+        recommendations_rejection = []
+        final_approvals = []
+        final_rejections = []
 
         for e_id in latest_email_ids:
             res, msg_data = mail.fetch(e_id, '(RFC822)')
@@ -221,16 +221,16 @@ def fetch_approval_replies(conn):
 
                     log(f"Gemini Intent for {sender_clean}: {intent} -> {parsed_notes}")
 
-                    payload_meta = {"sender": sender_clean, "notes": parsed_notes}
+                    payload_meta = {"po_id": po_id, "sender": sender_clean, "notes": parsed_notes}
 
                     if intent == "RECOMMEND_REJECT":
-                        recommendations_rejection[po_id] = payload_meta
+                        recommendations_rejection.append(payload_meta)
                     elif intent == "RECOMMEND_APPROVE":
-                        recommendations_approval[po_id] = payload_meta
+                        recommendations_approval.append(payload_meta)
                     elif intent == "REJECT":
-                        final_rejections[po_id] = payload_meta
+                        final_rejections.append(payload_meta)
                     elif intent == "APPROVE":
-                        final_approvals[po_id] = payload_meta
+                        final_approvals.append(payload_meta)
                     else:
                         write_control_log(conn, f"PO-ID-{po_id}", "Informational Reply", sender_clean, parsed_notes)
                         log(f"ℹ️ Email from {sender_clean} classified as NEUTRAL. Ignored as vote.")
@@ -242,7 +242,7 @@ def fetch_approval_replies(conn):
 
     except Exception as e:
         log(f"IMAP Processing Error: {e}", "ERROR")
-        return {}, {}, {}, {}
+        return [], [], [], []
 
 def verify_approver_authority(cursor, sender_email, required_permission):
     cursor.execute(
@@ -333,8 +333,8 @@ def process_replies():
                     log(f"❌ PO ID '{record['id']}' updated to FINANCE REJECTED.")
 
             # 2. PROCESS FINAL APPROVALS
-            for raw_po_id, meta in final_approvals.items():
-                po_id = int(raw_po_id)
+            for meta in final_approvals:
+                po_id = int(meta["po_id"])
                 record = po_id_map.get(po_id)
                 if not record:
                     continue
@@ -350,6 +350,7 @@ def process_replies():
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", meta["sender"], "Sender lacks approval authority.")
                     continue
 
+                # Check prior approvals from audit log + current vote
                 cursor.execute("""
                     SELECT actor_email 
                     FROM workflow_control_log 
@@ -396,7 +397,7 @@ def process_replies():
                 conn.commit()
 
                 write_control_log(conn, po_number, log_action, meta.get("sender"), notes)
-                log(f"✅ PO '{po_number}' updated to {new_status.upper()}.")
+                log(f"✅ PO '{po_number}' updated to {new_status.upper()} by {meta['sender']}.")
 
             # 3. PROCESS REJECTIONS
             for raw_po_id, meta in final_rejections.items():
