@@ -337,10 +337,6 @@
         <div class="dashboard-container">
             <div class="control-bar">
                 <h2 style="margin: 0; font-size: 20px;">Purchase Order Controls</h2>
-                <!-- Check Approvals Button -->
-                <button type="button" id="btn-check-approvals" class="btn btn-secondary" onclick="checkApprovals()" style="display: flex; align-items: center; gap: 6px;">
-                    <span id="check-spinner" style="display: none;">⏳</span> 🔄 Check Approvals
-                </button>
                 <a href="/" class="btn btn-secondary">Back to Dashboard &gt;</a>
             </div>
 
@@ -655,14 +651,17 @@
                                     {% endfor %}
                                 {% else %}
                                     <tr>
-                                        <td colspan="4" style="padding: 12px; text-align: center; color: var(--text-muted);">No audit events recorded for this purchase order yet.</td>
+                                        <td colspan="6" style="padding: 12px; text-align: center; color: var(--text-muted);">No audit events recorded for this purchase order yet.</td>
                                     </tr>
                                 {% endif %}
                             </tbody>
                         </table>
                     </div>
 
-                <div style="margin-top: 30px; text-align: right;">
+                <div style="margin-top: 30px; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+                    <button type="button" id="btn-check-approvals" class="btn btn-secondary" onclick="checkApprovals()" style="display: inline-flex; align-items: center; gap: 6px;">
+                        <span id="check-spinner" style="display: none;">⏳</span> 🔄 Check Approvals
+                    </button>
                     <button type="submit" class="btn btn-blue">Save Purchase Order</button>
                 </div>
             </form>
