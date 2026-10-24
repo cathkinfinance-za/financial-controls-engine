@@ -53,10 +53,45 @@ def extract_po_id(subject, body):
     match = re.search(r"PO-ID:\s*(\d+)", text_to_search, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
+def get_matrix_rule_for_po(cursor, expense_type, is_budgeted, estimated_cost):
+    """
+    Dynamically queries the approval_matrix table for the given PO parameters 
+    to retrieve min_responses_required and response_time_limit_days.
+    """
+    if expense_type == 'Emergency':
+        cat_filter = '%Emergency%'
+    elif is_budgeted == 'No':
+        cat_filter = '%Unbudgeted%'
+    elif expense_type == 'Service Contract':
+        cat_filter = '%Service Provider Contracts%'
+    elif expense_type == 'Capital':
+        cat_filter = '%Capital Expenditure%'
+    else:
+        cat_filter = '%Operational%'
+
+    cursor.execute("""
+        SELECT * FROM approval_matrix 
+        WHERE matrix_category ILIKE %s 
+          AND min_value <= %s 
+          AND (max_value >= %s OR max_value IS NULL)
+        ORDER BY min_value DESC 
+        LIMIT 1;
+    """, (cat_filter, estimated_cost, estimated_cost))
+    row = cursor.fetchone()
+    
+    if not row:
+        cursor.execute("""
+            SELECT * FROM approval_matrix 
+            WHERE min_value <= %s 
+              AND (max_value >= %s OR max_value IS NULL)
+            ORDER BY min_value DESC 
+            LIMIT 1;
+        """, (estimated_cost, estimated_cost))
+        row = cursor.fetchone()
+
+    return dict(row) if row else {"min_responses_required": 1, "response_time_limit_days": 7}
+
 def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
-    """
-    Fetches the prompt template, selected model, and active status from the database table system_prompts.
-    """
     try:
         with conn.cursor() as cur:
             cur.execute(
@@ -77,7 +112,6 @@ def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
     except Exception as e:
         log(f"Error fetching prompt from system_prompts: {e}", "WARNING")
     
-    # Fallback default if table row is missing
     return {
         "template": "Sender: {sender_email}\nSubject: {subject}\nBody: {body}\nClassify as APPROVE, REJECT, RECOMMEND_APPROVE, RECOMMEND_REJECT, or NEUTRAL as JSON.",
         "model": "gemini-3.5-flash",
@@ -86,10 +120,6 @@ def get_system_prompt_from_db(conn, process_name="Email Reply Classification"):
 
 
 def classify_reply_with_gemini(conn, sender_email, subject, body):
-    """
-    Uses the modern google-genai SDK and database prompt template, 
-    safely replacing placeholders without crashing on JSON curly braces.
-    """
     prompt_config = get_system_prompt_from_db(conn, process_name="Email Reply Classification")
     
     if not prompt_config["is_active"]:
@@ -99,8 +129,6 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
     template = prompt_config["template"]
     model_name = prompt_config["model"] or "gemini-3.5-flash"
 
-    # Safely replace placeholders using string replacement 
-    # (This prevents Python from crashing on the JSON curly braces in your template)
     prompt = template.replace("{sender_email}", sender_email) \
                      .replace("{subject}", subject or "") \
                      .replace("{body}", body or "")
@@ -111,7 +139,6 @@ def classify_reply_with_gemini(conn, sender_email, subject, body):
         return {"classification": "NEUTRAL", "summary_notes": "API key missing."}
 
     try:
-        # Explicitly pass the API key to the modern google-genai client
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
             model=model_name,
@@ -166,7 +193,6 @@ def fetch_approval_replies(conn):
 
                     msg = email.message_from_bytes(raw_bytes)
                     
-                    # --- 1. EXTRACT NATIVE EMAIL TIMESTAMP ---
                     date_header = msg.get('Date')
                     if date_header:
                         parsed_date_tuple = email.utils.parsedate_tz(date_header)
@@ -205,7 +231,6 @@ def fetch_approval_replies(conn):
                     if not po_id:
                         continue
 
-                    # Strip email threading and splitters
                     top_reply = body.strip()
                     reply_splitters = ["-----Original Message-----", "From:", "On ", "Am ", "Le ", "wrote:"]
                     for splitter in reply_splitters:
@@ -228,7 +253,6 @@ def fetch_approval_replies(conn):
                     sender_match = re.search(r'<([^>]+)>', sender)
                     sender_clean = sender_match.group(1).strip() if sender_match else sender.strip()
 
-                   # Classify intent using the database prompt & Gemini
                     ai_decision = classify_reply_with_gemini(conn, sender_clean, decoded_subject, clean_reply_notes)
                     intent = ai_decision.get("classification")
                     voter_email = ai_decision.get("voter_email", sender_clean).strip().lower()
@@ -239,10 +263,9 @@ def fetch_approval_replies(conn):
                         "sender": sender_clean, 
                         "voter": voter_email or sender_clean, 
                         "notes": parsed_notes,
-                        "timestamp": email_timestamp  # Passed along for correct audit logging
+                        "timestamp": email_timestamp
                     }
 
-                    # --- ROLE-BASED ROUTING & INTERCEPTION ---
                     with conn.cursor() as perm_cursor:
                         auth_check = verify_approver_authority(perm_cursor, payload_meta["voter"], 'Approval Authority')
                         finance_check = verify_approver_authority(perm_cursor, payload_meta["voter"], 'Finance Review')
@@ -396,10 +419,8 @@ def process_replies():
                     write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.", email_ts)
                     continue
 
-                # Log the inbound approval first so it's included in vote tallying
                 write_control_log(conn, po_number, "Inbound Approval", actual_voter, meta.get("notes") or "Approved via email reply.", email_ts)
 
-                # Fetch all valid active votes for this PO to compute detailed breakdown
                 cursor.execute("""
                     SELECT actor_email, action_type 
                     FROM workflow_control_log 
@@ -407,7 +428,6 @@ def process_replies():
                 """, (po_number,))
                 all_votes = cursor.fetchall()
 
-                # Deduplicate to get each approver's latest action
                 latest_votes = {}
                 for vote in all_votes:
                     latest_votes[vote['actor_email'].lower()] = vote['action_type']
@@ -415,7 +435,6 @@ def process_replies():
                 approved_emails = [email for email, action in latest_votes.items() if action in ('Inbound Approval', 'Board Approval')]
                 rejected_emails = [email for email, action in latest_votes.items() if action == 'Inbound Rejection']
 
-                # Check chair approval requirements
                 cursor.execute("""
                     SELECT count(*) as chair_count 
                     FROM approvers 
@@ -424,13 +443,20 @@ def process_replies():
                 """, (approved_emails,))
                 chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                required_count = record.get('required_approval_count', 1)
+                # --- DYNAMIC MATRIX LOOKUP FOR REQUIRED QUORUM ---
+                matrix_rule = get_matrix_rule_for_po(
+                    cursor, 
+                    record.get('expense_type'), 
+                    record.get('is_budgeted'), 
+                    float(record.get('estimated_cost', 0))
+                )
+                required_count = int(matrix_rule.get('min_responses_required') or 1)
+                
                 requires_chair = record.get('requires_chair_approval', False)
                 current_approvals = len(approved_emails)
                 current_rejections = len(rejected_emails)
                 chair_status_text = "Approved" if chair_approved else "Pending"
 
-                # Formulate detailed governance status banner string
                 if current_rejections > 0 and current_approvals < required_count:
                     new_status = 'Rejected'
                     detailed_status = f"REJECTED (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
@@ -441,7 +467,6 @@ def process_replies():
                     new_status = 'Partially Approved'
                     detailed_status = f"PENDING APPROVAL (Approvals: {current_approvals}/{required_count}, Rejections: {current_rejections}; Chair: {chair_status_text})"
 
-                # Update PO status & calculated approval status string in database
                 cursor.execute("""
                     UPDATE po_log 
                     SET submission_status = %s, calculated_approval_status = %s
@@ -467,10 +492,8 @@ def process_replies():
                         write_control_log(conn, po_number, "Unauthorized Action Blocked", forwarded_by, f"Voter {actual_voter} lacks approval authority.", email_ts)
                         continue
 
-                    # Log the inbound rejection
                     write_control_log(conn, po_number, "Inbound Rejection", actual_voter, meta.get("notes") or "Marked as rejected via email reply.", email_ts)
 
-                    # Re-tally votes
                     cursor.execute("""
                         SELECT actor_email, action_type 
                         FROM workflow_control_log 
@@ -493,7 +516,15 @@ def process_replies():
                     """, (approved_emails,))
                     chair_approved = (cursor.fetchone()['chair_count'] > 0)
 
-                    required_count = record.get('required_approval_count', 1)
+                    # --- DYNAMIC MATRIX LOOKUP FOR REQUIRED QUORUM ---
+                    matrix_rule = get_matrix_rule_for_po(
+                        cursor, 
+                        record.get('expense_type'), 
+                        record.get('is_budgeted'), 
+                        float(record.get('estimated_cost', 0))
+                    )
+                    required_count = int(matrix_rule.get('min_responses_required') or 1)
+
                     requires_chair = record.get('requires_chair_approval', False)
                     current_approvals = len(approved_emails)
                     current_rejections = len(rejected_emails)
