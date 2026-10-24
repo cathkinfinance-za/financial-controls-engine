@@ -245,7 +245,7 @@ function calculateSystemStatus() {
     // --- PART A: CALCULATE APPROVAL REQUIREMENT (Governance & Delegation) ---
     let approvalRequirement = '';
     if (rule) {
-        const timeText = responseTimeLimit ? `${responseTime_limit_days || responseTimeLimit}-day limit` : 'No time limit';
+        const timeText = responseTimeLimit ? `${responseTimeLimit}-day limit` : 'No time limit';
         const quorumText = minResponses ? `Min Quorum: ${minResponses}` : 'Single Approver';
         approvalRequirement = `${categoryName} (${requiredQuotes} Quotes Required | Approvers: ${approverRoles} | ${timeText}, ${quorumText})`;
     } else {
