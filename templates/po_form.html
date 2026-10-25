@@ -622,7 +622,7 @@
                     <input 
                         type="text" 
                         id="finance_dispatched_date_display" 
-                        value="{% if selected_po and selected_po.finance_requested_at %}{% if selected_po.finance_requested_at.strftime %}{{ selected_po.finance_requested_at.strftime('%Y-%m-%d %H:%M') }}{% else %}{{ selected_po.finance_requested_at[:16] }}{% endif %}{% else %}Not yet dispatched to finance{% endif %}" 
+                        value="{% if selected_po and selected_po.finance_requested_at %}{{ selected_po.finance_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po.finance_requested_at.strftime else selected_po.finance_requested_at | string | truncate(16, True, '') }}{% else %}Not yet dispatched to finance{% endif %}" 
                         readonly 
                         class="form-control"
                         style="width: 240px;"
