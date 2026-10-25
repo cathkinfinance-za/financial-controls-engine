@@ -287,9 +287,9 @@ function calculateSystemStatus() {
         systemStatusInput.value = systemStatus;
     }
 
-    // Update both top and bottom Governance Sign-off Tier fields simultaneously
-    const reqInputTop = document.getElementById('approval_requirement');
-    const reqInputBottom = document.getElementById('approval_requirement_copy');
+   // Update Governance Sign-off Tier field
+    const reqInput = document.getElementById('approval_requirement');
+    if (reqInput) reqInput.value = approvalRequirement;
     
     if (reqInputTop) reqInputTop.value = approvalRequirement;
     if (reqInputBottom) reqInputBottom.value = approvalRequirement;
