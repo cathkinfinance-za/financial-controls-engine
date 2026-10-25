@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const estimatedCost = parseFloat(document.querySelector('[name="estimated_cost"]')?.value) || 0;
 
             if ((totalBudget > 0 && estimatedCost > (totalBudget - ytdActual)) || isBudgeted === 'No') {
-                if (submissionStatus === 'Submit for Approval' || submissionStatus === 'Sent') {
+                if (submissionStatus === 'Submit for Approval' || submissionStatus === 'Sent' || submissionStatus === 'Send for Finance Review and Approval') {
                     e.preventDefault();
                     alert("❌ CANNOT SUBMIT FOR APPROVAL: Unbudgeted transactions must be routed through 'Submit for Finance Review' first.");
                 }
@@ -219,7 +219,7 @@ function calculateSystemStatus() {
     // 2. DISABLE/ENABLE SUBMISSION OPTIONS BASED ON BUDGET OVERRUN
     if (submissionStatusSelect) {
         Array.from(submissionStatusSelect.options).forEach(option => {
-            if (option.value === 'Submit for Approval' || option.value === 'Sent') {
+            if (['Submit for Approval', 'Sent', 'Send for Finance Review and Approval'].includes(option.value)) {
                 if (isOverAnnualBudget || isBudgetedSelect?.value === 'No') {
                     option.disabled = true;
                     if (option.selected) {
@@ -261,8 +261,10 @@ function calculateSystemStatus() {
         systemStatus = '🤖 AI ANALYSIS: Reviewing Compliance & Budget Impact';
     } else if (submissionStatus === 'Submit for Finance Review') {
         systemStatus = '🔍 FINANCE REVIEW: Awaiting Finance Committee Sign-off';    
+    } else if (submissionStatus === 'Send for Finance Review and Approval') {
+        systemStatus = '📬 SIMULTANEOUS DISPATCH: Finance & Board Review Active'; 
     } else if (submissionStatus === 'Sent') {
-        systemStatus = '📬 SENT: Approval Request Dispatched via Email'; 
+        systemStatus = '📬 SENT: Board Approval Request Dispatched via Email'; 
     } else if (submissionStatus === 'Rejected') {
         systemStatus = '🛑 REJECTED: Final Authorisation Declined';
     } else if ((isOverAnnualBudget || currentIsBudgeted === 'No') && quotesProvided < 3) {
@@ -274,7 +276,6 @@ function calculateSystemStatus() {
     } else if (quotesProvided < requiredQuotes) {
         systemStatus = `❌ BLOCKED: Insufficient Quotes Provided (${quotesProvided}/${requiredQuotes} Required)`;
     } else {
-        // Incorporating quorum and time limit rules into compliant status display
         const minResponsesReq = rule ? (rule.min_responses_required || 1) : 1;
         const timeLimitDays = rule ? (rule.response_time_limit_days || 7) : 7;
         systemStatus = `🟢 READY: Compliance Met (Min Quorum: ${minResponsesReq} Approvers | Time Limit: ${timeLimitDays}d)`;
@@ -293,23 +294,23 @@ function calculateSystemStatus() {
     if (reqInputTop) reqInputTop.value = approvalRequirement;
     if (reqInputBottom) reqInputBottom.value = approvalRequirement;
 
-    // --- CALCULATE & DISPLAY EXPIRY DEADLINE ---
+    // --- CALCULATE & DISPLAY EXPIRY DEADLINE (Relying strictly on Board Dispatch / chair_requested_at) ---
     const expiryInput = document.getElementById('expiry_date_display');
-    const dispatchedInput = document.getElementById('dispatched_date_display');
-    const dispatchedStr = dispatchedInput ? dispatchedInput.value : '';
+    const boardDispatchedInput = document.getElementById('dispatched_date_display'); // Bound to chair_requested_at
+    const boardDispatchedStr = boardDispatchedInput ? boardDispatchedInput.value : '';
 
     if (expiryInput) {
-        if (dispatchedStr && dispatchedStr.trim() !== '' && dispatchedStr !== 'Not yet dispatched' && dispatchedStr !== 'Pending Dispatch') {
-            const dispatchDate = new Date(dispatchedStr);
+        if (boardDispatchedStr && boardDispatchedStr.trim() !== '' && boardDispatchedStr !== 'Not yet dispatched to board' && boardDispatchedStr !== 'Pending Dispatch') {
+            const dispatchDate = new Date(boardDispatchedStr);
             const timeLimitDays = rule ? (rule.response_time_limit_days || 7) : 7;
             
-            // Add the database matrix rule's time limit days to dispatch date
+            // Add the database matrix rule's time limit days to board dispatch date
             dispatchDate.setDate(dispatchDate.getDate() + timeLimitDays);
             
             const options = { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
             expiryInput.value = dispatchDate.toLocaleDateString('en-US', options) + ` (${timeLimitDays}-day limit)`;
         } else {
-            expiryInput.value = 'Pending Dispatch';
+            expiryInput.value = 'Pending Board Dispatch (Clock Paused)';
         }
     }
 }
