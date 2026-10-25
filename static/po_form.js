@@ -287,11 +287,12 @@ function calculateSystemStatus() {
         systemStatusInput.value = systemStatus;
     }
 
-   // Update Governance Sign-off Tier field
+  // Update both Governance Sign-off Tier fields
     const reqInput = document.getElementById('approval_requirement');
-    if (reqInput) {
-        reqInput.value = approvalRequirement;
-    }
+    const reqInputCopy = document.getElementById('approval_requirement_copy');
+    
+    if (reqInput) reqInput.value = approvalRequirement;
+    if (reqInputCopy) reqInputCopy.value = approvalRequirement;
 
     // --- CALCULATE & DISPLAY EXPIRY DEADLINE (Relying strictly on Board Dispatch / chair_requested_at) ---
     const expiryInput = document.getElementById('expiry_date_display');
