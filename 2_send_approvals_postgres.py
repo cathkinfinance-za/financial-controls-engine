@@ -323,7 +323,7 @@ def process_postgres_approvals():
                 SELECT p.*, m.gl_code as master_gl_code, m.total_budget as total_annual_budget, m.ytd as ytd_actual, m.variance 
                 FROM po_log p
                 LEFT JOIN master_budget m ON p.gl_code_id = m.id
-                WHERE LOWER(p.submission_status) IN ('submit for approval', 'submit for finance review');
+                WHERE LOWER(p.submission_status) IN ('submit for approval', 'submit for finance review', 'send for finance review and approval');
             """)
             records = cursor.fetchall()
             log(f"Query executed. Found {len(records)} pending record(s) to process.")
@@ -385,19 +385,62 @@ def process_postgres_approvals():
                 approver_roles = matrix_rule.get('approver_roles') or 'Standard Sign-off'
                 tier_name = matrix_rule.get('matrix_category') or 'Standard Expenditure'
 
-                # Dispatch Timestamp & Expiry Calculation
-                dispatch_time = datetime.datetime.now()
-                expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
-                dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
-                expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
+                now_time = datetime.datetime.now()
+                submission_status = record.get('submission_status', '').strip().lower()
 
-                # Update chair_requested_at in database if not already set
-                if not record.get('chair_requested_at'):
+                # Determine routing path and timestamp stamping logic based on submission status
+                if submission_status == 'submit for finance review':
+                    # PATH 1: Sequential Step 1 (Finance Review only, board clock paused)
+                    to_list = finance_reviewers
+                    cc_list = estate_managers + admins
+                    next_status = "Finance Review"
+                    
+                    # Stamp finance_requested_at if not already present
+                    if not record.get('finance_requested_at'):
+                        with cursor.connection.cursor() as ts_cursor:
+                            ts_cursor.execute("UPDATE po_log SET finance_requested_at = %s WHERE id = %s;", (now_time, record['id']))
+                            cursor.connection.commit()
+                    
+                    dispatch_str = "N/A (Finance Review Phase)"
+                    expiry_str = "Paused until Board Dispatch"
+
+                elif submission_status == 'send for finance review and approval':
+                    # PATH 2: Simultaneous Dispatch (Finance & Board concurrently, board clock starts)
+                    to_list = list(set(finance_reviewers + approval_authorities))
+                    cc_list = list(set(estate_managers + admins))
+                    next_status = "Sent"
+                    
+                    dispatch_time = now_time
+                    expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
+                    dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
+                    expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
+
+                    # Stamp both finance_requested_at and chair_requested_at simultaneously
                     with cursor.connection.cursor() as ts_cursor:
-                        ts_cursor.execute("UPDATE po_log SET chair_requested_at = %s WHERE id = %s;", (dispatch_time, record['id']))
+                        ts_cursor.execute(
+                            "UPDATE po_log SET finance_requested_at = COALESCE(finance_requested_at, %s), chair_requested_at = COALESCE(chair_requested_at, %s) WHERE id = %s;",
+                            (dispatch_time, dispatch_time, record['id'])
+                        )
                         cursor.connection.commit()
 
-                log(f"PO {po_num} Governance: Tier='{tier_name}', Min Quorum={min_responses}, Time Limit={time_limit_days}d (Expires: {expiry_str})")
+                else:
+                    # PATH 3: Sequential Step 2 / Submit for Approval (Board Dispatch, board clock starts)
+                    to_list = approval_authorities
+                    cc_list = list(set(finance_reviewers + estate_managers + admins))
+                    next_status = "Sent"
+                    
+                    dispatch_time = now_time
+                    expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
+                    dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
+                    expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
+
+                    # Stamp chair_requested_at to start the board expiry clock
+                    if not record.get('chair_requested_at'):
+                        with cursor.connection.cursor() as ts_cursor:
+                            ts_cursor.execute("UPDATE po_log SET chair_requested_at = %s WHERE id = %s;", (dispatch_time, record['id']))
+                            cursor.connection.commit()
+
+                log(f"PO {po_num} Routing Path: '{submission_status}' -> To: {to_list}")
 
                 existing_summary = record.get('ai_recommendation_summary')
                 if existing_summary and str(existing_summary).strip():
@@ -408,22 +451,13 @@ def process_postgres_approvals():
                     ai_analysis_text = get_gemini_analysis(record, cursor)
                 
                 clean_ai_html = ai_analysis_text.split("AI_RECOMMENDATION_LINE:")[0].strip()
-                submission_status = record.get('submission_status', '').strip()
 
-                if submission_status.lower() == 'submit for finance review':
-                    to_list = finance_reviewers
-                    cc_list = estate_managers + admins
+                if submission_status == 'submit for finance review':
                     call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
                     call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
-                    next_status = "Finance Review"
                 else:
-                    to_list = approval_authorities
-                    cc_list = list(set(finance_reviewers + estate_managers + admins))
                     call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
                     call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
-                    next_status = "Sent"
-
-                log(f"Routing PO {po_num} -> To: {to_list}, CC: {cc_list}")
 
                 raw_filepaths = record.get('quote_filepath') or ''
                 quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
@@ -446,7 +480,7 @@ def process_postgres_approvals():
                 # 1. Plain Text Fallback Body with Thresholds
                 email_body_plain = f"""Hello,
 
-An expenditure item has been submitted for approval under strict governance rules.
+An expenditure item has been submitted for review under strict governance rules.
 
 GOVERNANCE & THRESHOLD REQUIREMENTS:
 - Sign-off Tier: {tier_name}
