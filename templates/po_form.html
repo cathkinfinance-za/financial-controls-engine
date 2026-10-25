@@ -441,6 +441,18 @@
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
+                <!-- Governance Sign-off Tier (First) -->
+                <div class="form-row">
+                    <label class="form-label">Governance Sign-off Tier</label>
+                    <input 
+                        type="text" 
+                        id="approval_requirement" 
+                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
+                        readonly 
+                        class="form-control"
+                    >
+                </div>
+                
                 <div class="form-row">
                     <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
                     <div>
@@ -591,17 +603,18 @@
                     </select>
                 </div>
 
-                <!-- Governance Sign-off Tier (Single Instance) -->
+                <!-- Governance Sign-off Tier (Copy) -->
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
                     <input 
                         type="text" 
-                        id="approval_requirement" 
+                        id="approval_requirement_copy" 
                         value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
                         readonly 
                         class="form-control"
                     >
                 </div>
+
 
                 <!-- Finance Dispatched Date Display -->
                 <div class="form-row">
