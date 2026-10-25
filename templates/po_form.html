@@ -306,7 +306,6 @@
         }
     </style>
 </head>
-</head>
 <body>
     {% include 'navbar.html' %}
 <div class="app-layout">
@@ -346,7 +345,6 @@
                 </div>
             {% endif %}
 
-            <!-- CHANGE 1: Added id="po-form" so JS event listeners and submit guards bind correctly -->
             <form id="po-form" action="/po_form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
                 <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
@@ -443,7 +441,6 @@
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
-                <!-- CHANGE 2: Consolidated duplicate upload sections into a single unified row with inline deletes -->
                 <div class="form-row">
                     <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
                     <div>
@@ -522,7 +519,6 @@
                     <input type="text" name="actioned_by" class="form-control" value="{{ selected_po.actioned_by if selected_po and selected_po.actioned_by else '' }}" style="width: 240px;">
                 </div>
 
-                <!-- CHANGE 3: Dedicated input field for Governance Sign-off Tier -->
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
                     <input 
@@ -535,7 +531,6 @@
                     >
                 </div>
 
-                <!-- CHANGE 4: Dedicated input field for System Compliance Status -->
                 <div class="form-row">
                     <label class="form-label">System Compliance Status</label>
                     <input 
@@ -553,29 +548,25 @@
                     <input type="text" name="approval_notes" class="form-control" value="{{ selected_po.approval_notes if selected_po and selected_po.approval_notes else '' }}">
                 </div>
                 
-<div class="form-row">
-    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-        <label class="form-label">AI Recommendation Summary</label>
-        {% if selected_po and selected_po.ai_recommendation_summary %}
-            <button type="button" id="btn-clear-ai" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;">Clear Analysis</button>
-        {% endif %}
-    </div>
-    <div style="width: 100%;">
-        <!-- Hidden input storing raw value for form submission -->
-        <input type="hidden" id="ai_recommendation_summary" name="ai_recommendation_summary" value="{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}">
-        
-        <!-- Formatted Render Container -->
-        <div id="ai-analysis-display" class="ai-analysis-card">
-            {% if selected_po and selected_po.ai_recommendation_summary %}
-                <!-- Will be populated by JS script below -->
-            {% else %}
-                <div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-
+                <div class="form-row">
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                        <label class="form-label">AI Recommendation Summary</label>
+                        {% if selected_po and selected_po.ai_recommendation_summary %}
+                            <button type="button" id="btn-clear-ai" class="btn btn-secondary" style="padding: 2px 8px; font-size: 12px;">Clear Analysis</button>
+                        {% endif %}
+                    </div>
+                    <div style="width: 100%;">
+                        <input type="hidden" id="ai_recommendation_summary" name="ai_recommendation_summary" value="{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}">
+                        
+                        <div id="ai-analysis-display" class="ai-analysis-card">
+                            {% if selected_po and selected_po.ai_recommendation_summary %}
+                                <!-- Populated by JS -->
+                            {% else %}
+                                <div class="ai-empty-state">No AI analysis generated for this purchase order yet.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Vendor Selection & Rationale -->
                 <div class="section-header">Vendor Selection & Rationale</div>
@@ -590,7 +581,7 @@
                     <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
                 </div>
 
-<div class="form-row">
+                <div class="form-row">
                     <label class="form-label">Submission Status</label>
                     <select name="submission_status" class="form-control" style="width: 280px;">
                         <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
@@ -599,20 +590,20 @@
                         <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review (Sequential)</option>
                         <option value="Send for Finance Review and Approval" {% if selected_po and selected_po.submission_status == "Send for Finance Review and Approval" %}selected{% endif %}>Send for Finance Review and Approval (Simultaneous)</option>
                         
-                        <!-- System/Committee controlled statuses (disabled for manual selection) -->
+                        <!-- System/Committee controlled statuses -->
                         <option value="Finance Recommended" {% if selected_po and selected_po.submission_status == "Finance Recommended" %}selected{% endif %} disabled>Finance Recommended (System)</option>
                         <option value="Finance Rejected" {% if selected_po and selected_po.submission_status == "Finance Rejected" %}selected{% endif %} disabled>Finance Rejected (System)</option>
                         
                         <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval (Sequential Step 2)</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
                         
-                        <!-- Final approval statuses (disabled for manual selection) -->
+                        <!-- Final approval statuses -->
                         <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %} disabled>Approved (System)</option>
                         <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %} disabled>Rejected (System)</option>
                     </select>
                 </div>
 
-                <!-- Bottom Copy of Governance Sign-off Tier -->
+                <!-- Governance Sign-off Tier (Single Instance) -->
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
                     <input 
@@ -650,45 +641,7 @@
                     >
                 </div>
 
-                <!-- Voting Expiry Deadline Display -->
-                <div class="form-row">
-                    <label class="form-label">Voting Expiry Deadline</label>
-                    <input 
-                        type="text" 
-                        id="expiry_date_display" 
-                        value="Calculated on load..." 
-                        readonly 
-                        class="form-control"
-                        style="width: 240px;"
-                    >
-                </div>
-
-                <!-- Bottom Copy of Governance Sign-off Tier -->
-                <div class="form-row">
-                    <label class="form-label">Governance Sign-off Tier</label>
-                    <input 
-                        type="text" 
-                        id="approval_requirement_copy" 
-                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
-                        readonly 
-                        class="form-control"
-                    >
-                </div>
-
-                <!-- Dispatched Date Display -->
-                <div class="form-row">
-                    <label class="form-label">Dispatched Date</label>
-                    <input 
-                        type="text" 
-                        id="dispatched_date_display" 
-                        value="{{ selected_po.chair_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po and selected_po.chair_requested_at else 'Not yet dispatched' }}" 
-                        readonly 
-                        class="form-control"
-                        style="width: 240px;"
-                    >
-                </div>
-
-                <!-- Voting Expiry Deadline Display -->
+                <!-- Response Expiry Deadline Display -->
                 <div class="form-row">
                     <label class="form-label">Response Expiry Deadline</label>
                     <input 
@@ -712,7 +665,6 @@
                         class="form-control {% if selected_po and 'APPROVED' in selected_po.calculated_approval_status|upper %}text-success fw-bold{% elif selected_po and 'REJECTED' in selected_po.calculated_approval_status|upper %}text-danger fw-bold{% endif %}"
                     >
                 </div>
-
 
                 <div class="section-header">Procurement & Audit History Log</div>
                     <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
@@ -778,7 +730,7 @@
                                     </tr>
                                 {% endif %}
                     
-                                <!-- Section 3: Other / System Events (Optional display if unassigned) -->
+                                <!-- Section 3: Other / System Events -->
                                 {% if audit_logs.other %}
                                 <tr style="background: #e9ecef;">
                                     <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
@@ -808,8 +760,6 @@
                 </div>
             </form>
         </div>
-
-
     </div>
 </div>
 
