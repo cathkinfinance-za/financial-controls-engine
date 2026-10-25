@@ -766,7 +766,7 @@
                         
                         <!-- View HTML Recommendation Link -->
                         {% if project and project.executive_recommendation_html %}
-                        <a href="{{ url_for('view_executive_recommendation', project_id=project.id) }}" 
+                        <a href="{{ url_for('projects.view_executive_recommendation', project_id=project.id) }}" 
                         target="_blank" 
                         rel="noopener noreferrer"
                         style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #0d6efd; text-decoration: none;">
