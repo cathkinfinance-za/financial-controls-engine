@@ -262,7 +262,7 @@ def po_form():
         combined_quote_filepath = ",".join(all_urls) if all_urls else None
         quotes_provided = len(all_urls)
 
-        if submission_status == "Run AI Analysis" or gemini_file_payloads:
+        if submission_status == "Run AI Analysis":
             if not gemini_file_payloads and combined_quote_filepath:
                 for file_url in combined_quote_filepath.split(','):
                     clean_url = file_url.strip()
