@@ -289,10 +289,9 @@ function calculateSystemStatus() {
 
    // Update Governance Sign-off Tier field
     const reqInput = document.getElementById('approval_requirement');
-    if (reqInput) reqInput.value = approvalRequirement;
-    
-    if (reqInputTop) reqInputTop.value = approvalRequirement;
-    if (reqInputBottom) reqInputBottom.value = approvalRequirement;
+    if (reqInput) {
+        reqInput.value = approvalRequirement;
+    }
 
     // --- CALCULATE & DISPLAY EXPIRY DEADLINE (Relying strictly on Board Dispatch / chair_requested_at) ---
     const expiryInput = document.getElementById('expiry_date_display');
