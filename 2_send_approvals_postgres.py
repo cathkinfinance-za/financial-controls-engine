@@ -90,6 +90,51 @@ def fetch_file_bytes_and_mime(location):
     return None, None
 
 
+def get_matrix_rule_for_po(cursor, expense_type, is_budgeted, estimated_cost):
+    """
+    Dynamically queries the approval_matrix table for the given PO parameters 
+    to retrieve governance rules (quotes, quorum, time limits).
+    """
+    if expense_type == 'Emergency':
+        cat_filter = '%Emergency%'
+    elif is_budgeted == 'No':
+        cat_filter = '%Unbudgeted%'
+    elif expense_type == 'Service Contract':
+        cat_filter = '%Service Provider Contracts%'
+    elif expense_type == 'Capital':
+        cat_filter = '%Capital Expenditure%'
+    else:
+        cat_filter = '%Operational%'
+
+    cursor.execute("""
+        SELECT * FROM approval_matrix 
+        WHERE matrix_category ILIKE %s 
+          AND min_value <= %s 
+          AND (max_value >= %s OR max_value IS NULL)
+        ORDER BY min_value DESC 
+        LIMIT 1;
+    """, (cat_filter, estimated_cost, estimated_cost))
+    row = cursor.fetchone()
+    
+    if not row:
+        cursor.execute("""
+            SELECT * FROM approval_matrix 
+            WHERE min_value <= %s 
+              AND (max_value >= %s OR max_value IS NULL)
+            ORDER BY min_value DESC 
+            LIMIT 1;
+        """, (estimated_cost, estimated_cost))
+        row = cursor.fetchone()
+
+    return dict(row) if row else {
+        "quotes_required": 1, 
+        "min_responses_required": 1, 
+        "response_time_limit_days": 7, 
+        "approver_roles": "Standard Sign-off",
+        "matrix_category": "Standard"
+    }
+
+
 def get_prompt_by_process(cursor, process_name):
     """Fetches prompt template only if is_active is True."""
     if not cursor:
@@ -116,7 +161,6 @@ def get_gemini_analysis(record, cursor):
         log(f"PO {po_num}: Skipping Gemini API call (GEMINI_API_KEY not found).", "WARNING")
         return "Automated compliance analysis processed via PostgreSQL workflow engine."
 
-    # 1. Initialize ALL variables with default fallbacks at the top
     desc_val = str(record.get('description') or 'Operational Procurement').strip()
     cost = float(record.get('estimated_cost') or 0.0)
     gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
@@ -138,9 +182,6 @@ def get_gemini_analysis(record, cursor):
         raw_filepaths = record.get('quote_filepath') or ''
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
-        # ----------------------------------------------------
-        # PHASE 1: QUOTE EVALUATION
-        # ----------------------------------------------------
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
 
         if quote_eval_template:
@@ -169,7 +210,6 @@ def get_gemini_analysis(record, cursor):
 
             log(f"PO {po_num}: 📑 Executing quote evaluation...")
             
-            # Remove application/json mime_type constraint to allow free-text markdown response
             parse_response = client.models.generate_content(
                 model='gemini-3.5-flash',
                 contents=parse_contents
@@ -177,9 +217,6 @@ def get_gemini_analysis(record, cursor):
 
             return parse_response.text.strip()
 
-        # ----------------------------------------------------
-        # PHASE 2: OSINT WEB SEARCH (DuckDuckGo)
-        # ----------------------------------------------------
         log(f"PO {po_num}: 🌐 Fetching public OSINT records for '{extracted_vendor_name}' via DuckDuckGo...")
         try:
             with DDGS() as ddgs:
@@ -192,9 +229,6 @@ def get_gemini_analysis(record, cursor):
         except Exception as search_err:
             log(f"PO {po_num}: DuckDuckGo search lookup failed for '{extracted_vendor_name}': {search_err}", "WARNING")
 
-        # ----------------------------------------------------
-        # PHASE 3: COMPANY ASSESSMENT / AUDIT SYNTHESIS (If Active)
-        # ----------------------------------------------------
         company_assess_template = get_prompt_by_process(cursor, 'Company assessment')
         
         if not company_assess_template:
@@ -253,7 +287,6 @@ def send_approval_email(to_emails, cc_emails, subject, text_body, html_body):
         if cc_emails:
             msg['Cc'] = ", ".join(cc_emails)
         
-        # Attach plain-text fallback first, then HTML
         msg.attach(MIMEText(text_body, 'plain'))
         msg.attach(MIMEText(html_body, 'html'))
         
@@ -303,7 +336,6 @@ def process_postgres_approvals():
             cursor.execute("SELECT email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
 
-            # Categorize recipient lists based on approval_permission
             approval_authorities = [
                 row['email'].strip() for row in approver_records 
                 if row.get('approval_permission') == 'Approval Authority' and row.get('email')
@@ -320,7 +352,6 @@ def process_postgres_approvals():
                 row['email'].strip() for row in approver_records 
                 if row.get('approval_permission') == 'Admin' and row.get('email')
             ]
-
 
             for idx, record in enumerate(records, start=1):
                 po_num = str(record.get('po_number', '')).strip()
@@ -339,15 +370,35 @@ def process_postgres_approvals():
                 cost = float(record.get('estimated_cost') or 0.0)
                 desc_val = str(record.get('description') or 'Operational Procurement').strip()
                 expense_type = str(record.get('expense_type') or '').strip()
+                is_budgeted_val = str(record.get('is_budgeted') or 'Yes').strip()
                 gl_code_val = str(record.get('gl_code') or record.get('master_gl_code') or 'N/A').strip()
                 
                 total_budget = float(record.get('total_annual_budget') or 0.0)
                 ytd_actual = float(record.get('ytd_actual') or 0.0)
                 remaining_budget = float(record.get('variance') or 0.0)
-                
-                log(f"PO {po_num} Summary: Cost=R{cost:,.2f}, Type='{expense_type}', GL='{gl_code_val}'")
 
-                # REUSE EXISTING AI SUMMARY IF PRESENT
+                # --- FETCH GOVERNANCE MATRIX RULE & CALCULATE DEADLINES ---
+                matrix_rule = get_matrix_rule_for_po(cursor, expense_type, is_budgeted_val, cost)
+                min_responses = int(matrix_rule.get('min_responses_required') or 1)
+                time_limit_days = int(matrix_rule.get('response_time_limit_days') or 7)
+                quotes_req = int(matrix_rule.get('quotes_required') or 1)
+                approver_roles = matrix_rule.get('approver_roles') or 'Standard Sign-off'
+                tier_name = matrix_rule.get('matrix_category') or 'Standard Expenditure'
+
+                # Dispatch Timestamp & Expiry Calculation
+                dispatch_time = datetime.datetime.now()
+                expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
+                dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
+                expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
+
+                # Update chair_requested_at in database if not already set
+                if not record.get('chair_requested_at'):
+                    with cursor.connection.cursor() as ts_cursor:
+                        ts_cursor.execute("UPDATE po_log SET chair_requested_at = %s WHERE id = %s;", (dispatch_time, record['id']))
+                        cursor.connection.commit()
+
+                log(f"PO {po_num} Governance: Tier='{tier_name}', Min Quorum={min_responses}, Time Limit={time_limit_days}d (Expires: {expiry_str})")
+
                 existing_summary = record.get('ai_recommendation_summary')
                 if existing_summary and str(existing_summary).strip():
                     log(f"PO {po_num}: Reusing existing AI recommendation summary from database.")
@@ -356,27 +407,24 @@ def process_postgres_approvals():
                     log(f"PO {po_num}: No existing AI summary found. Invoking Gemini engine...")
                     ai_analysis_text = get_gemini_analysis(record, cursor)
                 
-                # Clean system line if present
                 clean_ai_html = ai_analysis_text.split("AI_RECOMMENDATION_LINE:")[0].strip()
-
                 submission_status = record.get('submission_status', '').strip()
 
                 if submission_status.lower() == 'submit for finance review':
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
-                    call_to_action = 'Please review the purchase order details below and reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
-                    call_to_action_plain = 'Please review the purchase order details and reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
+                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
                     next_status = "Finance Review"
                 else:
                     to_list = approval_authorities
                     cc_list = list(set(finance_reviewers + estate_managers + admins))
-                    call_to_action = 'Please review the purchase order details below and reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
-                    call_to_action_plain = 'Please review the purchase order details and reply directly to this message typing either "APPROVED" or "REJECTED".'
+                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
                     next_status = "Sent"
 
                 log(f"Routing PO {po_num} -> To: {to_list}, CC: {cc_list}")
 
-                # Format attachments for HTML & Plain Text
                 raw_filepaths = record.get('quote_filepath') or ''
                 quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
@@ -395,10 +443,19 @@ def process_postgres_approvals():
 
                 email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}]"
 
-                # 1. Plain Text Fallback Body
+                # 1. Plain Text Fallback Body with Thresholds
                 email_body_plain = f"""Hello,
 
-An expenditure item has been submitted for approval.
+An expenditure item has been submitted for approval under strict governance rules.
+
+GOVERNANCE & THRESHOLD REQUIREMENTS:
+- Sign-off Tier: {tier_name}
+- Required Quotes: {quotes_req}
+- Required Approver Roles: {approverRoles}
+- Minimum Quorum Required: {min_responses} Approver(s)
+- Response Time Window: {time_limit_days} Days
+- Dispatched Date: {dispatch_str}
+- Voting Expiry Deadline: {expiry_str}
 
 Item Details:
 - PO ID: {po_id}
@@ -423,7 +480,7 @@ AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 Regards,
 Automated Compliance Engine"""
 
-                # 2. Fully Formatted HTML Body (Inline CSS)
+                # 2. Fully Formatted HTML Body with Threshold Banner
                 email_body_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -439,6 +496,21 @@ Automated Compliance Engine"""
         <p style="font-size: 14px; line-height: 1.5; color: #212529;">Hello,</p>
         <p style="font-size: 14px; line-height: 1.5; color: #212529;">An expenditure item has been submitted for your review and sign-off.</p>
         
+        <!-- Governance Threshold Banner -->
+        <div style="background-color: #e7f5ff; border: 1px solid #74c0fc; border-left: 4px solid #1c7ed6; border-radius: 6px; padding: 16px; margin: 20px 0;">
+            <div style="font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1c7ed6; margin-bottom: 8px; letter-spacing: 0.5px;">
+                Governance &amp; Threshold Requirements
+            </div>
+            <table style="width: 100%; font-size: 13px; color: #212529; border-collapse: collapse;">
+                <tr><td style="padding: 3px 0; font-weight: 600; width: 170px;">Sign-off Tier:</td><td style="padding: 3px 0;">{tier_name}</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600;">Required Quotes:</td><td style="padding: 3px 0;">{quotes_req} Quote(s)</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600;">Required Roles:</td><td style="padding: 3px 0;">{approverRoles}</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600;">Minimum Quorum:</td><td style="padding: 3px 0;">{min_responses} Approval(s)</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600;">Dispatched Date:</td><td style="padding: 3px 0;">{dispatch_str}</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600; color: #c92a2a;">Expiry Deadline:</td><td style="padding: 3px 0; font-weight: 700; color: #c92a2a;">{expiry_str} ({time_limit_days}-day limit)</td></tr>
+            </table>
+        </div>
+
         <table style="width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; background-color: #fdfdfd; border: 1px solid #e9ecef;">
             <thead>
                 <tr style="background-color: #f1f3f5; text-align: left;">
@@ -473,8 +545,8 @@ Automated Compliance Engine"""
         </div>
 
         <!-- Action Section Box -->
-        <div style="background-color: #e7f5ff; border: 1px solid #74c0fc; border-radius: 6px; padding: 16px; margin-top: 24px; text-align: center;">
-            <p style="margin: 0; font-size: 14px; color: #0b7285; line-height: 1.5;">
+        <div style="background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 6px; padding: 16px; margin-top: 24px; text-align: center;">
+            <p style="margin: 0; font-size: 14px; color: #856404; line-height: 1.5;">
                 {call_to_action}
             </p>
         </div>
@@ -500,7 +572,7 @@ Automated Compliance Engine"""
                         )
                         conn.commit()
                     log(f"Database successfully updated for PO {po_num}.")
-                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), f"Emailed approvers ({next_status}).")
+                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), f"Emailed approvers ({next_status}) with governance thresholds & expiry.")
                 else:
                     log(f"Failed to dispatch approval email for PO {po_num}. Skipping database update.", "ERROR")
 
