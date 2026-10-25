@@ -590,25 +590,77 @@
                     <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
                 </div>
 
-                <div class="form-row">
+<div class="form-row">
                     <label class="form-label">Submission Status</label>
-                    <select name="submission_status" class="form-control" style="width: 240px;">
+                    <select name="submission_status" class="form-control" style="width: 280px;">
                         <option value="" disabled {% if not selected_po or not selected_po.submission_status %}selected{% endif %}>Select status</option>
                         <option value="Draft" {% if selected_po and selected_po.submission_status == "Draft" %}selected{% endif %}>Draft</option>
                         <option value="Run AI Analysis" {% if selected_po and selected_po.submission_status == "Run AI Analysis" %}selected{% endif %}>Run AI Analysis</option>
-                        <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review</option>
+                        <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review (Sequential)</option>
+                        <option value="Send for Finance Review and Approval" {% if selected_po and selected_po.submission_status == "Send for Finance Review and Approval" %}selected{% endif %}>Send for Finance Review and Approval (Simultaneous)</option>
                         
                         <!-- System/Committee controlled statuses (disabled for manual selection) -->
                         <option value="Finance Recommended" {% if selected_po and selected_po.submission_status == "Finance Recommended" %}selected{% endif %} disabled>Finance Recommended (System)</option>
                         <option value="Finance Rejected" {% if selected_po and selected_po.submission_status == "Finance Rejected" %}selected{% endif %} disabled>Finance Rejected (System)</option>
                         
-                        <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval</option>
+                        <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval (Sequential Step 2)</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
                         
                         <!-- Final approval statuses (disabled for manual selection) -->
                         <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %} disabled>Approved (System)</option>
                         <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %} disabled>Rejected (System)</option>
                     </select>
+                </div>
+
+                <!-- Bottom Copy of Governance Sign-off Tier -->
+                <div class="form-row">
+                    <label class="form-label">Governance Sign-off Tier</label>
+                    <input 
+                        type="text" 
+                        id="approval_requirement_copy" 
+                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
+                        readonly 
+                        class="form-control"
+                    >
+                </div>
+
+                <!-- Finance Dispatched Date Display -->
+                <div class="form-row">
+                    <label class="form-label">Finance Dispatched Date</label>
+                    <input 
+                        type="text" 
+                        id="finance_dispatched_date_display" 
+                        value="{{ selected_po.finance_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po and selected_po.finance_requested_at else 'Not yet dispatched to finance' }}" 
+                        readonly 
+                        class="form-control"
+                        style="width: 240px;"
+                    >
+                </div>
+
+                <!-- Board Dispatched Date Display (Starts Expiry Clock) -->
+                <div class="form-row">
+                    <label class="form-label">Board Dispatched Date</label>
+                    <input 
+                        type="text" 
+                        id="dispatched_date_display" 
+                        value="{{ selected_po.chair_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po and selected_po.chair_requested_at else 'Not yet dispatched to board' }}" 
+                        readonly 
+                        class="form-control"
+                        style="width: 240px;"
+                    >
+                </div>
+
+                <!-- Voting Expiry Deadline Display -->
+                <div class="form-row">
+                    <label class="form-label">Voting Expiry Deadline</label>
+                    <input 
+                        type="text" 
+                        id="expiry_date_display" 
+                        value="Calculated on load..." 
+                        readonly 
+                        class="form-control"
+                        style="width: 240px;"
+                    >
                 </div>
 
                 <!-- Bottom Copy of Governance Sign-off Tier -->
