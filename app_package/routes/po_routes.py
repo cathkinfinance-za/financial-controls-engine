@@ -353,7 +353,7 @@ def po_form():
                             submission_status, system_status, quotes_provided, actioned_date, 
                             actioned_by, approval_notes, ai_recommendation_summary, 
                             combined_quote_filepath, combined_supp_filepath, 
-                            submission_status, original_po
+                            submission_status, submission_status, original_po
                         ))
                     else:
                         cur.execute("""
