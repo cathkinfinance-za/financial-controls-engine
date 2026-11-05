@@ -204,9 +204,10 @@ def po_form():
         except ValueError:
             estimated_cost = 0.0
 
-        existing_filepath_str = request.form.get("existing_quote_filepath", "").strip()
         deleted_files_raw = request.form.get("deleted_files", "").strip()
         
+        # --- Quote File Handling ---
+        existing_filepath_str = request.form.get("existing_quote_filepath", "").strip()
         if not existing_filepath_str and (original_po or new_po):
             try:
                 with conn.cursor() as cur:
@@ -219,13 +220,9 @@ def po_form():
                 pass
 
         existing_urls = [u.strip() for u in existing_filepath_str.split(",") if u.strip()]
-
         if deleted_files_raw:
             deleted_list = [df.strip() for df in deleted_files_raw.split(",") if df.strip()]
-            existing_urls = [
-                url for url in existing_urls 
-                if not any(df in url for df in deleted_list)
-            ]
+            existing_urls = [url for url in existing_urls if not any(df in url for df in deleted_list)]
 
         raw_files = request.files.getlist('attach_quotes') or request.files.getlist('quote_attachment')
         new_urls = []
@@ -236,24 +233,18 @@ def po_form():
                 try:
                     file_bytes = quote_file.read()
                     safe_filename = secure_filename(quote_file.filename)
-                    
                     blob_url = f"https://blob.vercel-storage.com/quotes/{safe_filename}"
                     headers = {
                         "Authorization": f"Bearer {os.getenv('PUBLIC_BLOB_READ_WRITE_TOKEN')}",
                         "x-access": "public",
                         "x-add-random-suffix": "1"
                     }
-                    
                     upload_resp = requests.put(blob_url, data=file_bytes, headers=headers)
-                    
                     if upload_resp.status_code == 200:
                         blob_response = upload_resp.json()
                         url = blob_response.get('url') if isinstance(blob_response, dict) else None
                         if url:
                             new_urls.append(url)
-                    else:
-                        print(f"Blob upload failed with status {upload_resp.status_code}: {upload_resp.text}")
-
                     gemini_file_payloads.append((file_bytes, safe_filename, quote_file.mimetype))
                 except Exception as upload_err:
                     print(f"File Processing Error: {upload_err}")
@@ -262,19 +253,67 @@ def po_form():
         combined_quote_filepath = ",".join(all_urls) if all_urls else None
         quotes_provided = len(all_urls)
 
+        # --- Supporting Document Handling ---
+        existing_supp_filepath_str = request.form.get("existing_supporting_docs_filepath", "").strip()
+        if not existing_supp_filepath_str and (original_po or new_po):
+            try:
+                with conn.cursor() as cur:
+                    lookup_target = original_po if original_po else new_po
+                    cur.execute("SELECT supporting_docs_filepath FROM po_log WHERE po_number = %s;", (lookup_target,))
+                    existing_supp_row = cur.fetchone()
+                    if existing_supp_row and existing_supp_row.get("supporting_docs_filepath"):
+                        existing_supp_filepath_str = existing_supp_row["supporting_docs_filepath"]
+            except Exception:
+                pass
+
+        existing_supp_urls = [u.strip() for u in existing_supp_filepath_str.split(",") if u.strip()]
+        if deleted_files_raw:
+            deleted_list = [df.strip() for df in deleted_files_raw.split(",") if df.strip()]
+            existing_supp_urls = [url for url in existing_supp_urls if not any(df in url for df in deleted_list)]
+
+        raw_supp_files = request.files.getlist('attach_supporting_docs')
+        new_supp_urls = []
+
+        for supp_file in raw_supp_files:
+            if supp_file and supp_file.filename:
+                try:
+                    file_bytes = supp_file.read()
+                    safe_filename = secure_filename(supp_file.filename)
+                    blob_url = f"https://blob.vercel-storage.com/supporting_docs/{safe_filename}"
+                    headers = {
+                        "Authorization": f"Bearer {os.getenv('PUBLIC_BLOB_READ_WRITE_TOKEN')}",
+                        "x-access": "public",
+                        "x-add-random-suffix": "1"
+                    }
+                    upload_resp = requests.put(blob_url, data=file_bytes, headers=headers)
+                    if upload_resp.status_code == 200:
+                        blob_response = upload_resp.json()
+                        url = blob_response.get('url') if isinstance(blob_response, dict) else None
+                        if url:
+                            new_supp_urls.append(url)
+                    gemini_file_payloads.append((file_bytes, safe_filename, supp_file.mimetype))
+                except Exception as upload_err:
+                    print(f"Supporting Document Processing Error: {upload_err}")
+
+        all_supp_urls = existing_supp_urls + new_supp_urls
+        combined_supp_filepath = ",".join(all_supp_urls) if all_supp_urls else None
+
+        # --- AI Analysis Trigger ---
         if submission_status == "Run AI Analysis":
-            if not gemini_file_payloads and combined_quote_filepath:
-                for file_url in combined_quote_filepath.split(','):
-                    clean_url = file_url.strip()
-                    if clean_url:
-                        try:
-                            resp = requests.get(clean_url, timeout=10)
-                            if resp.status_code == 200:
-                                filename = clean_url.split('/')[-1].split('?')[0]
-                                content_type = resp.headers.get('Content-Type', 'application/pdf')
-                                gemini_file_payloads.append((resp.content, filename, content_type))
-                        except Exception:
-                            pass
+            if not gemini_file_payloads and (combined_quote_filepath or combined_supp_filepath):
+                for file_url_str in [combined_quote_filepath, combined_supp_filepath]:
+                    if file_url_str:
+                        for file_url in file_url_str.split(','):
+                            clean_url = file_url.strip()
+                            if clean_url:
+                                try:
+                                    resp = requests.get(clean_url, timeout=10)
+                                    if resp.status_code == 200:
+                                        filename = clean_url.split('/')[-1].split('?')[0]
+                                        content_type = resp.headers.get('Content-Type', 'application/pdf')
+                                        gemini_file_payloads.append((resp.content, filename, content_type))
+                                except Exception:
+                                    pass
 
             if gemini_file_payloads:
                 ai_summary = analyze_po_with_gemini(gemini_file_payloads, request.form)
@@ -299,7 +338,7 @@ def po_form():
                                 recommended_vendor = %s, justification_notes = %s, submission_status = %s,
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
-                                quote_filepath = %s,
+                                quote_filepath = %s, supporting_docs_filepath = %s,
                                 chair_requested_at = CASE WHEN %s IN ('Submit for Finance Review','Submit for Approval', 'Sent') THEN NOW() ELSE chair_requested_at END,
                                 chair_escalated = CASE WHEN %s IN ('Submit for Finance Review','Submit for Approval', 'Sent') THEN FALSE ELSE chair_escalated END
                             WHERE po_number = %s;
@@ -308,7 +347,7 @@ def po_form():
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
                             actioned_by, approval_notes, ai_recommendation_summary, 
-                            combined_quote_filepath, submission_status, submission_status, original_po
+                            combined_quote_filepath, combined_supp_filepath, submission_status, submission_status, original_po
                         ))
                     else:
                         cur.execute("""
@@ -316,9 +355,9 @@ def po_form():
                                 po_number, description, po_date, is_budgeted, gl_code, gl_code_id, 
                                 expense_type, estimated_cost, recommended_vendor, justification_notes, 
                                 submission_status, system_status, quotes_provided, actioned_date, 
-                                actioned_by, approval_notes, ai_recommendation_summary, quote_filepath
+                                actioned_by, approval_notes, ai_recommendation_summary, quote_filepath, supporting_docs_filepath
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (po_number) DO UPDATE SET
                                 description = EXCLUDED.description,
                                 po_date = EXCLUDED.po_date,
@@ -336,12 +375,13 @@ def po_form():
                                 actioned_by = EXCLUDED.actioned_by,
                                 approval_notes = EXCLUDED.approval_notes,
                                 ai_recommendation_summary = EXCLUDED.ai_recommendation_summary,
-                                quote_filepath = EXCLUDED.quote_filepath;
+                                quote_filepath = EXCLUDED.quote_filepath,
+                                supporting_docs_filepath = EXCLUDED.supporting_docs_filepath;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary, combined_quote_filepath
+                            actioned_by, approval_notes, ai_recommendation_summary, combined_quote_filepath, combined_supp_filepath
                         ))
                     
                     conn.commit()
@@ -372,6 +412,9 @@ def po_form():
                 if selected_po:
                     raw_filepath = selected_po.get('quote_filepath') or ''
                     selected_po['quote_urls'] = [u.strip() for u in raw_filepath.split(',') if u.strip()]
+
+                    raw_supp_filepath = selected_po.get('supporting_docs_filepath') or ''
+                    selected_po['supporting_docs_urls'] = [u.strip() for u in raw_supp_filepath.split(',') if u.strip()]
 
                     try:
                         target_po = str(selected_po.get('po_number', '')).strip()
@@ -610,4 +653,4 @@ def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
 
             return dict(row) if row else None
     finally:
-        conn.close()
+    v    conn.close()
