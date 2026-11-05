@@ -348,6 +348,7 @@
             <form id="po-form" action="/po_form" method="POST" enctype="multipart/form-data">
                 <input type="hidden" name="original_po_number" value="{{ selected_po.po_number if selected_po else '' }}">
                 <input type="hidden" name="existing_quote_filepath" value="{{ selected_po.quote_filepath if selected_po and selected_po.quote_filepath else '' }}">
+                <input type="hidden" name="existing_supporting_docs_filepath" value="{{ selected_po.supporting_docs_filepath if selected_po and selected_po.supporting_docs_filepath else '' }}">
                 <input type="hidden" id="deleted_files" name="deleted_files" value="">
                 <input type="hidden" id="clear_ai_flag" name="clear_ai_flag" value="0">
                 
@@ -441,43 +442,24 @@
                 <!-- Approvals Fieldset -->
                 <div class="section-header">Approvals & Attachments</div>
 
-                <!-- Governance Sign-off Tier (First) -->
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
-                    <input 
-                        type="text" 
-                        id="approval_requirement" 
-                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
-                        readonly 
-                        class="form-control"
-                    >
+                    <input type="text" id="approval_requirement" value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" readonly class="form-control">
                 </div>
                 
+                <!-- Quotes Section -->
                 <div class="form-row">
                     <label class="form-label" for="attach_quotes">Attach Quotes (PDF / Images)</label>
                     <div>
                         <div class="file-upload-wrapper">
-                            <input 
-                                type="file" 
-                                id="attach_quotes" 
-                                name="attach_quotes" 
-                                accept=".pdf, image/*" 
-                                multiple 
-                                onchange="updateQuotesCount(this)"
-                                class="hidden-file-input"
-                            >
-                            
-                            <label for="attach_quotes" class="custom-file-upload-btn">
-                                📁 Choose Files
-                            </label>
+                            <input type="file" id="attach_quotes" name="attach_quotes" accept=".pdf, image/*" multiple onchange="updateQuotesCount(this)" class="hidden-file-input">
+                            <label for="attach_quotes" class="custom-file-upload-btn">📁 Choose Quotes</label>
                             <span id="file_chosen_status" class="file-chosen-text">No file chosen</span>
                         </div>
-
                         <div id="quotes_count_display" class="upload-feedback"></div>
 
-                        <!-- Document Grid with Inline Delete Buttons -->
                         <div class="attachments-card-container">
-                            <span class="attachments-label">Attached Documents</span>
+                            <span class="attachments-label">Attached Quotes</span>
                             <div id="attachments_list" class="doc-grid">
                                 {% if selected_po and selected_po.quote_urls %}
                                     {% for url in selected_po.quote_urls %}
@@ -488,9 +470,7 @@
                                                 <span class="doc-icon">{% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}</span>
                                                 <span class="doc-name">Quote {{ loop.index }}</span>
                                             </a>
-                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
-                                                ✖
-                                            </button>
+                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">✖</button>
                                         </div>
                                     {% endfor %}
                                 {% elif selected_po and selected_po.quote_filepath %}
@@ -503,13 +483,45 @@
                                                 <span class="doc-icon">{% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}</span>
                                                 <span class="doc-name">Quote {{ loop.index }}</span>
                                             </a>
-                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">
-                                                ✖
-                                            </button>
+                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'doc-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">✖</button>
                                         </div>
                                     {% endfor %}
                                 {% else %}
-                                    <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No documents attached yet.</span>
+                                    <span id="no_attachments_text" style="color: var(--text-muted); font-size: 13px;">No quotes attached yet.</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supporting Documents Section -->
+                <div class="form-row">
+                    <label class="form-label" for="attach_supporting_docs">Supporting Documents (Gemini-compatible formats)</label>
+                    <div>
+                        <div class="file-upload-wrapper">
+                            <input type="file" id="attach_supporting_docs" name="attach_supporting_docs" multiple onchange="updateSupportingDocsCount(this)" class="hidden-file-input">
+                            <label for="attach_supporting_docs" class="custom-file-upload-btn">📁 Choose Supporting Files</label>
+                            <span id="supp_file_chosen_status" class="file-chosen-text">No file chosen</span>
+                        </div>
+                        <div id="supp_count_display" class="upload-feedback"></div>
+
+                        <div class="attachments-card-container">
+                            <span class="attachments-label">Attached Supporting Documents</span>
+                            <div id="supp_attachments_list" class="doc-grid">
+                                {% if selected_po and selected_po.supporting_docs_urls %}
+                                    {% for url in selected_po.supporting_docs_urls %}
+                                        {% set fname = url.split('/')[-1].split('?')[0] %}
+                                        {% set ext = fname.split('.')[-1]|lower %}
+                                        <div id="supp-badge-{{ loop.index }}" class="doc-badge-wrapper" style="display: inline-flex; align-items: center; background: #f1f3f5; border: 1px solid var(--border-color); border-radius: 4px; padding: 4px 8px; gap: 6px;">
+                                            <a href="{{ url }}" target="_blank" rel="noopener noreferrer" class="doc-badge" style="border: none; padding: 0; background: transparent;">
+                                                <span class="doc-icon">{% if ext in ['jpg', 'jpeg', 'png', 'webp'] %}🖼️{% else %}📄{% endif %}</span>
+                                                <span class="doc-name">Doc {{ loop.index }}</span>
+                                            </a>
+                                            <button type="button" onclick="removeAttachment('{{ fname }}', 'supp-badge-{{ loop.index }}')" style="background: none; border: none; color: #dc3545; cursor: pointer; font-size: 12px; padding: 0 2px;" title="Delete attachment">✖</button>
+                                        </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <span id="no_supp_attachments_text" style="color: var(--text-muted); font-size: 13px;">No supporting documents attached yet.</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -533,14 +545,7 @@
 
                 <div class="form-row">
                     <label class="form-label">System Compliance Status</label>
-                    <input 
-                        type="text" 
-                        id="system_status" 
-                        name="system_status" 
-                        value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" 
-                        readonly 
-                        class="form-control status-banner"
-                    >
+                    <input type="text" id="system_status" name="system_status" value="{{ selected_po.system_status if selected_po and selected_po.system_status else '' }}" readonly class="form-control status-banner">
                 </div>
 
                 <div class="form-row">
@@ -557,7 +562,6 @@
                     </div>
                     <div style="width: 100%;">
                         <input type="hidden" id="ai_recommendation_summary" name="ai_recommendation_summary" value="{{ selected_po.ai_recommendation_summary if selected_po and selected_po.ai_recommendation_summary else '' }}">
-                        
                         <div id="ai-analysis-display" class="ai-analysis-card">
                             {% if selected_po and selected_po.ai_recommendation_summary %}
                                 <!-- Populated by JS -->
@@ -589,70 +593,33 @@
                         <option value="Run AI Analysis" {% if selected_po and selected_po.submission_status == "Run AI Analysis" %}selected{% endif %}>Run AI Analysis</option>
                         <option value="Submit for Finance Review" {% if selected_po and selected_po.submission_status == "Submit for Finance Review" %}selected{% endif %}>Submit for Finance Review (Sequential)</option>
                         <option value="Send for Finance Review and Approval" {% if selected_po and selected_po.submission_status == "Send for Finance Review and Approval" %}selected{% endif %}>Send for Finance Review and Approval (Simultaneous)</option>
-                        
-                        <!-- System/Committee controlled statuses -->
                         <option value="Finance Recommended" {% if selected_po and selected_po.submission_status == "Finance Recommended" %}selected{% endif %} disabled>Finance Recommended (System)</option>
                         <option value="Finance Rejected" {% if selected_po and selected_po.submission_status == "Finance Rejected" %}selected{% endif %} disabled>Finance Rejected (System)</option>
-                        
                         <option value="Submit for Approval" {% if selected_po and selected_po.submission_status == "Submit for Approval" %}selected{% endif %}>Submit for Approval (Sequential Step 2)</option>
                         <option value="Sent" {% if selected_po and selected_po.submission_status == "Sent" %}selected{% endif %}>Sent for Approval</option>
-                        
-                        <!-- Final approval statuses -->
                         <option value="Approved" {% if selected_po and selected_po.submission_status == "Approved" %}selected{% endif %} disabled>Approved (System)</option>
                         <option value="Rejected" {% if selected_po and selected_po.submission_status == "Rejected" %}selected{% endif %} disabled>Rejected (System)</option>
                     </select>
                 </div>
 
-                <!-- Governance Sign-off Tier (Copy) -->
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
-                    <input 
-                        type="text" 
-                        id="approval_requirement_copy" 
-                        value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" 
-                        readonly 
-                        class="form-control"
-                    >
+                    <input type="text" id="approval_requirement_copy" value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" readonly class="form-control">
                 </div>
 
-
-                <!-- Finance Dispatched Date Display -->
                 <div class="form-row">
                     <label class="form-label">Finance Dispatched Date</label>
-                    <input 
-                        type="text" 
-                        id="finance_dispatched_date_display" 
-                        value="{% if selected_po and selected_po.finance_requested_at %}{{ selected_po.finance_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po.finance_requested_at.strftime else selected_po.finance_requested_at | string | truncate(16, True, '') }}{% else %}Not yet dispatched to finance{% endif %}" 
-                        readonly 
-                        class="form-control"
-                        style="width: 240px;"
-                    >
+                    <input type="text" id="finance_dispatched_date_display" value="{% if selected_po and selected_po.finance_requested_at %}{{ selected_po.finance_requested_at }}{% else %}Not yet dispatched to finance{% endif %}" readonly class="form-control" style="width: 240px;">
                 </div>
 
-                <!-- Board Dispatched Date Display (Starts Expiry Clock) -->
                 <div class="form-row">
                     <label class="form-label">Board Dispatched Date</label>
-                    <input 
-                        type="text" 
-                        id="dispatched_date_display" 
-                        value="{{ selected_po.chair_requested_at.strftime('%Y-%m-%d %H:%M') if selected_po and selected_po.chair_requested_at else 'Not yet dispatched to board' }}" 
-                        readonly 
-                        class="form-control"
-                        style="width: 240px;"
-                    >
+                    <input type="text" id="dispatched_date_display" value="{{ selected_po.chair_requested_at if selected_po and selected_po.chair_requested_at else 'Not yet dispatched to board' }}" readonly class="form-control" style="width: 240px;">
                 </div>
 
-                <!-- Response Expiry Deadline Display -->
                 <div class="form-row">
                     <label class="form-label">Response Expiry Deadline</label>
-                    <input 
-                        type="text" 
-                        id="expiry_date_display" 
-                        value="Calculated on load..." 
-                        readonly 
-                        class="form-control"
-                        style="width: 240px;"
-                    >
+                    <input type="text" id="expiry_date_display" value="Calculated on load..." readonly class="form-control" style="width: 240px;">
                 </div>
 
                 <div class="form-row">
@@ -667,91 +634,92 @@
                     >
                 </div>
 
+                <!-- Procurement & Audit History Log -->
                 <div class="section-header">Procurement & Audit History Log</div>
-                    <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-                        <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
-                            <thead>
-                                <tr style="background: #f8f9fa; border-bottom: 1px solid var(--border-color); text-align: left;">
-                                    <th style="padding: 8px;">Timestamp</th>
-                                    <th style="padding: 8px;">Email</th>
-                                    <th style="padding: 8px;">Name</th>
-                                    <th style="padding: 8px;">Authority / Role</th>
-                                    <th style="padding: 8px;">Action / Status</th>
-                                    <th style="padding: 8px;">Notes</th>
+                <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f8f9fa; border-bottom: 1px solid var(--border-color); text-align: left;">
+                                <th style="padding: 8px;">Timestamp</th>
+                                <th style="padding: 8px;">Email</th>
+                                <th style="padding: 8px;">Name</th>
+                                <th style="padding: 8px;">Authority / Role</th>
+                                <th style="padding: 8px;">Action / Status</th>
+                                <th style="padding: 8px;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Section 1: Board Approvers -->
+                            <tr style="background: #e9ecef;">
+                                <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
+                                    Chair & Approval Authority Responses
+                                </td>
+                            </tr>
+                            {% if audit_logs.board %}
+                                {% for log in audit_logs.board %}
+                                <tr style="border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
+                                    <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                    <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
+                                    <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
+                                    <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
+                                    <td style="padding: 8px;">{{ log.notes or '-' }}</td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                <!-- Section 1: Board Approvers -->
-                                <tr style="background: #e9ecef;">
-                                    <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
-                                        Chair & Approval Authority Responses
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" style="padding: 8px; text-align: center; color: var(--text-muted); font-style: italic;">
+                                        No board responses recorded yet.
                                     </td>
                                 </tr>
-                                {% if audit_logs.board %}
-                                    {% for log in audit_logs.board %}
-                                    <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
-                                        <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
-                                        <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
-                                        <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
-                                        <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
-                                        <td style="padding: 8px;">{{ log.notes or '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="6" style="padding: 8px; text-align: center; color: var(--text-muted); font-style: italic;">
-                                            No board responses recorded yet.
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                    
-                                <!-- Section 2: Finance Reviewers -->
-                                <tr style="background: #e9ecef;">
-                                    <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
-                                        Finance Committee Reviews
+                            {% endif %}
+
+                            <!-- Section 2: Finance Reviewers -->
+                            <tr style="background: #e9ecef;">
+                                <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
+                                    Finance Committee Reviews
+                                </td>
+                            </tr>
+                            {% if audit_logs.finance %}
+                                {% for log in audit_logs.finance %}
+                                <tr style="border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
+                                    <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                    <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
+                                    <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
+                                    <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
+                                    <td style="padding: 8px;">{{ log.notes or '-' }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" style="padding: 8px; text-align: center; color: var(--text-muted); font-style: italic;">
+                                        No finance reviews recorded yet.
                                     </td>
                                 </tr>
-                                {% if audit_logs.finance %}
-                                    {% for log in audit_logs.finance %}
-                                    <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
-                                        <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
-                                        <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
-                                        <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
-                                        <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
-                                        <td style="padding: 8px;">{{ log.notes or '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% else %}
-                                    <tr>
-                                        <td colspan="6" style="padding: 8px; text-align: center; color: var(--text-muted); font-style: italic;">
-                                            No finance reviews recorded yet.
-                                        </td>
-                                    </tr>
-                                {% endif %}
-                    
-                                <!-- Section 3: Other / System Events -->
-                                {% if audit_logs.other %}
-                                <tr style="background: #e9ecef;">
-                                    <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
-                                        System & Other Events
-                                    </td>
+                            {% endif %}
+
+                            <!-- Section 3: Other / System Events -->
+                            {% if audit_logs.other %}
+                            <tr style="background: #e9ecef;">
+                                <td colspan="6" style="padding: 6px 8px; font-weight: bold; font-size: 12px; color: var(--text-main);">
+                                    System & Other Events
+                                </td>
+                            </tr>
+                                {% for log in audit_logs.other %}
+                                <tr style="border-bottom: 1px solid var(--border-color);">
+                                    <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
+                                    <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
+                                    <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
+                                    <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
+                                    <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
+                                    <td style="padding: 8px;">{{ log.notes or '-' }}</td>
                                 </tr>
-                                    {% for log in audit_logs.other %}
-                                    <tr style="border-bottom: 1px solid var(--border-color);">
-                                        <td style="padding: 8px; color: var(--text-muted);">{{ log.action_timestamp }}</td>
-                                        <td style="padding: 8px; font-weight: 500;">{{ log.actor_email }}</td>
-                                        <td style="padding: 8px;">{{ log.full_name or '-' }}</td>
-                                        <td style="padding: 8px;">{{ log.approval_permission or '-' }}</td>
-                                        <td style="padding: 8px;"><span class="status-badge">{{ log.action_type }}</span></td>
-                                        <td style="padding: 8px;">{{ log.notes or '-' }}</td>
-                                    </tr>
-                                    {% endfor %}
-                                {% endif %}
-                            </tbody>
-                        </table>
-                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
 
                 <div style="margin-top: 30px; display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
                     <button type="button" id="btn-check-approvals" class="btn btn-secondary" onclick="checkApprovals()" style="display: inline-flex; align-items: center; gap: 6px;">
@@ -764,14 +732,10 @@
     </div>
 </div>
 
-<!-- Pass server-side Jinja variables to global JS scope -->
 <script>
     window.initialPoNumber = {{ selected_po.po_number | tojson if selected_po and selected_po.po_number else '""' }};
     window.initialAiSummary = {{ selected_po.ai_recommendation_summary | tojson if selected_po and selected_po.ai_recommendation_summary else '""' }};
 </script>
-
-<!-- Load standalone JS file -->
 <script src="{{ url_for('static', filename='po_form.js') }}"></script>
-    
 </body>
 </html>
