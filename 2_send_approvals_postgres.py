@@ -179,8 +179,13 @@ def get_gemini_analysis(record, cursor):
     try:
         client = genai.Client(api_key=api_key)
         
+        # Aggregate both quotes and supporting documents for Gemini payload package
         raw_filepaths = record.get('quote_filepath') or ''
+        raw_supp_paths = record.get('supporting_docs_filepath') or ''
+        
         quote_attachments = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
+        supp_attachments = [u.strip() for u in raw_supp_paths.split(',') if u.strip()]
+        all_attachments = quote_attachments + supp_attachments
 
         quote_eval_template = get_prompt_by_process(cursor, 'Quote evaluation')
 
@@ -203,12 +208,12 @@ def get_gemini_analysis(record, cursor):
             )
             parse_contents = [parse_prompt_text]
 
-            for file_loc in quote_attachments:
+            for file_loc in all_attachments:
                 file_data, mime_type = fetch_file_bytes_and_mime(file_loc)
                 if file_data and mime_type:
                     parse_contents.append(types.Part.from_bytes(data=file_data, mime_type=mime_type))
 
-            log(f"PO {po_num}: 📑 Executing quote evaluation...")
+            log(f"PO {po_num}: 📑 Executing quote evaluation with quotes and supporting documents...")
             
             parse_response = client.models.generate_content(
                 model='gemini-3.5-flash',
@@ -390,12 +395,10 @@ def process_postgres_approvals():
 
                 # Determine routing path and timestamp stamping logic based on submission status
                 if submission_status == 'submit for finance review':
-                    # PATH 1: Sequential Step 1 (Finance Review only, board clock paused)
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
                     next_status = "Finance Review"
                     
-                    # Stamp finance_requested_at if not already present
                     if not record.get('finance_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
                             ts_cursor.execute("UPDATE po_log SET finance_requested_at = %s WHERE id = %s;", (now_time, record['id']))
@@ -405,7 +408,6 @@ def process_postgres_approvals():
                     expiry_str = "Paused until Board Dispatch"
 
                 elif submission_status == 'send for finance review and approval':
-                    # PATH 2: Simultaneous Dispatch (Finance & Board concurrently, board clock starts)
                     to_list = list(set(finance_reviewers + approval_authorities))
                     cc_list = list(set(estate_managers + admins))
                     next_status = "Sent"
@@ -415,7 +417,6 @@ def process_postgres_approvals():
                     dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
                     expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
 
-                    # Stamp both finance_requested_at and chair_requested_at simultaneously
                     with cursor.connection.cursor() as ts_cursor:
                         ts_cursor.execute(
                             "UPDATE po_log SET finance_requested_at = COALESCE(finance_requested_at, %s), chair_requested_at = COALESCE(chair_requested_at, %s) WHERE id = %s;",
@@ -424,7 +425,6 @@ def process_postgres_approvals():
                         cursor.connection.commit()
 
                 else:
-                    # PATH 3: Sequential Step 2 / Submit for Approval (Board Dispatch, board clock starts)
                     to_list = approval_authorities
                     cc_list = list(set(finance_reviewers + estate_managers + admins))
                     next_status = "Sent"
@@ -434,7 +434,6 @@ def process_postgres_approvals():
                     dispatch_str = dispatch_time.strftime("%Y-%m-%d %H:%M")
                     expiry_str = expiry_time.strftime("%Y-%m-%d %H:%M")
 
-                    # Stamp chair_requested_at to start the board expiry clock
                     if not record.get('chair_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
                             ts_cursor.execute("UPDATE po_log SET chair_requested_at = %s WHERE id = %s;", (dispatch_time, record['id']))
@@ -459,25 +458,48 @@ def process_postgres_approvals():
                     call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
                     call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
 
+                # --- EXTRACT QUOTES & SUPPORTING DOCUMENTS ---
                 raw_filepaths = record.get('quote_filepath') or ''
                 quote_urls = [u.strip() for u in raw_filepaths.split(',') if u.strip()]
 
+                raw_supp_paths = record.get('supporting_docs_filepath') or ''
+                supp_urls = [u.strip() for u in raw_supp_paths.split(',') if u.strip()]
+
+                # Plain Text Attachments Assembly
+                plain_parts = []
                 if quote_urls:
-                    formatted_plain_links = "\n".join([f"  • Document {i+1}: {url}" for i, url in enumerate(quote_urls)])
-                    attachments_section_plain = f"\nAttached Quote Documents:\n{formatted_plain_links}\n"
-                    
-                    attachments_html_list = "".join([
-                        f'<li style="margin-bottom: 4px;"><a href="{url}" style="color: #0d6efd; text-decoration: none;">Document {i+1}</a></li>'
-                        for i, url in enumerate(quote_urls)
-                    ])
-                    attachments_section_html = f'<ul style="margin: 6px 0; padding-left: 20px;">{attachments_html_list}</ul>'
+                    q_lines = "\n".join([f"  • Quote {i+1}: {url}" for i, url in enumerate(quote_urls)])
+                    plain_parts.append(f"Attached Quote Documents:\n{q_lines}")
                 else:
-                    attachments_section_plain = "\nAttached Quote Documents:\n  No documents attached.\n"
-                    attachments_section_html = '<p style="color: #6c757d; font-style: italic; margin: 4px 0;">No documents attached.</p>'
+                    plain_parts.append("Attached Quote Documents:\n  No quotes attached.")
+
+                if supp_urls:
+                    s_lines = "\n".join([f"  • Supporting Document {i+1}: {url}" for i, url in enumerate(supp_urls)])
+                    plain_parts.append(f"Attached Supporting Documents:\n{s_lines}")
+                else:
+                    plain_parts.append("Attached Supporting Documents:\n  No supporting documents attached.")
+                
+                attachments_section_plain = "\n" + "\n\n".join(plain_parts) + "\n"
+
+                # HTML Attachments Assembly
+                html_parts = []
+                if quote_urls:
+                    q_list = "".join([f'<li style="margin-bottom: 4px;"><a href="{url}" style="color: #0d6efd; text-decoration: none;">Quote Document {i+1}</a></li>' for i, url in enumerate(quote_urls)])
+                    html_parts.append(f'<div style="margin-bottom: 12px;"><strong style="font-size: 13px; text-transform: uppercase; color: #6c757d; display: block; margin-bottom: 4px;">Attached Quotes:</strong><ul style="margin: 0; padding-left: 20px;">{q_list}</ul></div>')
+                else:
+                    html_parts.append(f'<div style="margin-bottom: 12px;"><strong style="font-size: 13px; text-transform: uppercase; color: #6c757d; display: block; margin-bottom: 4px;">Attached Quotes:</strong><p style="color: #6c757d; font-style: italic; margin: 0;">No quotes attached.</p></div>')
+
+                if supp_urls:
+                    s_list = "".join([f'<li style="margin-bottom: 4px;"><a href="{url}" style="color: #0d6efd; text-decoration: none;">Supporting Document {i+1}</a></li>' for i, url in enumerate(supp_urls)])
+                    html_parts.append(f'<div style="margin-bottom: 12px;"><strong style="font-size: 13px; text-transform: uppercase; color: #6c757d; display: block; margin-bottom: 4px;">Attached Supporting Documents:</strong><ul style="margin: 0; padding-left: 20px;">{s_list}</ul></div>')
+                else:
+                    html_parts.append(f'<div style="margin-bottom: 12px;"><strong style="font-size: 13px; text-transform: uppercase; color: #6c757d; display: block; margin-bottom: 4px;">Attached Supporting Documents:</strong><p style="color: #6c757d; font-style: italic; margin: 0;">No supporting documents attached.</p></div>')
+
+                attachments_section_html = "".join(html_parts)
 
                 email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}]"
 
-                # 1. Plain Text Fallback Body with Thresholds
+                # 1. Plain Text Fallback Body with Thresholds & Attachments
                 email_body_plain = f"""Hello,
 
 An expenditure item has been submitted for review under strict governance rules.
@@ -502,7 +524,6 @@ Item Details:
 - YTD Actual Spend: R{ytd_actual:,.2f}
 - Remaining YTD Budget: R{remaining_budget:,.2f}
 {attachments_section_plain}
-
 ====================================================
 AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 ====================================================
@@ -514,7 +535,7 @@ AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 Regards,
 Automated Compliance Engine"""
 
-                # 2. Fully Formatted HTML Body with Threshold Banner
+                # 2. Fully Formatted HTML Body with Threshold Banner & Attachments
                 email_body_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -563,8 +584,8 @@ Automated Compliance Engine"""
             </tbody>
         </table>
 
-        <div style="margin-bottom: 20px;">
-            <strong style="font-size: 13px; text-transform: uppercase; color: #6c757d; display: block; margin-bottom: 6px;">Attached Supplier Quotes:</strong>
+        <!-- Package Documents Section -->
+        <div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 16px; margin-bottom: 20px;">
             {attachments_section_html}
         </div>
 
@@ -606,7 +627,7 @@ Automated Compliance Engine"""
                         )
                         conn.commit()
                     log(f"Database successfully updated for PO {po_num}.")
-                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), f"Emailed approvers ({next_status}) with governance thresholds & expiry.")
+                    write_control_log(po_num, "Outbound Dispatch", os.getenv("SENDER_EMAIL"), f"Emailed approvers ({next_status}) with governance thresholds, quotes, supporting docs, and expiry.")
                 else:
                     log(f"Failed to dispatch approval email for PO {po_num}. Skipping database update.", "ERROR")
 
