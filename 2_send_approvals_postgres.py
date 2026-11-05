@@ -414,7 +414,7 @@ def process_postgres_approvals():
                     dispatch_str = "N/A (Operations Review Phase)"
                     expiry_str = "Paused until Board Dispatch"
 
-                elif submission_status == 'submit for finance review'
+                elif submission_status == 'submit for finance review':
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
                     next_status = "Finance Review"
