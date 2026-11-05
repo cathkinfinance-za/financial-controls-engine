@@ -530,10 +530,12 @@ def process_postgres_approvals():
 
                 email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}]"
 
+                approverRoles = "Board of Directors"
+
                 # 1. Plain Text Fallback Body with Thresholds & Attachments
                 email_body_plain = f"""Hello,
 
-An expenditure item has been submitted for review under strict governance rules.
+An expenditure item has been submitted for review.
 
 GOVERNANCE & THRESHOLD REQUIREMENTS:
 - Sign-off Tier: {tier_name}
