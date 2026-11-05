@@ -653,4 +653,4 @@ def get_applicable_approval_rule(expense_type, is_budgeted, estimated_cost):
 
             return dict(row) if row else None
     finally:
-    v    conn.close()
+        conn.close()
