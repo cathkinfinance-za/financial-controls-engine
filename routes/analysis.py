@@ -183,7 +183,7 @@ def analyze_project_documents(project_id):
 
 @analysis_bp.route('/view-analysis/<int:option_id>', methods=['GET'])
 def view_analysis(option_id):
-    from app import get_db_connection
+    from app_package.db import get_db_connection 
     conn = get_db_connection()
     cursor = conn.cursor()
     
