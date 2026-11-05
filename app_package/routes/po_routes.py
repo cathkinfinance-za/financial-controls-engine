@@ -187,6 +187,8 @@ def po_form():
         gl_code = request.form.get("gl_code", "").strip() or None
         expense_type = request.form.get("expense_type")
         recommended_vendor = request.form.get("recommended_vendor", "").strip()
+        conflict_of_interest = request.form.get("conflict_of_interest", "").strip()
+        conflict_details = request.form.get("conflict_details", "").strip()
         justification_notes = request.form.get("justification_notes", "").strip()
         submission_status = request.form.get("submission_status")
         actioned_date = request.form.get("actioned_date") or None
