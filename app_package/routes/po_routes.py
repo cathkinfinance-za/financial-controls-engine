@@ -349,11 +349,11 @@ def po_form():
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
                             expense_type, estimated_cost, recommended_vendor, 
-                            conflict_of_interest, conflict_details,
-                            justification_notes, 
+                            conflict_of_interest, conflict_details, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
                             actioned_by, approval_notes, ai_recommendation_summary, 
-                            combined_quote_filepath, combined_supp_filepath, submission_status, submission_status, original_po
+                            combined_quote_filepath, combined_supp_filepath, 
+                            submission_status, original_po
                         ))
                     else:
                         cur.execute("""
