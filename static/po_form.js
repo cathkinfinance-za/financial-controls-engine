@@ -331,6 +331,50 @@ function removeAttachment(filename, elementId) {
     }
 }
 
+function updateSupportingDocsCount(input) {
+    const display = document.getElementById('supp_count_display');
+    const attachmentsList = document.getElementById('supp_attachments_list');
+    const statusText = document.getElementById('supp_file_chosen_status');
+    const files = input.files ? Array.from(input.files) : [];
+    const count = files.length;
+
+    if (statusText) {
+        if (count === 1) {
+            statusText.textContent = files[0].name;
+            statusText.style.fontStyle = 'normal';
+        } else if (count > 1) {
+            statusText.textContent = `${count} files selected`;
+            statusText.style.fontStyle = 'normal';
+        } else {
+            statusText.textContent = 'No file chosen';
+            statusText.style.fontStyle = 'italic';
+        }
+    }
+
+    if (display) {
+        display.style.display = count > 0 ? 'block' : 'none';
+        display.textContent = count > 0 ? `${count} supporting file(s) selected for upload.` : '';
+    }
+
+    if (attachmentsList && count > 0) {
+        attachmentsList.innerHTML = '';
+        files.forEach((file) => {
+            const objectUrl = URL.createObjectURL(file);
+            const ext = file.name.split('.').pop().toLowerCase();
+            const icon = ['jpg', 'jpeg', 'png', 'webp'].includes(ext) ? '🖼️' : '📄';
+
+            const badge = document.createElement('a');
+            badge.href = objectUrl;
+            badge.target = '_blank';
+            badge.rel = 'noopener noreferrer';
+            badge.className = 'doc-badge';
+            badge.innerHTML = `<span class="doc-icon">${icon}</span> <span class="doc-name">${file.name}</span>`;
+
+            attachmentsList.appendChild(badge);
+        });
+    }
+}
+
 function clearAiAnalysis() {
     const aiTextarea = document.getElementById('ai_recommendation_summary');
     const aiDisplay = document.getElementById('ai-analysis-display');
