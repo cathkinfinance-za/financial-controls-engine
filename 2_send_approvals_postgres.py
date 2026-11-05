@@ -404,7 +404,7 @@ def process_postgres_approvals():
                 if submission_status == 'submit for operations review':
                     to_list = operations_reviewers
                     cc_list = estate_managers + admins
-                    next_status = "Operations Review"
+                    next_status = "Sent for Operations Review"
                     
                     if not record.get('operations_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
@@ -417,7 +417,7 @@ def process_postgres_approvals():
                 elif submission_status == 'submit for finance review':
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
-                    next_status = "Finance Review"
+                    next_status = "Sent for Finance Review"
                     
                     if not record.get('finance_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
