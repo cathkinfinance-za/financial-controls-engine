@@ -581,6 +581,20 @@
                 </div>
 
                 <div class="form-row">
+                    <label class="form-label">Conflict of Interest?</label>
+                    <select name="conflict_of_interest" class="form-control" style="width: 200px;">
+                        <option value="" disabled {% if not selected_po or not selected_po.conflict_of_interest %}selected{% endif %}>Select option</option>
+                        <option value="No" {% if selected_po and selected_po.conflict_of_interest == "No" %}selected{% endif %}>No</option>
+                        <option value="Yes" {% if selected_po and selected_po.conflict_of_interest == "Yes" %}selected{% endif %}>Yes</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <label class="form-label">Conflict of Interest Details</label>
+                    <textarea name="conflict_details" class="form-control" placeholder="Provide details if there is a conflict of interest...">{{ selected_po.conflict_details if selected_po and selected_po.conflict_details else '' }}</textarea>
+                </div>
+
+                <div class="form-row">
                     <label class="form-label">Justification Notes</label>
                     <textarea name="justification_notes" class="form-control">{{ selected_po.justification_notes if selected_po and selected_po.justification_notes else '' }}</textarea>
                 </div>
