@@ -340,7 +340,7 @@ def po_form():
                             SET po_number = %s, description = %s, po_date = %s, is_budgeted = %s,
                                 gl_code = %s, gl_code_id = %s, expense_type = %s, estimated_cost = %s,
                                 recommended_vendor = %s, conflict_of_interest = %s, conflict_details = %s, justification_notes = %s,
-                                system_status = %s, quotes_provided = %s, actioned_date = %s,
+                                submission_status = %s, system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
                                 quote_filepath = %s, supporting_docs_filepath = %s,
                                 chair_requested_at = CASE WHEN %s IN ('Submit for Finance Review','Submit for Approval', 'Sent') THEN NOW() ELSE chair_requested_at END,
