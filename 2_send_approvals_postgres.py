@@ -528,8 +528,6 @@ def process_postgres_approvals():
 
                 attachments_section_html = "".join(html_parts)
 
-                email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}]"
-
                 approverRoles = "Board of Directors"
 
                 # 1. Plain Text Fallback Body with Thresholds & Attachments
