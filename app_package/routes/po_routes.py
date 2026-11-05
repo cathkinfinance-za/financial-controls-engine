@@ -123,6 +123,14 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None):
             )
             gemini_file_objects.append(uploaded_gemini_file)
 
+        coi_status = form_data.get('conflict_of_interest', 'No')
+        coi_det_text = form_data.get('conflict_details', '').strip()
+        
+        if coi_status == 'Yes':
+            formatted_coi = f"Yes — {coi_det_text if coi_det_text else 'No details provided'}"
+        else:
+            formatted_coi = "No (None declared)"
+
         prompt_context = {
             "po_num": form_data.get('po_number', 'N/A'),
             "desc_val": form_data.get('description', 'N/A'),
@@ -134,10 +142,9 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None):
             "budget_ytd": float(financial_data.get('budget_ytd', 0.0) or 0.0),
             "remaining_budget": remaining_budget,
             "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
-            "coi_status": form_data.get('conflict_of_interest', 'No'),
-            "coi_details": form_data.get('conflict_details', 'None declared'),
+            "coi_status": coi_status,
+            "coi_details": formatted_coi,  # <--- Use the combined formatted string here
             "user_justification": form_data.get('justification_notes', 'N/A'),
-            "coi_details": form_data.get('coi_details', 'None declared'),
             "approval_requirement": form_data.get('approval_requirement'),
             "system_status": form_data.get('system_status')
         }
