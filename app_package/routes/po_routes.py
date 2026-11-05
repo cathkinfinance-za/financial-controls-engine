@@ -357,11 +357,12 @@ def po_form():
                         cur.execute("""
                             INSERT INTO po_log (
                                 po_number, description, po_date, is_budgeted, gl_code, gl_code_id, 
-                                expense_type, estimated_cost, recommended_vendor, justification_notes, 
+                                expense_type, estimated_cost, recommended_vendor, 
+                                conflict_of_interest, conflict_details, justification_notes, 
                                 submission_status, system_status, quotes_provided, actioned_date, 
                                 actioned_by, approval_notes, ai_recommendation_summary, quote_filepath, supporting_docs_filepath
                             )
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                             ON CONFLICT (po_number) DO UPDATE SET
                                 description = EXCLUDED.description,
                                 po_date = EXCLUDED.po_date,
@@ -371,6 +372,8 @@ def po_form():
                                 expense_type = EXCLUDED.expense_type,
                                 estimated_cost = EXCLUDED.estimated_cost,
                                 recommended_vendor = EXCLUDED.recommended_vendor,
+                                conflict_of_interest = EXCLUDED.conflict_of_interest,
+                                conflict_details = EXCLUDED.conflict_details,
                                 justification_notes = EXCLUDED.justification_notes,
                                 submission_status = EXCLUDED.submission_status,
                                 system_status = EXCLUDED.system_status,
@@ -383,9 +386,11 @@ def po_form():
                                 supporting_docs_filepath = EXCLUDED.supporting_docs_filepath;
                         """, (
                             new_po, description, po_date, is_budgeted, gl_code, gl_code_id, 
-                            expense_type, estimated_cost, recommended_vendor, justification_notes, 
+                            expense_type, estimated_cost, recommended_vendor, 
+                            conflict_of_interest, conflict_details, justification_notes, 
                             submission_status, system_status, quotes_provided, actioned_date, 
-                            actioned_by, approval_notes, ai_recommendation_summary, combined_quote_filepath, combined_supp_filepath
+                            actioned_by, approval_notes, ai_recommendation_summary, 
+                            combined_quote_filepath, combined_supp_filepath
                         ))
                     
                     conn.commit()
