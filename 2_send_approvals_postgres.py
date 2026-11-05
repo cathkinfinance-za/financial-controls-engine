@@ -328,7 +328,7 @@ def process_postgres_approvals():
                 SELECT p.*, m.gl_code as master_gl_code, m.total_budget as total_annual_budget, m.ytd as ytd_actual, m.variance 
                 FROM po_log p
                 LEFT JOIN master_budget m ON p.gl_code_id = m.id
-                WHERE LOWER(p.submission_status) IN ('submit for approval', 'submit for finance review', 'send for finance review and approval');
+                WHERE LOWER(p.submission_status) IN ('submit for operations review', 'submit for approval', 'submit for finance review', 'send for finance review and approval');
             """)
             records = cursor.fetchall()
             log(f"Query executed. Found {len(records)} pending record(s) to process.")
@@ -340,6 +340,11 @@ def process_postgres_approvals():
             log("Fetching active approver matrix mapping...")
             cursor.execute("SELECT email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
+
+            operations_reviewers = [
+                row['email'].strip() for row in approver_records 
+                if 'Operations' in (row.get('approval_permission') or '') and row.get('email')
+            ]
 
             approval_authorities = [
                 row['email'].strip() for row in approver_records 
@@ -394,7 +399,22 @@ def process_postgres_approvals():
                 submission_status = record.get('submission_status', '').strip().lower()
 
                 # Determine routing path and timestamp stamping logic based on submission status
-                if submission_status == 'submit for finance review':
+
+
+                if submission_status == 'submit for operations review':
+                    to_list = operations_reviewers
+                    cc_list = estate_managers + admins
+                    next_status = "Operations Review"
+                    
+                    if not record.get('operations_requested_at'):
+                        with cursor.connection.cursor() as ts_cursor:
+                            ts_cursor.execute("UPDATE po_log SET operations_requested_at = %s WHERE id = %s;", (now_time, record['id']))
+                            cursor.connection.commit()
+                    
+                    dispatch_str = "N/A (Operations Review Phase)"
+                    expiry_str = "Paused until Board Dispatch"
+
+                elif submission_status == 'submit for finance review'
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
                     next_status = "Finance Review"
@@ -451,12 +471,23 @@ def process_postgres_approvals():
                 
                 clean_ai_html = ai_analysis_text.split("AI_RECOMMENDATION_LINE:")[0].strip()
 
-                if submission_status == 'submit for finance review':
+                if submission_status == 'submit for operations review':
+                    call_to_action = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
+                
+                elif submission_status == 'submit for finance review':
                     call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
                     call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
                 else:
                     call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
                     call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
+
+                if submission_status == 'submit for operations review':
+                    email_subject = f"[{po_num}] - Review Required: PO-ID: {po_id}"
+                elif submission_status == 'submit for finance review':
+                    email_subject = f"[{po_num}] - Finance Review Required: PO-ID: {po_id}"
+                else:
+                    email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
 
                 # --- EXTRACT QUOTES & SUPPORTING DOCUMENTS ---
                 raw_filepaths = record.get('quote_filepath') or ''
