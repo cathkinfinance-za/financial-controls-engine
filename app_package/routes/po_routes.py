@@ -134,6 +134,8 @@ def analyze_po_with_gemini(uploaded_files_data, form_data, financial_data=None):
             "budget_ytd": float(financial_data.get('budget_ytd', 0.0) or 0.0),
             "remaining_budget": remaining_budget,
             "user_recommended_vendor": form_data.get('recommended_vendor', 'N/A'),
+            "coi_status": form_data.get('conflict_of_interest', 'No'),
+            "coi_details": form_data.get('conflict_details', 'None declared'),
             "user_justification": form_data.get('justification_notes', 'N/A'),
             "coi_details": form_data.get('coi_details', 'None declared'),
             "approval_requirement": form_data.get('approval_requirement'),
@@ -337,7 +339,7 @@ def po_form():
                             UPDATE po_log 
                             SET po_number = %s, description = %s, po_date = %s, is_budgeted = %s,
                                 gl_code = %s, gl_code_id = %s, expense_type = %s, estimated_cost = %s,
-                                recommended_vendor = %s, justification_notes = %s, submission_status = %s,
+                                recommended_vendor = %s, conflict_of_interest = %s, conflict_details = %s, justification_notes = %s,
                                 system_status = %s, quotes_provided = %s, actioned_date = %s,
                                 actioned_by = %s, approval_notes = %s, ai_recommendation_summary = %s,
                                 quote_filepath = %s, supporting_docs_filepath = %s,
