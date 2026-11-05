@@ -444,8 +444,10 @@
 
                 <div class="form-row">
                     <label class="form-label">Governance Sign-off Tier</label>
-                    <input type="text" id="approval_requirement" value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" readonly class="form-control">
+                    <input type="text" id="approval_requirement" name="approval_requirement" value="{{ selected_po.approval_requirement if selected_po and selected_po.approval_requirement else '' }}" readonly class="form-control">
                 </div>
+
+                
                 
                 <!-- Quotes Section -->
                 <div class="form-row">
