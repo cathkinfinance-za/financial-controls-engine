@@ -337,30 +337,27 @@ def process_postgres_approvals():
                 return
 
             log("Fetching active approver matrix mapping...")
-            cursor.execute("SELECT email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
+            cursor.execute("SELECT name, surname, email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
 
-            operations_reviewers = [
-                row['email'].strip() for row in approver_records 
-                if 'Operations' in (row.get('approval_permission') or '') and row.get('email')
-            ]
+            # Helper to extract full names neatly
+            def get_names_by_permission(keyword):
+                names = []
+                for row in approver_records:
+                    perm = row.get('approval_permission') or ''
+                    if keyword.lower() in perm.lower() and row.get('email'):
+                        full_name = f"{row.get('name', '').strip()} {row.get('surname', '').strip()}".strip()
+                        names.append(full_name if full_name else row['email'].strip())
+                return names
 
-            approval_authorities = [
-                row['email'].strip() for row in approver_records 
-                if 'Approval Authority' in (row.get('approval_permission') or '') and row.get('email')
-            ]
-            finance_reviewers = [
-                row['email'].strip() for row in approver_records
-                if 'Finance Review' in (row.get('approval_permission') or '') and row.get('email')
-            ]
-            estate_managers = [
-                row['email'].strip() for row in approver_records 
-                if 'Estate Manager' in (row.get('approval_permission') or '') and row.get('email')
-            ]
-            admins = [
-                row['email'].strip() for row in approver_records 
-                if 'Admin' in (row.get('approval_permission') or '') and row.get('email')
-            ]
+            operations_reviewers_emails = [row['email'].strip() for row in approver_records if 'Operations' in (row.get('approval_permission') or '') and row.get('email')]
+            approval_authorities_emails = [row['email'].strip() for row in approver_records if 'Approval Authority' in (row.get('approval_permission') or '') and row.get('email')]
+            finance_reviewers_emails = [row['email'].strip() for row in approver_records if 'Finance Review' in (row.get('approval_permission') or '') and row.get('email')]
+            estate_managers_emails = [row['email'].strip() for row in approver_records if 'Estate Manager' in (row.get('approval_permission') or '') and row.get('email')]
+            admins_emails = [row['email'].strip() for row in approver_records if 'Admin' in (row.get('approval_permission') or '') and row.get('email')]
+
+            director_names = get_names_by_permission('Approval Authority')
+            finance_reviewer_names = get_names_by_permission('Finance Review')
 
             for idx, record in enumerate(records, start=1):
                 po_num = str(record.get('po_number', '')).strip()
@@ -399,8 +396,8 @@ def process_postgres_approvals():
 
                 # Determine routing path and dynamic variables based on submission status
                 if submission_status == 'submit for operations review':
-                    to_list = operations_reviewers
-                    cc_list = estate_managers + admins
+                    to_list = operations_reviewers_emails
+                    cc_list = estate_managers_emails + admins_emails
                     next_status = "Sent for Operations Review"
                     recipient_salutation = "Operations Reviewer,"
                     email_subject = f"[{po_num}] - Review Required: PO-ID: {po_id}"
@@ -416,8 +413,8 @@ def process_postgres_approvals():
                     expiry_str = "Paused until Board Dispatch"
 
                 elif submission_status == 'submit for finance review':
-                    to_list = finance_reviewers
-                    cc_list = estate_managers + admins
+                    to_list = finance_reviewers_emails
+                    cc_list = estate_managers_emails + admins_emails
                     next_status = "Sent for Finance Review"
                     recipient_salutation = "Finance Reviewers,"
                     email_subject = f"[{po_num}] - Finance Review Required: PO-ID: {po_id}"
@@ -433,8 +430,8 @@ def process_postgres_approvals():
                     expiry_str = "Paused until Board Dispatch"
 
                 elif submission_status == 'send for finance review and approval':
-                    to_list = list(set(finance_reviewers + approval_authorities))
-                    cc_list = list(set(estate_managers + admins))
+                    to_list = list(set(finance_reviewers_emails + approval_authorities_emails))
+                    cc_list = list(set(estate_managers_emails + admins_emails))
                     next_status = "Sent"
                     recipient_salutation = "Directors and Finance Reviewers,"
                     email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
@@ -454,8 +451,8 @@ def process_postgres_approvals():
                         cursor.connection.commit()
 
                 else:
-                    to_list = approval_authorities
-                    cc_list = list(set(finance_reviewers + estate_managers + admins))
+                    to_list = approval_authorities_emails
+                    cc_list = list(set(finance_reviewers_emails + estate_managers_emails + admins_emails))
                     next_status = "Sent"
                     recipient_salutation = "Board Directors / Approval Authorities,"
                     email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
@@ -523,11 +520,11 @@ def process_postgres_approvals():
 
                 attachments_section_html = "".join(html_parts)
 
-                # Format recipient strings for audit footer display
-                to_names_str = ", ".join(to_list) if to_list else "None specified"
-                cc_names_str = ", ".join(cc_list) if cc_list else "None"
+                # Format director and finance reviewer name strings for footer display
+                directors_str = ", ".join(director_names) if director_names else "None listed"
+                finance_reviewers_str = ", ".join(finance_reviewer_names) if finance_reviewer_names else "None listed"
 
-                # 1. Plain Text Body with Dynamic Greeting & Circulation List
+                # 1. Plain Text Body with Dynamic Greeting & Named Roles Footer
                 email_body_plain = f"""{recipient_salutation}
 
 An expenditure item has been submitted for review.
@@ -561,15 +558,15 @@ AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 {call_to_action_plain}
 
 ----------------------------------------------------
-CIRCULATION LIST:
-- To: {to_names_str}
-- CC: {cc_names_str}
+CIRCULATION DETAILS:
+- Directors: {directors_str}
+- Finance Reviewers: {finance_reviewers_str}
 ----------------------------------------------------
 
 Regards,
 Automated Compliance Engine"""
 
-                # 2. Fully Formatted HTML Body with Dynamic Greeting & Circulation Footer
+                # 2. Fully Formatted HTML Body with Dynamic Greeting & Named Roles Footer Box
                 email_body_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -642,9 +639,9 @@ Automated Compliance Engine"""
 
         <!-- Circulation List Footer Box -->
         <div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 12px 16px; margin-top: 20px; font-size: 12px; color: #6c757d;">
-            <strong style="text-transform: uppercase; display: block; margin-bottom: 4px; color: #495057;">Circulation Details:</strong>
-            <div style="margin-bottom: 2px;"><strong>To:</strong> {to_names_str}</div>
-            <div><strong>CC:</strong> {cc_names_str}</div>
+            <strong style="text-transform: uppercase; display: block; margin-bottom: 6px; color: #495057;">Circulation Details:</strong>
+            <div style="margin-bottom: 3px;"><strong>Directors:</strong> {directors_str}</div>
+            <div><strong>Finance Reviewers:</strong> {finance_reviewers_str}</div>
         </div>
 
         <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; text-align: center;">
