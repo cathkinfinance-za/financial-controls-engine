@@ -337,21 +337,22 @@ def process_postgres_approvals():
                 return
 
             log("Fetching active approver matrix mapping...")
-            cursor.execute("""
-                SELECT "Name", "Surname", email, approval_permission 
-                FROM approvers 
-                WHERE UPPER(active) = 'YES';
-            """)
+            cursor.execute('SELECT "Name", "Surname", email, approval_permission FROM approvers WHERE UPPER(active) = \'YES\';')
             approver_records = cursor.fetchall()
 
-            # Helper to extract full names neatly
+            # Helper to extract full names using case-sensitive PostgreSQL column identifiers ("Name", "Surname")
             def get_names_by_permission(keyword):
                 names = []
                 for row in approver_records:
                     perm = row.get('approval_permission') or ''
-                    if keyword.lower() in perm.lower() and row.get('email'):
-                        full_name = f"{row.get('name', '').strip()} {row.get('surname', '').strip()}".strip()
-                        names.append(full_name if full_name else row['email'].strip())
+                    if keyword.lower() in perm.lower():
+                        first_name = (row.get('Name') or '').strip()
+                        last_name = (row.get('Surname') or '').strip()
+                        full_name = f"{first_name} {last_name}".strip()
+                        if full_name:
+                            names.append(full_name)
+                        elif row.get('email'):
+                            names.append(row['email'].strip())
                 return names
 
             operations_reviewers_emails = [row['email'].strip() for row in approver_records if 'Operations' in (row.get('approval_permission') or '') and row.get('email')]
