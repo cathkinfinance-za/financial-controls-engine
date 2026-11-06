@@ -337,7 +337,7 @@ def process_postgres_approvals():
                 return
 
             log("Fetching active approver matrix mapping...")
-            cursor.execute("SELECT name, surname, email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
+            cursor.execute("SELECT "Name", "Surname", email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
 
             # Helper to extract full names neatly
