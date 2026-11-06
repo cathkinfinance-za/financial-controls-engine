@@ -179,7 +179,6 @@ def get_gemini_analysis(record, cursor):
     try:
         client = genai.Client(api_key=api_key)
         
-        # Aggregate both quotes and supporting documents for Gemini payload package
         raw_filepaths = record.get('quote_filepath') or ''
         raw_supp_paths = record.get('supporting_docs_filepath') or ''
         
@@ -341,7 +340,6 @@ def process_postgres_approvals():
             cursor.execute("SELECT email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
 
-            # Replace strict equality with robust checks:
             operations_reviewers = [
                 row['email'].strip() for row in approver_records 
                 if 'Operations' in (row.get('approval_permission') or '') and row.get('email')
@@ -399,13 +397,15 @@ def process_postgres_approvals():
                 now_time = datetime.datetime.now()
                 submission_status = record.get('submission_status', '').strip().lower()
 
-                # Determine routing path and timestamp stamping logic based on submission status
-
-
+                # Determine routing path and dynamic variables based on submission status
                 if submission_status == 'submit for operations review':
                     to_list = operations_reviewers
                     cc_list = estate_managers + admins
                     next_status = "Sent for Operations Review"
+                    recipient_salutation = "Operations Reviewer,"
+                    email_subject = f"[{po_num}] - Review Required: PO-ID: {po_id}"
+                    call_to_action = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
                     
                     if not record.get('operations_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
@@ -419,6 +419,10 @@ def process_postgres_approvals():
                     to_list = finance_reviewers
                     cc_list = estate_managers + admins
                     next_status = "Sent for Finance Review"
+                    recipient_salutation = "Finance Reviewers,"
+                    email_subject = f"[{po_num}] - Finance Review Required: PO-ID: {po_id}"
+                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
                     
                     if not record.get('finance_requested_at'):
                         with cursor.connection.cursor() as ts_cursor:
@@ -432,6 +436,10 @@ def process_postgres_approvals():
                     to_list = list(set(finance_reviewers + approval_authorities))
                     cc_list = list(set(estate_managers + admins))
                     next_status = "Sent"
+                    recipient_salutation = "Directors and Finance Reviewers,"
+                    email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
+                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
                     
                     dispatch_time = now_time
                     expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
@@ -449,6 +457,10 @@ def process_postgres_approvals():
                     to_list = approval_authorities
                     cc_list = list(set(finance_reviewers + estate_managers + admins))
                     next_status = "Sent"
+                    recipient_salutation = "Board Directors / Approval Authorities,"
+                    email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
+                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
+                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
                     
                     dispatch_time = now_time
                     expiry_time = dispatch_time + datetime.timedelta(days=time_limit_days)
@@ -471,24 +483,6 @@ def process_postgres_approvals():
                     ai_analysis_text = get_gemini_analysis(record, cursor)
                 
                 clean_ai_html = ai_analysis_text.split("AI_RECOMMENDATION_LINE:")[0].strip()
-
-                if submission_status == 'submit for operations review':
-                    call_to_action = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
-                    call_to_action_plain = 'Please review the purchase order details and governance thresholds below. This is circulated for your information and review (no action or reply is required).'
-                
-                elif submission_status == 'submit for finance review':
-                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"RECOMMEND FOR APPROVAL"</strong> or <strong>"RECOMMEND FOR REJECTION"</strong>.'
-                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "RECOMMEND FOR APPROVAL" or "RECOMMEND FOR REJECTION".'
-                else:
-                    call_to_action = 'Please review the purchase order details and governance thresholds below, then reply directly to this message typing either <strong>"APPROVED"</strong> or <strong>"REJECTED"</strong>.'
-                    call_to_action_plain = 'Please review the purchase order details and governance thresholds, then reply directly to this message typing either "APPROVED" or "REJECTED".'
-
-                if submission_status == 'submit for operations review':
-                    email_subject = f"[{po_num}] - Review Required: PO-ID: {po_id}"
-                elif submission_status == 'submit for finance review':
-                    email_subject = f"[{po_num}] - Finance Review Required: PO-ID: {po_id}"
-                else:
-                    email_subject = f"[{po_num}] - Approval Required: PO-ID: {po_id}"
 
                 # --- EXTRACT QUOTES & SUPPORTING DOCUMENTS ---
                 raw_filepaths = record.get('quote_filepath') or ''
@@ -529,17 +523,19 @@ def process_postgres_approvals():
 
                 attachments_section_html = "".join(html_parts)
 
-                approverRoles = "Board of Directors"
+                # Format recipient strings for audit footer display
+                to_names_str = ", ".join(to_list) if to_list else "None specified"
+                cc_names_str = ", ".join(cc_list) if cc_list else "None"
 
-                # 1. Plain Text Fallback Body with Thresholds & Attachments
-                email_body_plain = f"""Hello,
+                # 1. Plain Text Body with Dynamic Greeting & Circulation List
+                email_body_plain = f"""{recipient_salutation}
 
 An expenditure item has been submitted for review.
 
 GOVERNANCE & THRESHOLD REQUIREMENTS:
 - Sign-off Tier: {tier_name}
 - Required Quotes: {quotes_req}
-- Required Approver Roles: {approverRoles}
+- Required Approver Roles: {approver_roles}
 - Minimum Quorum Required: {min_responses} Approver(s)
 - Response Time Window: {time_limit_days} Days
 - Dispatched Date: {dispatch_str}
@@ -564,10 +560,16 @@ AUTOMATED INTELLIGENCE AUDIT SUMMARY & RECOMMENDATION
 
 {call_to_action_plain}
 
+----------------------------------------------------
+CIRCULATION LIST:
+- To: {to_names_str}
+- CC: {cc_names_str}
+----------------------------------------------------
+
 Regards,
 Automated Compliance Engine"""
 
-                # 2. Fully Formatted HTML Body with Threshold Banner & Attachments
+                # 2. Fully Formatted HTML Body with Dynamic Greeting & Circulation Footer
                 email_body_html = f"""<!DOCTYPE html>
 <html>
 <head>
@@ -580,7 +582,7 @@ Automated Compliance Engine"""
             Purchase Order Approval Request
         </h2>
         
-        <p style="font-size: 14px; line-height: 1.5; color: #212529;">Hello,</p>
+        <p style="font-size: 14px; line-height: 1.5; color: #212529; font-weight: 600;">{recipient_salutation}</p>
         <p style="font-size: 14px; line-height: 1.5; color: #212529;">An expenditure item has been submitted for your review and sign-off.</p>
         
         <!-- Governance Threshold Banner -->
@@ -591,7 +593,7 @@ Automated Compliance Engine"""
             <table style="width: 100%; font-size: 13px; color: #212529; border-collapse: collapse;">
                 <tr><td style="padding: 3px 0; font-weight: 600; width: 170px;">Sign-off Tier:</td><td style="padding: 3px 0;">{tier_name}</td></tr>
                 <tr><td style="padding: 3px 0; font-weight: 600;">Required Quotes:</td><td style="padding: 3px 0;">{quotes_req} Quote(s)</td></tr>
-                <tr><td style="padding: 3px 0; font-weight: 600;">Required Roles:</td><td style="padding: 3px 0;">{approverRoles}</td></tr>
+                <tr><td style="padding: 3px 0; font-weight: 600;">Required Roles:</td><td style="padding: 3px 0;">{approver_roles}</td></tr>
                 <tr><td style="padding: 3px 0; font-weight: 600;">Minimum Quorum:</td><td style="padding: 3px 0;">{min_responses} Approval(s)</td></tr>
                 <tr><td style="padding: 3px 0; font-weight: 600;">Dispatched Date:</td><td style="padding: 3px 0;">{dispatch_str}</td></tr>
                 <tr><td style="padding: 3px 0; font-weight: 600; color: #c92a2a;">Expiry Deadline:</td><td style="padding: 3px 0; font-weight: 700; color: #c92a2a;">{expiry_str} ({time_limit_days}-day limit)</td></tr>
@@ -636,6 +638,13 @@ Automated Compliance Engine"""
             <p style="margin: 0; font-size: 14px; color: #856404; line-height: 1.5;">
                 {call_to_action}
             </p>
+        </div>
+
+        <!-- Circulation List Footer Box -->
+        <div style="background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; padding: 12px 16px; margin-top: 20px; font-size: 12px; color: #6c757d;">
+            <strong style="text-transform: uppercase; display: block; margin-bottom: 4px; color: #495057;">Circulation Details:</strong>
+            <div style="margin-bottom: 2px;"><strong>To:</strong> {to_names_str}</div>
+            <div><strong>CC:</strong> {cc_names_str}</div>
         </div>
 
         <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e9ecef; font-size: 12px; color: #6c757d; text-align: center;">
