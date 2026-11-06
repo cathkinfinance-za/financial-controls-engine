@@ -341,6 +341,7 @@ def process_postgres_approvals():
             cursor.execute("SELECT email, approval_permission FROM approvers WHERE UPPER(active) = 'YES';")
             approver_records = cursor.fetchall()
 
+            # Replace strict equality with robust checks:
             operations_reviewers = [
                 row['email'].strip() for row in approver_records 
                 if 'Operations' in (row.get('approval_permission') or '') and row.get('email')
@@ -348,19 +349,19 @@ def process_postgres_approvals():
 
             approval_authorities = [
                 row['email'].strip() for row in approver_records 
-                if row.get('approval_permission') == 'Approval Authority' and row.get('email')
+                if 'Approval Authority' in (row.get('approval_permission') or '') and row.get('email')
             ]
             finance_reviewers = [
                 row['email'].strip() for row in approver_records
-                if row.get('approval_permission') == 'Finance Review' and row.get('email')
+                if 'Finance Review' in (row.get('approval_permission') or '') and row.get('email')
             ]
             estate_managers = [
                 row['email'].strip() for row in approver_records 
-                if row.get('approval_permission') == 'Estate Manager' and row.get('email')
+                if 'Estate Manager' in (row.get('approval_permission') or '') and row.get('email')
             ]
             admins = [
                 row['email'].strip() for row in approver_records 
-                if row.get('approval_permission') == 'Admin' and row.get('email')
+                if 'Admin' in (row.get('approval_permission') or '') and row.get('email')
             ]
 
             for idx, record in enumerate(records, start=1):
