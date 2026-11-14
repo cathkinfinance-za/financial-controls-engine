@@ -27,7 +27,8 @@ jobs:
       - name: Run URL Fetcher Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SENDER_EMAIL: ${{ secrets.SENDER_EMAIL }}
+          SENDER_PASSWORD: ${{ secrets.SENDER_PASSWORD }}
+          IMAP_SERVER: ${{ secrets.IMAP_SERVER }}
         run: |
           python weconnectu_report_logs.py
