@@ -30,4 +30,4 @@ jobs:
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
-          python [weconnectu_report_logs.py](https://github.com/cathkinfinance-za/financial-controls-engine/edit/main/weconnectu_report_logs.py)
+          python weconnectu_report_logs.py
