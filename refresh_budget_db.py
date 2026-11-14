@@ -9,6 +9,34 @@ from playwright.sync_api import sync_playwright
 import psycopg2
 from weconnectu_report_logs import get_latest_weconnectu_url
 
+def header_to_column(header_text):
+    """Maps WeConnectU community report budget headers to database column names."""
+    if not header_text:
+        return None
+    cleaned = header_text.strip().lower()
+    
+    # Direct mapping for standard month/year headers or general columns
+    # Adjust or expand these based on exact headers returned by your report view
+    month_map = {
+        "mar 2026": "mar_2026",
+        "apr 2026": "apr_2026",
+        "may 2026": "may_2026",
+        "jun 2026": "jun_2026",
+        "jul 2026": "jul_2026",
+        "aug 2026": "aug_2026",
+        "sep 2026": "sep_2026",
+        "oct 2026": "oct_2026",
+        "nov 2026": "nov_2026",
+        "dec 2026": "dec_2026",
+        "jan 2027": "jan_2027",
+        "feb 2027": "feb_2027",
+    }
+    
+    if cleaned in month_map:
+        return month_map[cleaned]
+        
+    # Fallback pattern matching for YYYY-MM or standard format headers
+    return None
 
 def fetch_and_sync_weconnectu_budget():
     DATABASE_URL = os.getenv("DATABASE_URL")
