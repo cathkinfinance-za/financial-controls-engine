@@ -1,9 +1,66 @@
 import os
 import re
+import imaplib
+import email
+from email.header import decode_header
 import pandas as pd
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 import psycopg2
+
+def get_latest_weconnectu_url_from_email():
+    """Connects to Gmail via IMAP and extracts the latest Community Report URL."""
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    
+    if not gmail_user or not gmail_pass:
+        raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD environment variable is missing.")
+
+    print("Connecting to Gmail to fetch the latest WeConnectU report link...")
+    mail = imaplib.IMAP4_SSL("imap.gmail.com")
+    mail.login(gmail_user, gmail_pass)
+    mail.select("inbox")
+
+    # Search for emails with the matching subject
+    status, messages = mail.search(None, '(SUBJECT "Community Report - Cathkin Estate")')
+    if status != "OK" or not messages[0]:
+        mail.logout()
+        raise RuntimeError("No 'Community Report - Cathkin Estate' emails found in Inbox.")
+
+    # Get the most recent email ID
+    latest_email_id = messages[0].split()[-1]
+    _, msg_data = mail.fetch(latest_email_id, "(RFC822)")
+    
+    raw_email = msg_data[0][1]
+    msg = email.message_from_bytes(raw_email)
+    mail.logout()
+
+    # Extract HTML body from the email
+    html_body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                html_body = part.get_payload(decode=True).decode(errors="ignore")
+                break
+    else:
+        if msg.get_content_type() == "text/html":
+            html_body = msg.get_payload(decode=True).decode(errors="ignore")
+
+    if not html_body:
+        raise RuntimeError("Could not find HTML content in the latest Community Report email.")
+
+    # Parse the email HTML to find the 'Click here to view the Community Report online' link
+    soup = BeautifulSoup(html_body, "html.parser")
+    
+    # Look specifically for the link containing the Community Report text
+    for a_tag in soup.find_all("a", href=True):
+        link_text = a_tag.get_text(strip=True).lower()
+        if "community report online" in link_text:
+            report_url = a_tag["href"]
+            print(f"✅ [LOG] Extracted WeConnectU Community Report URL: {report_url}")
+            return report_url
+
+    raise RuntimeError("Found the email, but could not locate the 'Community Report online' link.")
 
 def clean_and_convert_number(text_value):
     """Converts clean accounting string metrics into valid calculation floats."""
@@ -34,12 +91,16 @@ def header_to_column(header_text):
     return None
 
 def fetch_and_sync_weconnectu_budget():
-    URL = os.getenv("WECONNECTU_URL")
     DATABASE_URL = os.getenv("DATABASE_URL")
-
-    if not URL or not DATABASE_URL:
-        print("❌ ERROR: WECONNECTU_URL or DATABASE_URL environment variable is missing.")
+    if not DATABASE_URL:
+        print("❌ ERROR: DATABASE_URL environment variable is missing.")
         return
+
+    try:
+        URL = get_latest_weconnectu_url_from_email()
+    except Exception as e:
+        print(f"❌ ERROR fetching URL from email: {e}")
+    return
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
