@@ -235,6 +235,7 @@ def expenditure_expose():
 
 @expenditure_bp.route('/expenditure_expose/refresh/<month>')
 def refresh_expenditure_ai(month):
+    ALLOWED_MONTHS = get_allowed_months()
     if month in ALLOWED_MONTHS:
         try:
             conn = get_db_connection()
