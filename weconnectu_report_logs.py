@@ -6,19 +6,20 @@ import psycopg2
 
 def fetch_and_store_weconnectu_url(report_type="Community Report - Cathkin Estate"):
     """
-    Connects to Gmail via IMAP, extracts the latest report URL, 
-    saves it to the PostgreSQL database for record-keeping, and returns the URL.
+    Connects to Gmail via IMAP using SENDER_EMAIL / SENDER_PASSWORD, 
+    extracts the latest report URL, and saves it to the PostgreSQL database.
     """
-    gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    # Match the environment variables used in 3_process_replies_postgres.py
+    gmail_user = os.getenv("SENDER_EMAIL")
+    gmail_pass = os.getenv("SENDER_PASSWORD")
     database_url = os.getenv("DATABASE_URL")
     
     if not gmail_user or not gmail_pass:
-        raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD environment variable is missing.")
+        raise ValueError("SENDER_EMAIL or SENDER_PASSWORD environment variable is missing.")
     if not database_url:
         raise ValueError("DATABASE_URL environment variable is missing.")
 
-    print("Connecting to Gmail to fetch the latest WeConnectU report link...")
+    print(f"Connecting to Gmail inbox as {gmail_user}...")
     mail = imaplib.IMAP4_SSL("imap.gmail.com")
     mail.login(gmail_user, gmail_pass)
     mail.select("inbox")
