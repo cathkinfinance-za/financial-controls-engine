@@ -152,27 +152,25 @@ def fetch_and_sync_weconnectu_budget():
 
     print("Connecting to Neon PostgreSQL for Budget Synchronization...")
     try:
+        # 1. Fetch current columns and apply DDL using a dedicated autocommit connection
+        ddl_conn = psycopg2.connect(DATABASE_URL)
+        ddl_conn.autocommit = True
+        try:
+            with ddl_conn.cursor() as cur:
+                cur.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'master_budget';")
+                existing_columns = {row[0] for row in cur.fetchall()}
+                print(f"📋 [LOG] Current DB columns before alteration: {sorted(list(existing_columns))}")
+    
+                for col in detected_db_columns:
+                    if col and col not in existing_columns and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
+                        print(f"⚙️ [LOG] Executing DDL: ALTER TABLE master_budget ADD COLUMN {col}...")
+                        cur.execute(f"ALTER TABLE master_budget ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';")
+                        print(f"✅ [LOG] Column {col} added successfully.")
+        finally:
+            ddl_conn.close()
+    
+        # 2. Open normal transactional connection for data upserts
         conn = psycopg2.connect(DATABASE_URL)
-        
-        # 1. Fetch current columns directly from the database schema
-        with conn.cursor() as cur:
-            cur.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'master_budget';
-            """)
-            existing_columns = {row[0] for row in cur.fetchall()}
-            print(f"📋 [LOG] Current DB columns before alteration: {sorted(list(existing_columns))}")
-
-        # 2. Add missing columns with explicit autocommit & transaction commit
-        for col in detected_db_columns:
-            if col and col not in existing_columns and col not in ['ytd', 'budget_ytd', 'variance', 'total_budget']:
-                print(f"⚙️ [LOG] Executing DDL: ALTER TABLE master_budget ADD COLUMN {col}...")
-                conn.autocommit = True
-                with conn.cursor() as cur:
-                    cur.execute(f"ALTER TABLE master_budget ADD COLUMN IF NOT EXISTS {col} NUMERIC(12, 2) DEFAULT '0.00';")
-                conn.autocommit = False
-                print(f"✅ [LOG] Column {col} added successfully.")
 
         # 3. Perform Upsert
         with conn.cursor() as cur:
