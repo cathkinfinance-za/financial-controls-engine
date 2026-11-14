@@ -19,7 +19,12 @@ ALLOWED_MONTHS = {
     'jun_2026': 'June 2026',
     'jul_2026': 'July 2026',
     'aug_2026': 'August 2026',
-    'sep_2026': 'September 2026'
+    'sep_2026': 'September 2026',
+    'oct_2026': 'October 2026',
+    'nov_2026 : 'November 2026',
+    'dec_2026 : 'December 2026',
+    'jan_2027 : 'January 2027',
+    'feb_2027 : 'February 2027'
 }
 
 @expenditure_bp.route('/expenditure_expose')
