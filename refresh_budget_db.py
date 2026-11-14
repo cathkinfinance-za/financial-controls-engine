@@ -38,6 +38,23 @@ def header_to_column(header_text):
     # Fallback pattern matching for YYYY-MM or standard format headers
     return None
 
+def clean_and_convert_number(val_str):
+    """Cleans currency symbols, whitespace, and parentheses, returning a float."""
+    if not val_str:
+        return 0.0
+    cleaned = str(val_str).strip()
+    # Handle negative numbers in accounting parentheses like (123.45)
+    is_negative = cleaned.startswith("(") and cleaned.endswith(")")
+    if is_negative:
+        cleaned = cleaned[1:-1]
+    
+    cleaned = cleaned.replace("R", "").replace(" ", "").replace(",", "")
+    try:
+        val = float(cleaned)
+        return -val if is_negative else val
+    except ValueError:
+        return 0.0
+
 def fetch_and_sync_weconnectu_budget():
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
