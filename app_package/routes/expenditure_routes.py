@@ -12,20 +12,39 @@ except ModuleNotFoundError:
 
 expenditure_bp = Blueprint('expenditure', __name__)
 
-ALLOWED_MONTHS = {
-    'mar_2026': 'March 2026',
-    'apr_2026': 'April 2026',
-    'may_2026': 'May 2026',
-    'jun_2026': 'June 2026',
-    'jul_2026': 'July 2026',
-    'aug_2026': 'August 2026',
-    'sep_2026': 'September 2026',
-    'oct_2026': 'October 2026',
-    'nov_2026 : 'November 2026',
-    'dec_2026 : 'December 2026',
-    'jan_2027 : 'January 2027',
-    'feb_2027 : 'February 2027'
-}
+def get_allowed_months():
+    """Dynamically fetches available report months from weconnectu_report_logs."""
+    months_dict = {}
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT report_month 
+            FROM public.weconnectu_report_logs 
+            WHERE report_month IS NOT NULL 
+            ORDER BY report_month DESC;
+        """)
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+
+        for row in rows:
+            # row['report_month'] will be a date object e.g., 2026-10-01
+            dt = row['report_month']
+            key = dt.strftime('%b_%Y').lower() # e.g. 'oct_2026'
+            label = dt.strftime('%B %Y')       # e.g. 'October 2026'
+            months_dict[key] = label
+    except Exception as e:
+        print(f"⚠️ Error fetching allowed months from DB: {e}")
+
+    # Fallback to current/default months if table is empty or unpopulated
+    if not months_dict:
+        months_dict = {
+            'oct_2026': 'October 2026',
+            'sep_2026': 'September 2026',
+            'aug_2026': 'August 2026'
+        }
+    return months_dict
 
 @expenditure_bp.route('/expenditure_expose')
 def expenditure_expose():
