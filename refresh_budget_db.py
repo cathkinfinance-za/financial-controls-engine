@@ -7,88 +7,9 @@ import pandas as pd
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
 import psycopg2
+from weconnectu_report_logs import fetch_and_store_weconnectu_url
 
-def get_latest_weconnectu_url_from_email():
-    """Connects to Gmail via IMAP and extracts the latest Community Report URL."""
-    gmail_user = os.getenv("GMAIL_USER")
-    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
-    
-    if not gmail_user or not gmail_pass:
-        raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD environment variable is missing.")
 
-    print("Connecting to Gmail to fetch the latest WeConnectU report link...")
-    mail = imaplib.IMAP4_SSL("imap.gmail.com")
-    mail.login(gmail_user, gmail_pass)
-    mail.select("inbox")
-
-    # Search for emails with the matching subject
-    status, messages = mail.search(None, '(SUBJECT "Community Report - Cathkin Estate")')
-    if status != "OK" or not messages[0]:
-        mail.logout()
-        raise RuntimeError("No 'Community Report - Cathkin Estate' emails found in Inbox.")
-
-    # Get the most recent email ID
-    latest_email_id = messages[0].split()[-1]
-    _, msg_data = mail.fetch(latest_email_id, "(RFC822)")
-    
-    raw_email = msg_data[0][1]
-    msg = email.message_from_bytes(raw_email)
-    mail.logout()
-
-    # Extract HTML body from the email
-    html_body = ""
-    if msg.is_multipart():
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                html_body = part.get_payload(decode=True).decode(errors="ignore")
-                break
-    else:
-        if msg.get_content_type() == "text/html":
-            html_body = msg.get_payload(decode=True).decode(errors="ignore")
-
-    if not html_body:
-        raise RuntimeError("Could not find HTML content in the latest Community Report email.")
-
-    # Parse the email HTML to find the 'Click here to view the Community Report online' link
-    soup = BeautifulSoup(html_body, "html.parser")
-    
-    # Look specifically for the link containing the Community Report text
-    for a_tag in soup.find_all("a", href=True):
-        link_text = a_tag.get_text(strip=True).lower()
-        if "community report online" in link_text:
-            report_url = a_tag["href"]
-            print(f"✅ [LOG] Extracted WeConnectU Community Report URL: {report_url}")
-            return report_url
-
-    raise RuntimeError("Found the email, but could not locate the 'Community Report online' link.")
-
-def clean_and_convert_number(text_value):
-    """Converts clean accounting string metrics into valid calculation floats."""
-    if not text_value or str(text_value).strip() == "" or str(text_value).strip() == "-":
-        return 0.0
-    cleaned = re.sub(r'[\s\xa0R\(\)]', '', str(text_value))
-    if '(' in str(text_value) and ')' in str(text_value):
-        cleaned = "-" + re.sub(r'[\(\)]', '', cleaned)
-    try:
-        return float(cleaned)
-    except ValueError:
-        return 0.0
-
-def header_to_column(header_text):
-    """Maps header text like 'Jun 2026' to database column names like 'jun_2026'."""
-    text = header_text.strip().lower()
-    match = re.search(r'(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s*(\d{4})', text)
-    if match:
-        return f"{match.group(1)}_{match.group(2)}"
-    if text == 'ytd':
-        return 'ytd'
-    if 'budget ytd' in text:
-        return 'budget_ytd'
-    if text == 'variance':
-        return 'variance'
-    if 'total budget' in text:
-        return 'total_budget'
-    return None
 
 def fetch_and_sync_weconnectu_budget():
     DATABASE_URL = os.getenv("DATABASE_URL")
@@ -97,10 +18,11 @@ def fetch_and_sync_weconnectu_budget():
         return
 
     try:
-        URL = get_latest_weconnectu_url_from_email()
+        # Calls the standalone function which fetches from Gmail AND logs to Neon
+        URL = fetch_and_store_weconnectu_url()
     except Exception as e:
-        print(f"❌ ERROR fetching URL from email: {e}")
-    return
+        print(f"❌ ERROR fetching and logging URL: {e}")
+        return
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
