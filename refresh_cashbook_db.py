@@ -1,5 +1,7 @@
 import os
 import re
+import imaplib
+import email
 import psycopg2
 import pandas as pd
 from datetime import datetime
@@ -25,40 +27,92 @@ def parse_date(date_text):
     except ValueError:
         return None
 
-def fetch_and_sync_cashbook_allocations():
-    URL = os.getenv("WECONNECTU_URL")
-    DATABASE_URL = os.getenv("DATABASE_URL")
+def get_latest_weconnectu_url_from_email():
+    """Connects to Gmail via IMAP and extracts the latest Community Report URL."""
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    
+    if not gmail_user or not gmail_pass:
+        raise ValueError("GMAIL_USER or GMAIL_APP_PASSWORD environment variable is missing.")
 
-    if not URL or not DATABASE_URL:
-        print("❌ ERROR: WECONNECTU_URL or DATABASE_URL environment variable is missing.")
+    print("Connecting to Gmail to fetch the latest WeConnectU report link...")
+    mail = imaplib.IMAP4_SSL("imap.gmail.com")
+    mail.login(gmail_user, gmail_pass)
+    mail.select("inbox")
+
+    # Search for emails with the matching subject
+    status, messages = mail.search(None, '(SUBJECT "Community Report - Cathkin Estate")')
+    if status != "OK" or not messages[0]:
+        mail.logout()
+        raise RuntimeError("No 'Community Report - Cathkin Estate' emails found in Inbox.")
+
+    # Get the most recent email ID
+    latest_email_id = messages[0].split()[-1]
+    _, msg_data = mail.fetch(latest_email_id, "(RFC822)")
+    
+    raw_email = msg_data[0][1]
+    msg = email.message_from_bytes(raw_email)
+    mail.logout()
+
+    # Extract HTML body from the email
+    html_body = ""
+    if msg.is_multipart():
+        for part in msg.walk():
+            if part.get_content_type() == "text/html":
+                html_body = part.get_payload(decode=True).decode(errors="ignore")
+                break
+    else:
+        if msg.get_content_type() == "text/html":
+            html_body = msg.get_payload(decode=True).decode(errors="ignore")
+
+    if not html_body:
+        raise RuntimeError("Could not find HTML content in the latest Community Report email.")
+
+    # Parse the email HTML to find the 'Click here to view the Community Report online' link
+    soup = BeautifulSoup(html_body, "html.parser")
+    for a_tag in soup.find_all("a", href=True):
+        link_text = a_tag.get_text(strip=True).lower()
+        if "community report online" in link_text:
+            report_url = a_tag["href"]
+            print(f"✅ [LOG] Extracted WeConnectU Community Report URL: {report_url}")
+            return report_url
+
+    raise RuntimeError("Found the email, but could not locate the 'Community Report online' link.")
+
+def fetch_and_sync_cashbook_allocations():
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        print("❌ ERROR: DATABASE_URL environment variable is missing.")
+        return
+
+    try:
+        URL = get_latest_weconnectu_url_from_email()
+    except Exception as e:
+        print(f"❌ ERROR fetching URL from email: {e}")
         return
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        
         print("Connecting to WeconnectU report server...")
         page.goto(URL, timeout=90000, wait_until="networkidle")
-        
         print("Waiting for #payment-cashbook container...")
         page.wait_for_selector("#payment-cashbook", timeout=30000)
-
         # Scroll into view so all pay-info divs render
         page.eval_on_selector("#payment-cashbook", "el => el.scrollIntoView()")
         page.wait_for_timeout(3000)
-
         html_content = page.content()
         browser.close()
 
     soup = BeautifulSoup(html_content, 'html.parser')
-    
     cashbook_container = soup.find(id="payment-cashbook")
     if not cashbook_container:
         print("❌ Error: #payment-cashbook element not found in DOM.")
         return
-
+        
     # Target parent section to ensure we catch box-info wrapper
     parent_section = cashbook_container.parent if cashbook_container.parent else cashbook_container
+    # ... rest of your cashbook synchronization logic ...
 
     allocations_data = []
     gl_pattern = re.compile(r'(\d{3,4}/\d{3})')
