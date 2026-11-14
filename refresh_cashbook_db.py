@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 from bs4 import BeautifulSoup
 from playwright.sync_api import sync_playwright
-from weconnectu_report_logs import fetch_and_store_weconnectu_url
+from weconnectu_report_logs import get_latest_weconnectu_url
 
 def clean_amount(text_value):
     """Converts accounting formatted text into floats."""
@@ -37,7 +37,7 @@ def fetch_and_sync_cashbook_allocations():
 
     try:
         # Calls the standalone function which fetches from Gmail AND logs to Neon
-        URL = fetch_and_store_weconnectu_url()
+        URL = get_latest_weconnectu_url(DATABASE_URL)
     except Exception as e:
         print(f"❌ ERROR fetching and logging URL: {e}")
         return
