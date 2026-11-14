@@ -48,9 +48,12 @@ def get_allowed_months():
 
 @expenditure_bp.route('/expenditure_expose')
 def expenditure_expose():
-    selected_month = request.args.get('month', 'sep_2026')
+    ALLOWED_MONTHS = get_allowed_months()
+    default_month = list(ALLOWED_MONTHS.keys())[0] if ALLOWED_MONTHS else 'oct_2026'
+    
+    selected_month = request.args.get('month', default_month)
     if selected_month not in ALLOWED_MONTHS:
-        selected_month = 'sep_2026'
+        selected_month = default_month
 
     all_items = []
     grouped_audit = {}
