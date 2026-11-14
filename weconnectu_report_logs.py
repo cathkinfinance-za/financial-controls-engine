@@ -85,3 +85,12 @@ def fetch_and_store_weconnectu_url(report_type="Community Report - Cathkin Estat
         print(f"⚠️ Warning: Failed to record URL to database: {e}")
 
     return report_url
+
+
+if __name__ == "__main__":
+    print("Running standalone WeConnectU URL fetcher...")
+    try:
+        url = fetch_and_store_weconnectu_url()
+        print(f"Successfully fetched and logged URL: {url}")
+    except Exception as e:
+        print(f"Error: {e}")
