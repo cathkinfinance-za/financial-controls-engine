@@ -50,6 +50,8 @@ def get_allowed_months():
 def expenditure_expose():
     ALLOWED_MONTHS = get_allowed_months()
     default_month = list(ALLOWED_MONTHS.keys())[0] if ALLOWED_MONTHS else 'oct_2026'
+
+    
     
     selected_month = request.args.get('month', default_month)
     if selected_month not in ALLOWED_MONTHS:
@@ -73,15 +75,11 @@ def expenditure_expose():
         if cache_row:
             cached_analysis = cache_row['analysis_text']
 
+        # Dynamically query actuals for the selected month column (e.g., oct_2026, sep_2026)
         query = f"""
-            SELECT gl_code, description, 
-                   COALESCE({selected_month}, 0) AS selected_month_actual,
-                   COALESCE(ytd, 0) AS ytd, 
-                   COALESCE(budget_ytd, 0) AS budget_ytd, 
-                   COALESCE(variance, 0) AS variance, 
-                   COALESCE(total_budget, 0) AS total_budget
-            FROM public.master_budget
-            WHERE gl_code NOT LIKE '%%/000'
+            SELECT gl_code, description, COALESCE({selected_month}, 0) AS selected_month_actual, COALESCE(ytd, 0) AS ytd, COALESCE(budget_ytd, 0) AS budget_ytd, COALESCE(variance, 0) AS variance, COALESCE(total_budget, 0) AS total_budget 
+            FROM public.master_budget 
+            WHERE gl_code NOT LIKE '%%/000' 
             ORDER BY gl_code ASC;
         """
         cur.execute(query)
@@ -219,8 +217,29 @@ def expenditure_expose():
                 conn_ai.close()
     else:
         ai_analysis = "AI analysis is currently disabled or unavailable."
+
+    # Fetch the specific report URL for this month from Neon
+    report_url = "https://app.weconnectu.co.za"
+    try:
+        month_dt = datetime.strptime(selected_month, '%b_%Y').replace(day=1).date()
+    except ValueError:
+        month_dt = None
+
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # 1. Fetch dynamic report link
+        if month_dt:
+            cur.execute("SELECT report_url FROM public.weconnectu_report_logs WHERE report_month = %s;", (month_dt,))
+        else:
+            cur.execute("SELECT report_url FROM public.weconnectu_report_logs ORDER BY report_month DESC LIMIT 1;")
+        url_row = cur.fetchone()
+        if url_row and url_row['report_url']:
+            report_url = url_row['report_url']
     
     return render_template(
+        report_url=report_url,
         'expenditure_expose.html',
         income_items=income_items, expenditure_items=expenditure_items,
         over_budget_expenditure=over_budget_expenditure, under_budget_income=under_budget_income,
