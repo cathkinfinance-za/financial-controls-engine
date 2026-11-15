@@ -138,14 +138,11 @@ def expenditure_expose():
     except Exception as e:
         flash(f"Database error: {str(e)}", "danger")
 
-    income_items = [
-        item for item in all_items 
-        if str(item['gl_code']).startswith('1') or str(item['gl_code']).startswith('RFI')
-    ]
-    expenditure_items = [
-        item for item in all_items 
-        if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE')
-    ]
+    income_items = [item for item in all_items if str(item['gl_code']).startswith('1') or str(item['gl_code']).startswith('RFI')]
+    expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE')]
+
+    total_selected_month_income = sum(float(item['selected_month_actual']) for item in income_items)
+    total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
 
     over_budget_expenditure = []
     for item in expenditure_items:
@@ -191,13 +188,19 @@ def expenditure_expose():
             if not prompt_row or not prompt_row.get('prompt_template'):
                 ai_analysis = "AI analysis is currently disabled or template is missing."
             else:
-                income_summary = "\n".join([f"- GL {i['gl_code']} ({i['description']}): YTD Actual R{float(i['ytd']):,.2f} vs Budget R{float(i['budget_ytd']):,.2f}" for i in income_items])
-                expenditure_summary = "\n".join([f"- GL {e['gl_code']} ({e['description']}): YTD Actual R{float(e['ytd']):,.2f} vs Budget R{float(e['budget_ytd']):,.2f}" for e in expenditure_items])
-
+                income_summary = "\n".join([f"- GL {i['gl_code']} ({i['description']}): Selected Month Actual R{float(i['selected_month_actual']):,.2f}" for i in income_items])
+                expenditure_summary = "\n".join([f"- GL {e['gl_code']} ({e['description']}): Selected Month Actual R{float(e['selected_month_actual']):,.2f}" for e in expenditure_items])
+                
                 formatted_prompt = prompt_row['prompt_template'].format(
-                    month_label=month_label, total_ytd_income=total_ytd_income, total_ytd_income_budget=total_ytd_income_budget,
-                    income_summary=income_summary, total_ytd_expenditure=total_ytd_expenditure, total_ytd_expenditure_budget=total_ytd_expenditure_budget,
-                    total_expenditure_overrun=total_expenditure_overrun, expenditure_summary=expenditure_summary
+                    month_label=month_label,
+                    total_selected_month_income=total_selected_month_income,
+                    total_selected_month_spend=total_selected_month_spend,
+                    income_summary=income_summary,
+                    expenditure_summary=expenditure_summary,
+                    total_ytd_income=total_ytd_income,
+                    total_ytd_expenditure=total_ytd_expenditure,
+                    total_expenditure_overrun=total_expenditure_overrun,
+                    total_expenditure_variance=total_expenditure_variance
                 )
 
                 model_name = prompt_row.get('selected_model') or 'gemini-3.6-flash'
