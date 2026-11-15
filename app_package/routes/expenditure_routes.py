@@ -228,8 +228,6 @@ def expenditure_expose():
     try:
         conn = get_db_connection()
         cur = conn.cursor()
-        
-        # 1. Fetch dynamic report link
         if month_dt:
             cur.execute("SELECT report_url FROM public.weconnectu_report_logs WHERE report_month = %s;", (month_dt,))
         else:
@@ -237,18 +235,31 @@ def expenditure_expose():
         url_row = cur.fetchone()
         if url_row and url_row['report_url']:
             report_url = url_row['report_url']
-    
+        cur.close()
+        conn.close()
+    except Exception as e:
+        print(f"⚠️ Error fetching report URL: {e}")
+
     return render_template(
-        report_url=report_url,
         'expenditure_expose.html',
-        income_items=income_items, expenditure_items=expenditure_items,
-        over_budget_expenditure=over_budget_expenditure, under_budget_income=under_budget_income,
-        total_ytd_income=total_ytd_income, total_ytd_income_budget=total_ytd_income_budget,
-        total_ytd_expenditure=total_ytd_expenditure, total_ytd_expenditure_budget=total_ytd_expenditure_budget,
-        total_selected_month_spend=total_selected_month_spend, total_expenditure_overrun=total_expenditure_overrun,
-        total_expenditure_variance=total_expenditure_variance, selected_month=selected_month,
-        allowed_months=ALLOWED_MONTHS, ai_analysis=ai_analysis, is_cached=bool(cached_analysis),
-        grouped_audit=grouped_audit, category_totals=category_totals
+        income_items=income_items,
+        expenditure_items=expenditure_items,
+        over_budget_expenditure=over_budget_expenditure,
+        under_budget_income=under_budget_income,
+        total_ytd_income=total_ytd_income,
+        total_ytd_income_budget=total_ytd_income_budget,
+        total_ytd_expenditure=total_ytd_expenditure,
+        total_ytd_expenditure_budget=total_ytd_expenditure_budget,
+        total_selected_month_spend=total_selected_month_spend,
+        total_expenditure_overrun=total_expenditure_overrun,
+        total_expenditure_variance=total_expenditure_variance,
+        selected_month=selected_month,
+        allowed_months=ALLOWED_MONTHS,
+        report_url=report_url,
+        ai_analysis=ai_analysis,
+        is_cached=bool(cached_analysis),
+        grouped_audit=grouped_audit,
+        category_totals=category_totals
     )
 
 
