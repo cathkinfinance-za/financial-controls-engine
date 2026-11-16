@@ -141,11 +141,15 @@ def expenditure_expose():
     income_items = [item for item in all_items if str(item['gl_code']).startswith('1') or str(item['gl_code']).startswith('RFI')]
     expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE')]
 
-    # Calculate selected month totals for the performance summary cards
+    # --- UPDATE THESE TO USE SELECTED MONTH ACTUALS INSTEAD OF YTD ---
     total_selected_month_income = sum(float(item['selected_month_actual']) for item in income_items)
     total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
     
-    # Keep YTD totals available if needed for comparison cards
+    # Calculate monthly variances against the monthly budget proportion or total budget if needed
+    total_selected_month_income_budget = sum(float(item['budget_ytd']) for item in income_items) # (or your monthly budget column if available)
+    total_selected_month_expenditure_budget = sum(float(item['budget_ytd']) for item in expenditure_items)
+    
+    # Keep YTD totals available for side-by-side or background reference
     total_ytd_income = sum(float(item['ytd']) for item in income_items)
     total_ytd_income_budget = sum(float(item['budget_ytd']) for item in income_items)
     total_ytd_expenditure = sum(float(item['ytd']) for item in expenditure_items)
