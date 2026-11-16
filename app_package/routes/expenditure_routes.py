@@ -257,7 +257,8 @@ def expenditure_expose():
         total_ytd_income_budget=total_ytd_income_budget,
         total_ytd_expenditure=total_ytd_expenditure,
         total_ytd_expenditure_budget=total_ytd_expenditure_budget,
-        total_selected_month_spend=total_selected_month_spend,
+        total_selected_month_income=total_selected_month_income,  # <-- Add this line here
+        total_selected_month_spend=total_selected_month_spend,    
         total_expenditure_overrun=total_expenditure_overrun,
         total_expenditure_variance=total_expenditure_variance,
         selected_month=selected_month,
@@ -268,7 +269,6 @@ def expenditure_expose():
         grouped_audit=grouped_audit,
         category_totals=category_totals
     )
-
 
 @expenditure_bp.route('/expenditure_expose/refresh/<month>')
 def refresh_expenditure_ai(month):
