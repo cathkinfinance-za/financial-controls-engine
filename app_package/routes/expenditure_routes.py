@@ -141,9 +141,16 @@ def expenditure_expose():
     income_items = [item for item in all_items if str(item['gl_code']).startswith('1') or str(item['gl_code']).startswith('RFI')]
     expenditure_items = [item for item in all_items if str(item['gl_code']).startswith('2') or str(item['gl_code']).startswith('RFE')]
 
+    # Calculate selected month totals for the performance summary cards
     total_selected_month_income = sum(float(item['selected_month_actual']) for item in income_items)
     total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
     
+    # Keep YTD totals available if needed for comparison cards
+    total_ytd_income = sum(float(item['ytd']) for item in income_items)
+    total_ytd_income_budget = sum(float(item['budget_ytd']) for item in income_items)
+    total_ytd_expenditure = sum(float(item['ytd']) for item in expenditure_items)
+    total_ytd_expenditure_budget = sum(float(item['budget_ytd']) for item in expenditure_items)
+
     over_budget_expenditure = []
     for item in expenditure_items:
         ytd = float(item['ytd'])
@@ -166,14 +173,10 @@ def expenditure_expose():
             under_budget_income.append(item_dict)
     under_budget_income.sort(key=lambda x: x['variance'], reverse=True)
 
-    total_ytd_income = sum(float(item['ytd']) for item in income_items)
-    total_ytd_income_budget = sum(float(item['budget_ytd']) for item in income_items)
-    total_ytd_expenditure = sum(float(item['ytd']) for item in expenditure_items)
-    total_ytd_expenditure_budget = sum(float(item['budget_ytd']) for item in expenditure_items)
-    total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
     total_expenditure_overrun = sum(float(item['variance']) for item in over_budget_expenditure)
     total_expenditure_variance = total_ytd_expenditure - total_ytd_expenditure_budget
-    month_label = ALLOWED_MONTHS[selected_month]
+
+    
 
     if cached_analysis:
         ai_analysis = cached_analysis
