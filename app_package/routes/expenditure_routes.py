@@ -143,7 +143,7 @@ def expenditure_expose():
 
     total_selected_month_income = sum(float(item['selected_month_actual']) for item in income_items)
     total_selected_month_spend = sum(float(item['selected_month_actual']) for item in expenditure_items)
-
+    
     over_budget_expenditure = []
     for item in expenditure_items:
         ytd = float(item['ytd'])
